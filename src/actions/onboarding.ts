@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import {
   onboardingEmpresaSchema,
   onboardingProyectoSchema,
-} from '@/lib/validations/auth';
+} from '@/lib/validations/schemas';
 import type { ActionResult } from '@/types';
 
 /**

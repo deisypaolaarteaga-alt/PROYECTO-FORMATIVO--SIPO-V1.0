@@ -110,6 +110,59 @@ export const clienteSchema = z.object({
   notas: z.string().max(500).optional(),
 });
 
+// ============ Auth schemas ============
+
+export const loginSchema = z.object({
+  email: z.string().email('Email inválido'),
+  password: z.string().min(1, 'Contraseña requerida'),
+});
+
+export const registroSchema = z.object({
+  nombre_completo: z.string().min(2, 'Nombre requerido').max(100),
+  email: z.string().email('Email inválido'),
+  password: z.string()
+    .min(8, 'Mínimo 8 caracteres')
+    .regex(/[A-Z]/, 'Debe tener al menos una mayúscula')
+    .regex(/[0-9]/, 'Debe tener al menos un número')
+    .regex(/[!@#$%^&*()_+\-=\[\]{}]/, 
+      'Debe tener al menos un carácter especial'),
+  confirmar_password: z.string(),
+}).refine(
+  (data) => data.password === data.confirmar_password,
+  { message: 'Las contraseñas no coinciden', path: ['confirmar_password'] }
+);
+
+export const recuperarContrasenaSchema = z.object({
+  email: z.string().email('Email inválido'),
+});
+
+export const nuevaContrasenaSchema = z.object({
+  password: z.string()
+    .min(8, 'Mínimo 8 caracteres')
+    .regex(/[A-Z]/, 'Debe tener al menos una mayúscula')
+    .regex(/[0-9]/, 'Debe tener al menos un número')
+    .regex(/[!@#$%^&*()_+\-=\[\]{}]/, 
+      'Debe tener al menos un carácter especial'),
+  confirmar_password: z.string(),
+}).refine(
+  (data) => data.password === data.confirmar_password,
+  { message: 'Las contraseñas no coinciden', path: ['confirmar_password'] }
+);
+
+export const onboardingEmpresaSchema = z.object({
+  empresa: z.string().min(1, 'El nombre de la empresa es obligatorio').max(200),
+  ciudad: z.string().min(1, 'Selecciona una ciudad'),
+  nit: z.string().optional(),
+  telefono: z.string().optional(),
+});
+
+export const onboardingProyectoSchema = z.object({
+  nombre: z.string().min(1, 'El nombre de la obra es obligatorio').max(200),
+  cliente_nombre: z.string().optional(),
+  ubicacion: z.string().min(1, 'Selecciona la ciudad de la obra'),
+  descripcion: z.string().max(500).optional(),
+});
+
 // Types
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
@@ -120,6 +173,12 @@ export type CreateActivityInput = z.infer<typeof createActivitySchema>;
 export type CreateApuItemInput = z.infer<typeof createApuItemSchema>;
 export type CreateUserMaterialInput = z.infer<typeof createUserMaterialSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+export type RegistroInput = z.infer<typeof registroSchema>;
+export type LoginInput = z.infer<typeof loginSchema>;
+export type RecuperarContrasenaInput = z.infer<typeof recuperarContrasenaSchema>;
+export type NuevaContrasenaInput = z.infer<typeof nuevaContrasenaSchema>;
+export type OnboardingEmpresaInput = z.infer<typeof onboardingEmpresaSchema>;
+export type OnboardingProyectoInput = z.infer<typeof onboardingProyectoSchema>;
 
 // ============ Backwards compatibility aliases ============
 export const presupuestoSchema = updateBudgetSchema;

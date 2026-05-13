@@ -10,7 +10,6 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatCurrency } from '@/lib/utils/format';
-import { formatDate } from '@/lib/utils/date'; // Asumiendo que existe o usaré localeString
 
 export default async function ClienteDetailPage({ params }: { params: { id: string } }) {
   const { id } = await params;
@@ -36,7 +35,7 @@ export default async function ClienteDetailPage({ params }: { params: { id: stri
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <Link href="/clientes">
-            <Button variant="ghost" size="icon" className="rounded-full">
+            <Button variant="ghost" size="sm" className="rounded-full">
               <ChevronLeft className="h-5 w-5" />
             </Button>
           </Link>
@@ -184,7 +183,7 @@ export default async function ClienteDetailPage({ params }: { params: { id: stri
                             <span className="text-xs text-mortar flex items-center">
                               <Calendar className="h-3 w-3 mr-1" /> {new Date(proyecto.created_at).toLocaleDateString()}
                             </span>
-                            <Badge variant="outline" className="text-[10px] uppercase py-0 px-2">
+                            <Badge className="text-[10px] uppercase py-0 px-2">
                               {proyecto.tipo_obra || 'Otro'}
                             </Badge>
                           </div>
@@ -198,7 +197,7 @@ export default async function ClienteDetailPage({ params }: { params: { id: stri
                           <p className="text-[10px] text-mortar">{proyecto.budgets?.length || 0} presupuestos</p>
                         </div>
                         <Link href={`/proyectos/${proyecto.id}`}>
-                          <Button size="icon" variant="ghost" className="rounded-full hover:bg-[var(--accent-primary)]/10 hover:text-[var(--accent-primary)]">
+                          <Button size="sm" variant="ghost" className="rounded-full hover:bg-[var(--accent-primary)]/10 hover:text-[var(--accent-primary)]">
                             <ArrowRight className="h-5 w-5" />
                           </Button>
                         </Link>

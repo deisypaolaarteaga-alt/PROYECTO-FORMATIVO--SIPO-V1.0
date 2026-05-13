@@ -10,32 +10,33 @@ import { ErrorMessage } from '@/components/shared/ErrorMessage';
 import { signUp, signInWithGoogle } from '@/actions/auth';
 import { CIUDADES_COLOMBIA } from '@/types';
 
-/** Calcula la fuerza de la contraseña (0–4) */
-function getPasswordStrength(pwd: string): number {
-  let score = 0;
-  if (pwd.length >= 8) score++;
-  if (/[a-z]/.test(pwd) && /[A-Z]/.test(pwd)) score++;
-  if (/\d/.test(pwd)) score++;
-  if (/[^a-zA-Z0-9]/.test(pwd)) score++;
-  return score;
+function IndicadorPassword({ password }: { password: string }) {
+  const criterios = [
+    { label: 'Mínimo 8 caracteres', ok: password.length >= 8 },
+    { label: 'Una mayúscula', ok: /[A-Z]/.test(password) },
+    { label: 'Un número', ok: /[0-9]/.test(password) },
+    { label: 'Un carácter especial', ok: /[!@#$%^&*()_+\-=\[\]{}]/.test(password) },
+  ];
+  
+  if (!password) return null;
+  
+  return (
+    <ul className="mt-2 space-y-1">
+      {criterios.map(c => (
+        <li key={c.label} className={`text-xs flex items-center gap-1 
+          ${c.ok ? 'text-green-600' : 'text-red-500'}`}>
+          {c.ok ? '✅' : '❌'} {c.label}
+        </li>
+      ))}
+    </ul>
+  );
 }
-
-const strengthLabels = ['Muy débil', 'Débil', 'Regular', 'Fuerte', 'Muy fuerte'];
-const strengthColors = [
-  'bg-danger-500',
-  'bg-danger-400',
-  'bg-warning-500',
-  'bg-success-500',
-  'bg-success-600',
-];
 
 export default function RegistroPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [password, setPassword] = useState('');
-
-  const strength = useMemo(() => getPasswordStrength(password), [password]);
 
   async function handleSubmit(formData: FormData) {
     setLoading(true);
@@ -125,26 +126,11 @@ export default function RegistroPage() {
               required
               onChange={(e) => setPassword(e.target.value)}
             />
-            {/* Indicador de seguridad */}
-            {password.length > 0 && (
-              <div className="mt-2 space-y-1">
-                <div className="flex gap-1">
-                  {[0, 1, 2, 3].map((i) => (
-                    <div
-                      key={i}
-                      className={`h-1 flex-1 rounded-full transition-all duration-200 ${
-                        i < strength ? strengthColors[strength] : 'bg-concrete'
-                      }`}
-                    />
-                  ))}
-                </div>
-                <p className="text-[11px] text-stone">{strengthLabels[strength]}</p>
-              </div>
-            )}
+            <IndicadorPassword password={password} />
           </div>
 
           <Input
-            name="confirmPassword"
+            name="confirmar_password"
             type="password"
             label="Confirmar contraseña"
             placeholder="Repite tu contraseña"

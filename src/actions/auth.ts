@@ -7,7 +7,7 @@ import {
   registroSchema,
   recuperarContrasenaSchema,
   nuevaContrasenaSchema,
-} from '@/lib/validations/auth';
+} from '@/lib/validations/schemas';
 import type { ActionResult } from '@/types';
 
 /**
@@ -31,16 +31,16 @@ export async function signIn(formData: FormData): Promise<ActionResult> {
   });
 
   if (error) {
-    // Mensajes de error en español
-    const messages: Record<string, string> = {
-      'Invalid login credentials': 'Credenciales incorrectas. Verifica tu correo y contraseña.',
-      'Email not confirmed': 'Tu correo no ha sido confirmado. Revisa tu bandeja de entrada.',
-      'Too many requests': 'Demasiados intentos. Espera unos minutos antes de intentar de nuevo.',
-    };
-    return {
-      success: false,
-      error: messages[error.message] || 'Error al iniciar sesión. Intenta de nuevo.',
-    };
+    if (error.message.includes('Email not confirmed')) {
+      return { success: false, error: 'Debes confirmar tu email primero. Revisa tu bandeja de entrada (incluyendo spam).' };
+    }
+    if (error.message.includes('Invalid login credentials')) {
+      return { success: false, error: 'Email o contraseña incorrectos.' };
+    }
+    if (error.message.includes('Too many requests')) {
+      return { success: false, error: 'Demasiados intentos. Espera unos minutos.' };
+    }
+    return { success: false, error: 'Error al iniciar sesión. Intenta de nuevo.' };
   }
 
   redirect('/dashboard');
@@ -54,7 +54,7 @@ export async function signUp(formData: FormData): Promise<ActionResult> {
     nombre_completo: formData.get('nombre_completo') as string,
     email: formData.get('email') as string,
     password: formData.get('password') as string,
-    confirmPassword: formData.get('confirmPassword') as string,
+    confirmar_password: formData.get('confirmar_password') as string,
     empresa: (formData.get('empresa') as string) || undefined,
     ciudad: (formData.get('ciudad') as string) || undefined,
   };
@@ -69,31 +69,25 @@ export async function signUp(formData: FormData): Promise<ActionResult> {
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
-      data: {
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+      data: { 
         nombre_completo: parsed.data.nombre_completo,
-        empresa: parsed.data.empresa || null,
-        ciudad: parsed.data.ciudad || null,
-      },
-    },
+      }
+    }
   });
 
+  if (error?.message?.includes('already registered')) {
+    return { success: false, error: 'Este email ya tiene una cuenta registrada.' };
+  }
   if (error) {
-    const messages: Record<string, string> = {
-      'User already registered': 'Ya existe una cuenta con este correo electrónico.',
-      'Password should be at least 6 characters':
-        'La contraseña debe tener al menos 6 caracteres.',
-    };
-    return {
-      success: false,
-      error: messages[error.message] || 'Error al crear la cuenta. Intenta de nuevo.',
-    };
+    return { success: false, error: 'Error al crear la cuenta. Intenta de nuevo.' };
   }
 
-  // Si el usuario necesita confirmar correo
   if (data.user && !data.session) {
-    return {
-      success: true,
+    return { 
+      success: true, 
       data: { needsConfirmation: true },
+      message: 'Revisa tu correo para confirmar tu cuenta.' 
     };
   }
 
@@ -168,7 +162,7 @@ export async function resetPassword(formData: FormData): Promise<ActionResult> {
 export async function updatePassword(formData: FormData): Promise<ActionResult> {
   const raw = {
     password: formData.get('password') as string,
-    confirmPassword: formData.get('confirmPassword') as string,
+    confirmar_password: formData.get('confirmar_password') as string,
   };
 
   const parsed = nuevaContrasenaSchema.safeParse(raw);

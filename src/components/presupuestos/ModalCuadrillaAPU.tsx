@@ -13,7 +13,7 @@ interface ModalCuadrillaAPUProps {
   onClose: () => void;
   cuadrillas: CuadrillaConTrabajadores[];
   actividadUnidad: string;
-  onAplicar: (item: { nombre: string; tipo: 'mano_obra'; unidad: string; cantidad: number; precio_unitario: number }) => void;
+  onAplicar: (item: { nombre: string; tipo: 'mano_obra'; unidad: string; cantidad: number; precio_unitario: number; cuadrilla_id?: string; precio_editado_manual?: boolean }) => void;
 }
 
 export function ModalCuadrillaAPU({

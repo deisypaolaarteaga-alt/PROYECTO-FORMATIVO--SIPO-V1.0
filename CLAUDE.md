@@ -67,7 +67,7 @@ NEXT_PUBLIC_APP_URL
 - Triggers: `DROP TRIGGER IF EXISTS name ON table; CREATE TRIGGER ...`
 - Functions: `CREATE OR REPLACE FUNCTION`
 
-### Applied migrations (18 total, in order)
+### Applied migrations (29 total, in order)
 
 | File | Content | Status |
 |------|---------|--------|
@@ -96,6 +96,8 @@ NEXT_PUBLIC_APP_URL
 | `20260512140000_add_hotelero_tipo_obra.sql` | **Schema**: Agrega 'hotelero' a `tipo_obra` en `projects` y `catalogo_capitulos` | ✅ applied |
 | `20260512150000_strip_chapter_number_prefix.sql` | **Cleanup**: Remueve prefijos numéricos (ej: "1. ") de nombres de capítulos en catálogo | ✅ applied |
 | `20260512200000_apu_items_cuadrilla.sql` | **Schema**: Agrega `cuadrilla_id` opcional a `apu_items` para trazabilidad | ✅ applied |
+| `20260512210000_fix_catalogo_apu_precios.sql` | **Bug fix**: Primera pasada de corrección de precios en catálogo | ✅ applied |
+| `20260512210001_fix_catalogo_apu_precios_v2.sql` | **Bug fix**: Segunda pasada de corrección de precios en catálogo | ✅ applied |
 | `20260512210002_fix_catalogo_apu_precios_v3.sql` | **Bug fix**: Corrige precios desactualizados en el catálogo tras la importación masiva | ✅ applied |
 | `20260512300000_clientes.sql` | **Módulo Clientes**: Tabla `clientes` + `cliente_id` en `projects` + RLS | ✅ applied |
 
@@ -229,9 +231,13 @@ Token reference: `src/lib/design-tokens.ts`. User accent color stored in `profil
 - `ResumenFinancieroModal` existe en `src/components/presupuestos/ResumenFinancieroModal.tsx` pero **no tiene botón disparador** en `EditorPresupuesto.tsx` — el editor solo usa `ResumenFinanciero` (inline). Falta agregar un botón "Ver resumen completo" que abra el modal con `budget` y `subtotalDirecto`.
 - **Migración pendiente de ejecutar**: `npm run migrate` debe correr `20260511130000` + `20260511140000` para actualizar el constraint de `projects.estado` en BD.
 
+~~### Pendiente — errores TypeScript (5 archivos, descubiertos 2026-05-13)~~ ✅ 2026-05-13 — todos resueltos, `tsc --noEmit --skipLibCheck` sin errores
+
 ### Pendiente — deuda técnica
+~~- Turbopack FATAL panic en Windows con `@react-pdf/renderer` — OS error 5 "Acceso denegado" al crear junction points~~ ✅ 2026-05-13 — `package.json` cambiado a `next dev --no-turbo`
 ~~- Legacy tables `users`, `usuarios` — verificar que no se usan antes de eliminar~~ ✅ 2026-05-11
 ~~- Imprecisión de punto flotante en `apus.costo_total` GENERATED (ej: `26757.96000000000...`) — columna NUMERIC debería usar escala fija `NUMERIC(15,2)`~~ ✅ 2026-05-11
+~~- `ResumenFinancieroModal.tsx` líneas 416-425 — fragmento huérfano de versión anterior causaba 14 errores TS1005/TS1109 parse errors~~ ✅ 2026-05-13
 
 ### Completado ✅
 - ~~Módulo de Gestión de Clientes~~ — Dashboard completo (`/clientes`) con CRUD de clientes (Persona Natural / Empresa); integración en `ModalNuevoProyecto` y `ProjectSettings` para asignar cliente; actualización de `PresupuestoPDF` para mostrar datos del cliente (NIT, contacto, cargo) y firmas dinámicas ✅ 2026-05-12

@@ -23,6 +23,8 @@ import { BotonExportarPDF } from '@/components/pdf/BotonExportarPDF';
 import { ModalCatalogo } from './ModalCatalogo';
 import { BotonEnviarRevision } from './BotonEnviarRevision';
 import { ExplosionInsumosView } from './ExplosionInsumosView';
+import { ResumenFinancieroModal } from './ResumenFinancieroModal';
+import { BarChart3 } from 'lucide-react';
 
 interface EditorPresupuestoProps {
   budget: any;
@@ -46,6 +48,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
   const [activeApuActivity, setActiveApuActivity] = useState<any | null>(null);
   const [confirmState, setConfirmState] = useState<{ title: string; description?: string; onConfirm: () => void } | null>(null);
   const [catalogoOpen, setCatalogoOpen] = useState(false);
+  const [resumenOpen, setResumenOpen] = useState(false);
   const [bannerCiudadIgnorado, setBannerCiudadIgnorado] = useState(false);
   const router = useRouter();
 
@@ -175,9 +178,19 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
             proyectoId={budget.project_id}
             estado={budget.estado ?? 'borrador'}
           />
-          <div className="text-right">
-            <p className="text-xs text-stone uppercase font-semibold tracking-wider">Total Presupuesto</p>
-            <p className="text-2xl font-bold text-ink">{formatearCOP(totalGeneral)}</p>
+          <div className="flex flex-col items-end">
+            <p className="text-[10px] text-stone uppercase font-bold tracking-widest mb-1">Total Presupuesto</p>
+            <div className="flex items-center gap-3">
+              <p className="text-2xl font-black text-ink">{formatearCOP(totalGeneral)}</p>
+              <button
+                onClick={() => setResumenOpen(true)}
+                className="h-10 px-4 bg-burn-orange/10 text-burn-orange hover:bg-burn-orange hover:text-white rounded-xl transition-all duration-200 flex items-center gap-2 group shadow-sm border border-burn-orange/20"
+                title="Ver Dashboard de Inteligencia"
+              >
+                <BarChart3 className="h-5 w-5 group-hover:scale-110 transition-transform" />
+                <span className="text-xs font-black uppercase tracking-tight">Dashboard</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -462,6 +475,13 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
         }}
         activity={activeApuActivity}
         budgetId={budget.id}
+      />
+
+      <ResumenFinancieroModal
+        isOpen={resumenOpen}
+        onClose={() => setResumenOpen(false)}
+        budget={budget}
+        subtotalDirecto={subtotalDirecto}
       />
 
     </div>

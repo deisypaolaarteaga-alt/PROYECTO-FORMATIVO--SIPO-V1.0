@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Modal } from '@/components/shared/Modal';
+import { Modal, ModalContent, ModalHeader, ModalTitle, ModalDescription } from '@/components/shared/Modal';
 import { Button } from '@/components/shared/Button';
 import { Input } from '@/components/shared/Input';
 import { clienteSchema } from '@/lib/validations/schemas';
@@ -102,13 +102,12 @@ export function ModalCliente({ isOpen, onClose, cliente }: ModalClienteProps) {
   }
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={cliente ? 'Editar Cliente' : 'Nuevo Cliente'}
-      description="Registra la información de tu cliente para asociarlo a tus proyectos."
-      size="lg"
-    >
+    <Modal open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <ModalContent className="max-w-2xl">
+        <ModalHeader>
+          <ModalTitle>{cliente ? 'Editar Cliente' : 'Nuevo Cliente'}</ModalTitle>
+          <ModalDescription>Registra la información de tu cliente para asociarlo a tus proyectos.</ModalDescription>
+        </ModalHeader>
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Tipo de Cliente Selector */}
         <div className="flex p-1 bg-steel-fog rounded-lg w-fit">
@@ -246,6 +245,7 @@ export function ModalCliente({ isOpen, onClose, cliente }: ModalClienteProps) {
           </Button>
         </div>
       </form>
+      </ModalContent>
     </Modal>
   );
 }

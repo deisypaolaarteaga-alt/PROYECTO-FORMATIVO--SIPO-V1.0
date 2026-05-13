@@ -643,8 +643,9 @@ export async function sincronizarPrecioCuadrilla(
     // 3. Calcular costo_dia actual usando Decimal.js
     let costoDia = new Decimal(0);
     for (const ct of cuadrilla.cuadrilla_trabajadores || []) {
-      const jornal = new Decimal(ct.trabajadores?.jornal_base || 0);
-      const factor = new Decimal(ct.trabajadores?.factor_prestacional || 1.64); // Fallback factor
+      const trab = Array.isArray(ct.trabajadores) ? ct.trabajadores[0] : ct.trabajadores;
+      const jornal = new Decimal(trab?.jornal_base || 0);
+      const factor = new Decimal(trab?.factor_prestacional || 1.64);
       const cantidad = new Decimal(ct.cantidad || 1);
       costoDia = costoDia.plus(jornal.mul(factor).mul(cantidad));
     }

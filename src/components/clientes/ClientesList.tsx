@@ -121,11 +121,11 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     {cliente.tipo === 'empresa' ? (
-                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-100 py-0.5 px-2 text-[10px]">
+                      <Badge className="bg-blue-50 text-blue-700 border border-blue-100 py-0.5 px-2 text-[10px]">
                         <Building2 className="h-3 w-3 mr-1" /> Empresa
                       </Badge>
                     ) : (
-                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-100 py-0.5 px-2 text-[10px]">
+                      <Badge className="bg-amber-50 text-amber-700 border border-amber-100 py-0.5 px-2 text-[10px]">
                         <User className="h-3 w-3 mr-1" /> Persona Natural
                       </Badge>
                     )}
@@ -153,7 +153,7 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
                     <DropdownMenuItem onClick={() => handleEditar(cliente)}>
                       <Edit className="h-4 w-4 mr-2" /> Editar
                     </DropdownMenuItem>
-                    <DropdownMenuItem variant="danger" onClick={() => handleDesactivar(cliente.id)}>
+                    <DropdownMenuItem onClick={() => handleDesactivar(cliente.id)} className="text-danger-text focus:bg-danger-text/10">
                       <Trash2 className="h-4 w-4 mr-2" /> Desactivar
                     </DropdownMenuItem>
                   </DropdownMenuContent>

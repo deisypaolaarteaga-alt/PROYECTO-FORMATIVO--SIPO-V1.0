@@ -374,6 +374,7 @@ export interface UserPreferences {
 export interface ActionResult<T = unknown> {
   success: boolean;
   error?: string;
+  message?: string;
   data?: T;
 }
 

@@ -1,0 +1,178 @@
+@import "tailwindcss";
+
+/* ============================================
+   SIPO — Sistema de Diseño Profesional
+   Paleta Construcción Colombia 2025
+   ============================================ */
+
+@theme inline {
+  /* ── Azules Steel ── */
+  --color-steel-dark:   #1C2B3A;
+  --color-steel-mid:    #2E4A63;
+  --color-steel-light:  #8BA3B8;
+  --color-steel-fog:    #E6EFF8;
+
+  /* ── Naranjas Burn ── */
+  --color-burn-orange:  #E8571A;
+  --color-burn-light:   #F07848;
+  --color-burn-pale:    #FFF0E8;
+  --color-burn-deep:    #C44A10;
+
+  /* ── Neutros cálidos ── */
+  --color-sand:         #F4F2EE;
+  --color-concrete:     #E2DDD6;
+  --color-mortar:       #C8C0B5;
+  --color-stone:        #7A7265;
+  --color-charcoal:     #3D3530;
+  --color-ink:          #1C1814;
+
+  /* ── Semánticos ── */
+  --color-success-bg:     #E8F4E8;
+  --color-success-text:   #1A5C2A;
+  --color-success-border: #B8D9B8;
+  --color-warning-bg:     #FFF8E6;
+  --color-warning-text:   #7A5800;
+  --color-warning-border: #F0D080;
+  --color-info-bg:        #E6EFF8;
+  --color-info-text:      #1C4A72;
+  --color-info-border:    #A8C4DC;
+  --color-danger-bg:      #FDE8E8;
+  --color-danger-text:    #991B1B;
+  --color-danger-border:  #F0B8B8;
+  --color-draft-bg:       #F0F0EE;
+  --color-draft-text:     #5A5248;
+  --color-draft-border:   #D0CCC6;
+
+  /* ── Compatibilidad legacy (los componentes que aún usan primary-*) ── */
+  --color-primary-50:  #FFF0E8;
+  --color-primary-100: #FFF0E8;
+  --color-primary-200: #F0D080;
+  --color-primary-300: #F07848;
+  --color-primary-400: #F07848;
+  --color-primary-500: #E8571A;
+  --color-primary-600: #C44A10;
+  --color-primary-700: #A83D0E;
+  --color-primary-800: #1C2B3A;
+  --color-primary-900: #1C1814;
+  --color-primary-950: #1C1814;
+
+  --color-secondary-50:  #FFF8E6;
+  --color-secondary-100: #FFF8E6;
+  --color-secondary-500: #7A5800;
+  --color-secondary-600: #5A4200;
+
+  --color-neutral-0:   #FFFFFF;
+  --color-neutral-50:  #F4F2EE;
+  --color-neutral-100: #E2DDD6;
+  --color-neutral-200: #E2DDD6;
+  --color-neutral-300: #C8C0B5;
+  --color-neutral-400: #7A7265;
+  --color-neutral-500: #7A7265;
+  --color-neutral-600: #3D3530;
+  --color-neutral-700: #3D3530;
+  --color-neutral-800: #1C1814;
+  --color-neutral-900: #1C1814;
+  --color-neutral-950: #1C1814;
+
+  --color-success-50:  #E8F4E8;
+  --color-success-500: #1A5C2A;
+  --color-success-600: #1A5C2A;
+  --color-success-700: #145220;
+  --color-warning-50:  #FFF8E6;
+  --color-warning-500: #7A5800;
+  --color-warning-600: #5A4200;
+  --color-danger-50:   #FDE8E8;
+  --color-danger-500:  #991B1B;
+  --color-danger-600:  #7F1D1D;
+  --color-danger-700:  #7F1D1D;
+  --color-info-50:     #E6EFF8;
+  --color-info-500:    #1C4A72;
+  --color-info-600:    #1C4A72;
+
+  /* ── Fuente ── */
+  --font-sans: var(--font-inter), 'Inter', system-ui, sans-serif;
+
+  /* ── Sombras (mínimas — bordes hacen el trabajo) ── */
+  --shadow-xs: 0 1px 2px 0 rgba(28, 24, 20, 0.04);
+  --shadow-sm: 0 1px 3px 0 rgba(28, 24, 20, 0.06);
+  --shadow-card: none;
+  --shadow-lg: 0 4px 12px -2px rgba(28, 24, 20, 0.08);
+  --shadow-xl: 0 8px 24px -4px rgba(28, 24, 20, 0.1);
+  --shadow-glow: none;
+  --shadow-inner: none;
+
+  /* ── Animaciones ── */
+  --animate-fade-in: fade-in 0.2s ease-out;
+  --animate-slide-up: slide-up 0.2s ease-out;
+  --animate-slide-down: slide-down 0.2s ease-out;
+  --animate-slide-left: slide-left 0.2s ease-out;
+  --animate-slide-right: slide-right 0.2s ease-out;
+  --animate-scale-in: scale-in 0.15s ease-out;
+  --animate-spin-slow: spin 3s linear infinite;
+  --animate-pulse-soft: pulse-soft 2s ease-in-out infinite;
+  --animate-shimmer: shimmer 2s infinite linear;
+}
+
+/* ----------- Keyframes ----------- */
+@keyframes fade-in   { from { opacity: 0 } to { opacity: 1 } }
+@keyframes slide-up  { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: translateY(0) } }
+@keyframes slide-down { from { opacity: 0; transform: translateY(-8px) } to { opacity: 1; transform: translateY(0) } }
+@keyframes slide-left { from { opacity: 0; transform: translateX(8px) } to { opacity: 1; transform: translateX(0) } }
+@keyframes slide-right { from { opacity: 0; transform: translateX(-8px) } to { opacity: 1; transform: translateX(0) } }
+@keyframes scale-in  { from { opacity: 0; transform: scale(0.97) } to { opacity: 1; transform: scale(1) } }
+@keyframes pulse-soft { 0%, 100% { opacity: 1 } 50% { opacity: 0.7 } }
+@keyframes shimmer   { 0% { background-position: -200% 0 } 100% { background-position: 200% 0 } }
+
+/* ----------- Base ----------- */
+:root {
+  --background: #F4F2EE;
+  --foreground: #1C1814;
+  --sidebar-width: 240px;
+  --sidebar-collapsed-width: 64px;
+  --header-height: 60px;
+  /* Accent theming — overridden by ThemeProvider */
+  --accent-primary: #E8571A;
+  --accent-hover: #F07848;
+  --accent-pale: #FFF0E8;
+}
+
+* { box-sizing: border-box }
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* ----------- Scrollbar ----------- */
+::-webkit-scrollbar { width: 5px; height: 5px }
+::-webkit-scrollbar-track { background: transparent }
+::-webkit-scrollbar-thumb { background: #C8C0B5; border-radius: 9999px }
+::-webkit-scrollbar-thumb:hover { background: #7A7265 }
+
+/* ----------- Focus ----------- */
+*:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ----------- Selection ----------- */
+::selection {
+  background-color: #FFF0E8;
+  color: #1C1814;
+}
+
+/* ----------- Utility classes ----------- */
+.accent-bg   { background-color: var(--accent-primary) }
+.accent-text { color: var(--accent-primary) }
+.accent-border { border-color: var(--accent-primary) }

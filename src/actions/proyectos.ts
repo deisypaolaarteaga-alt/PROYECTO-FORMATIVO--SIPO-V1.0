@@ -19,9 +19,12 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     const rateLimit = checkRateLimit(user.id);
     if (!rateLimit.success) return { success: false, error: `Demasiadas solicitudes. Intenta en ${rateLimit.retryAfter}s.` };
 
-    // Validación Zod
+    // Validación Zod — convierte strings vacíos a undefined (FormData siempre envía "")
     const raw = Object.fromEntries(formData.entries());
-    const validated = proyectoSchema.parse(raw);
+    const sanitized = Object.fromEntries(
+      Object.entries(raw).map(([k, v]) => [k, v === '' ? undefined : v])
+    );
+    const validated = proyectoSchema.parse(sanitized);
 
     const { data, error } = await supabase
       .from('projects')
@@ -39,7 +42,7 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     revalidatePath('/dashboard');
     return { success: true, data };
   } catch (error: any) {
-    if (error.name === 'ZodError') return { success: false, error: error.errors[0].message };
+    if (error.name === 'ZodError') return { success: false, error: error.issues?.[0]?.message ?? 'Datos inválidos.' };
     return { success: false, error: 'No se pudo crear el proyecto.' };
   }
 }
@@ -54,7 +57,7 @@ export async function getProjects() {
 
   const { data } = await supabase
     .from('projects')
-    .select('*, budgets(count)')
+    .select('*, budgets(count), clientes(nombre_razon_social)')
     .eq('user_id', user.id)
     .is('deleted_at', null)
     .order('updated_at', { ascending: false });
@@ -94,7 +97,10 @@ export async function updateProject(id: string, formData: FormData): Promise<Act
     if (!rateLimit.success) return { success: false, error: 'Demasiadas solicitudes.' };
 
     const raw = Object.fromEntries(formData.entries());
-    const validated = proyectoSchema.parse(raw);
+    const sanitized = Object.fromEntries(
+      Object.entries(raw).map(([k, v]) => [k, v === '' ? undefined : v])
+    );
+    const validated = proyectoSchema.parse(sanitized);
 
     const { error } = await supabase
       .from('projects')
@@ -143,7 +149,7 @@ export async function actualizarProyecto(
     revalidatePath('/proyectos');
     return { success: true };
   } catch (error: any) {
-    if (error.name === 'ZodError') return { success: false, error: error.errors[0]?.message ?? 'Datos inválidos.' };
+    if (error.name === 'ZodError') return { success: false, error: error.issues?.[0]?.message ?? 'Datos inválidos.' };
     return { success: false, error: 'No se pudo actualizar el proyecto.' };
   }
 }

@@ -1,5 +1,6 @@
 import { getClientes } from '@/actions/clientes';
 import { ClientesList } from '@/components/clientes/ClientesList';
+import { ClientesNewButton } from '@/components/clientes/ClientesNewButton';
 import { Users } from 'lucide-react';
 
 export const metadata = {
@@ -25,6 +26,7 @@ export default async function ClientesPage() {
             </p>
           </div>
         </div>
+        <ClientesNewButton />
       </div>
 
       <ClientesList initialClientes={clientes} />

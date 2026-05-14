@@ -10,6 +10,7 @@ import {
   ModalFooter,
 } from '@/components/shared/Modal';
 import { Button } from '@/components/shared/Button';
+import { ClienteSelector } from '@/components/clientes/ClienteSelector';
 import { actualizarProyecto } from '@/actions/proyectos';
 
 const TIPOS_OBRA = [
@@ -30,19 +31,20 @@ interface EditarProyectoModalProps {
     descripcion?: string | null;
     ubicacion?: string | null;
     tipo_obra?: string | null;
+    cliente_id?: string | null;
     cliente_nombre?: string | null;
   };
 }
 
 export function EditarProyectoModal({ isOpen, onClose, proyecto }: EditarProyectoModalProps) {
   const router = useRouter();
-  const [nombre,        setNombre]        = useState(proyecto.nombre);
-  const [descripcion,   setDescripcion]   = useState(proyecto.descripcion   ?? '');
-  const [ubicacion,     setUbicacion]     = useState(proyecto.ubicacion     ?? '');
-  const [tipoObra,      setTipoObra]      = useState(proyecto.tipo_obra     ?? '');
-  const [clienteNombre, setClienteNombre] = useState(proyecto.cliente_nombre ?? '');
-  const [saving,        setSaving]        = useState(false);
-  const [error,         setError]         = useState('');
+  const [nombre,      setNombre]      = useState(proyecto.nombre);
+  const [descripcion, setDescripcion] = useState(proyecto.descripcion ?? '');
+  const [ubicacion,   setUbicacion]   = useState(proyecto.ubicacion   ?? '');
+  const [tipoObra,    setTipoObra]    = useState(proyecto.tipo_obra   ?? '');
+  const [clienteId,   setClienteId]   = useState<string | null>(proyecto.cliente_id ?? null);
+  const [saving,      setSaving]      = useState(false);
+  const [error,       setError]       = useState('');
 
   async function handleSave() {
     if (!nombre.trim())   { setError('El nombre es obligatorio.');  return; }
@@ -50,11 +52,11 @@ export function EditarProyectoModal({ isOpen, onClose, proyecto }: EditarProyect
     setSaving(true);
     setError('');
     const result = await actualizarProyecto(proyecto.id, {
-      nombre:        nombre.trim(),
-      descripcion:   descripcion.trim() || null,
-      ubicacion:     ubicacion.trim(),
-      tipo_obra:     tipoObra  || null,
-      cliente_nombre: clienteNombre.trim() || null,
+      nombre:      nombre.trim(),
+      descripcion: descripcion.trim() || null,
+      ubicacion:   ubicacion.trim(),
+      tipo_obra:   tipoObra || null,
+      cliente_id:  clienteId ?? null,
     });
     setSaving(false);
     if (result.success) {
@@ -113,13 +115,7 @@ export function EditarProyectoModal({ isOpen, onClose, proyecto }: EditarProyect
 
           <div>
             <label className="block text-xs font-medium text-neutral-600 mb-1">Cliente</label>
-            <input
-              type="text"
-              value={clienteNombre}
-              onChange={e => setClienteNombre(e.target.value)}
-              className={fieldCls}
-              placeholder="Nombre del cliente"
-            />
+            <ClienteSelector selectedId={clienteId} onSelect={setClienteId} />
           </div>
 
           <div>

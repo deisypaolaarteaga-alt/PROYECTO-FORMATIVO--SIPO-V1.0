@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react';
 import { buscarClientes } from '@/actions/clientes';
 import { Cliente } from '@/types';
-import { Search, Plus, User, MapPin, X, Building2 } from 'lucide-react';
-import { Badge } from '@/components/shared/Badge';
+import { Search, Plus, User, X, Building2 } from 'lucide-react';
 import { ModalCliente } from './ModalCliente';
 import { cn } from '@/lib/utils';
 
@@ -20,7 +19,6 @@ export function ClienteSelector({ selectedId, onSelect }: ClienteSelectorProps) 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
 
-  // Buscar clientes cuando cambia el query
   useEffect(() => {
     const timer = setTimeout(async () => {
       if (query.length >= 2) {
@@ -32,7 +30,6 @@ export function ClienteSelector({ selectedId, onSelect }: ClienteSelectorProps) 
         setShowDropdown(false);
       }
     }, 300);
-
     return () => clearTimeout(timer);
   }, [query]);
 
@@ -48,11 +45,16 @@ export function ClienteSelector({ selectedId, onSelect }: ClienteSelectorProps) 
     onSelect(null);
   };
 
+  const handleNuevoCreado = (nuevoCliente: any) => {
+    if (nuevoCliente) handleSelect(nuevoCliente);
+  };
+
   return (
-    <div className="space-y-1.5 relative">
+    <div className="space-y-1.5">
       <label className="text-[13px] font-medium text-stone">Cliente (Opcional)</label>
-      
+
       {selectedCliente ? (
+        /* Chip de cliente seleccionado */
         <div className="flex items-center justify-between p-3 bg-steel-fog rounded-lg border border-concrete animate-in fade-in zoom-in duration-200">
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 rounded-full bg-white flex items-center justify-center text-[var(--accent-primary)] shadow-sm">
@@ -65,8 +67,8 @@ export function ClienteSelector({ selectedId, onSelect }: ClienteSelectorProps) 
               </p>
             </div>
           </div>
-          <button 
-            type="button" 
+          <button
+            type="button"
             onClick={handleClear}
             className="p-1 hover:bg-concrete rounded-full text-mortar transition-colors"
           >
@@ -74,70 +76,75 @@ export function ClienteSelector({ selectedId, onSelect }: ClienteSelectorProps) 
           </button>
         </div>
       ) : (
-        <div className="relative">
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-mortar pointer-events-none">
-            <Search className="h-4 w-4" />
-          </div>
-          <input
-            type="text"
-            placeholder="Buscar por nombre o NIT..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onFocus={() => query.length >= 2 && setShowDropdown(true)}
-            className="w-full h-10 pl-10 pr-3 text-[14px] rounded-lg border border-concrete bg-white text-ink hover:border-mortar focus:outline-none focus:border-[var(--accent-primary)] transition-all"
-          />
-
-          {showDropdown && (
-            <div className="absolute z-50 mt-1 w-full bg-white border border-concrete rounded-xl shadow-xl overflow-hidden animate-in slide-in-from-top-2 duration-200">
-              <div className="max-h-[240px] overflow-y-auto">
-                {results.length > 0 ? (
-                  results.map((cliente) => (
-                    <button
-                      key={cliente.id}
-                      type="button"
-                      onClick={() => handleSelect(cliente)}
-                      className="w-full flex items-center gap-3 p-3 hover:bg-steel-fog text-left transition-colors border-b border-concrete last:border-0"
-                    >
-                      <div className="h-8 w-8 rounded-full bg-steel-fog flex items-center justify-center text-mortar">
-                        <Building2 className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-stone truncate">{cliente.nombre_razon_social}</p>
-                        <p className="text-[11px] text-mortar truncate">
-                          {cliente.nit_cedula || 'Sin NIT'} • {cliente.ciudad || 'Sin ciudad'}
-                        </p>
-                      </div>
-                    </button>
-                  ))
-                ) : (
-                  <div className="p-4 text-center text-sm text-mortar italic">
-                    No se encontraron resultados
-                  </div>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(true)}
-                className="w-full flex items-center justify-center gap-2 p-3 bg-steel-fog/50 hover:bg-steel-fog text-[var(--accent-primary)] text-sm font-bold transition-colors border-t border-concrete"
-              >
-                <Plus className="h-4 w-4" /> Registrar nuevo cliente
-              </button>
+        <div className="space-y-2">
+          {/* Input de búsqueda con dropdown de resultados */}
+          <div className="relative">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-mortar pointer-events-none">
+              <Search className="h-4 w-4" />
             </div>
-          )}
+            <input
+              type="text"
+              placeholder="Buscar por nombre o NIT..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onFocus={() => query.length >= 2 && setShowDropdown(true)}
+              className="w-full h-10 pl-10 pr-3 text-[14px] rounded-lg border border-concrete bg-white text-ink hover:border-mortar focus:outline-none focus:border-[var(--accent-primary)] transition-all"
+            />
+
+            {showDropdown && (
+              <div className="absolute z-50 mt-1 w-full bg-white border border-concrete rounded-xl shadow-xl overflow-hidden animate-in slide-in-from-top-2 duration-200">
+                <div className="max-h-[200px] overflow-y-auto">
+                  {results.length > 0 ? (
+                    results.map((cliente) => (
+                      <button
+                        key={cliente.id}
+                        type="button"
+                        onClick={() => handleSelect(cliente)}
+                        className="w-full flex items-center gap-3 p-3 hover:bg-steel-fog text-left transition-colors border-b border-concrete last:border-0"
+                      >
+                        <div className="h-8 w-8 rounded-full bg-steel-fog flex items-center justify-center text-mortar">
+                          <Building2 className="h-4 w-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-stone truncate">{cliente.nombre_razon_social}</p>
+                          <p className="text-[11px] text-mortar truncate">
+                            {cliente.nit_cedula || 'Sin NIT'} • {cliente.ciudad || 'Sin ciudad'}
+                          </p>
+                        </div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="p-4 text-center text-sm text-mortar italic">
+                      No se encontraron resultados
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Botón siempre visible */}
+          <button
+            type="button"
+            onClick={() => setIsModalOpen(true)}
+            className="w-full flex items-center justify-center gap-2 h-9 px-3 rounded-lg border border-dashed border-[var(--accent-primary)]/40 text-[var(--accent-primary)] text-[13px] font-semibold hover:bg-[var(--accent-primary)]/5 transition-colors"
+          >
+            <Plus className="h-4 w-4" /> Crear nuevo cliente
+          </button>
         </div>
       )}
 
-      {/* Backdrop para cerrar el dropdown */}
       {showDropdown && (
-        <div 
-          className="fixed inset-0 z-40 bg-transparent" 
-          onClick={() => setShowDropdown(false)} 
+        <div
+          className="fixed inset-0 z-40 bg-transparent"
+          onClick={() => setShowDropdown(false)}
         />
       )}
 
-      <ModalCliente 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+      <ModalCliente
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={handleNuevoCreado}
       />
     </div>
   );

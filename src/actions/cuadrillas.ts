@@ -129,7 +129,8 @@ export async function calcularMOCuadrilla(
     const costo = calcularCostoCuadrilla(cuadrilla, rendimiento, unidad);
     return { success: true, data: costo };
   } catch (err: any) {
-    return { success: false, error: err.message || 'Error en el cálculo' };
+    console.error('[calcularMOCuadrilla] error:', err);
+    return { success: false, error: 'Error en el cálculo de la cuadrilla.' };
   }
 }
 
@@ -288,6 +289,9 @@ export async function importarLaborComoTrabajador(
     .select('*')
     .single();
 
-  if (error || !nuevo) return { success: false, error: 'Error al importar: ' + (error?.message || 'desconocido') };
+  if (error || !nuevo) {
+    console.error('[importarLaborComoTrabajador] error:', error);
+    return { success: false, error: 'No se pudo importar el trabajador desde el catálogo.' };
+  }
   return { success: true, trabajador: nuevo as TrabajadorBase };
 }

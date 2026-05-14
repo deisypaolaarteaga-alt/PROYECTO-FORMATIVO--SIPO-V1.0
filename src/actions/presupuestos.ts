@@ -64,7 +64,7 @@ export async function crearPresupuesto(
     revalidatePath(`/proyectos/${projectId}`);
     return { success: true, data };
   } catch (error: any) {
-    if (error.name === 'ZodError') return { success: false, error: error.errors[0].message };
+    if (error.name === 'ZodError') return { success: false, error: error.issues?.[0]?.message ?? 'Datos inválidos.' };
     return { success: false, error: 'Error al crear el presupuesto.' };
   }
 }
@@ -171,7 +171,7 @@ export async function actualizarPresupuesto(
     revalidatePath(`/presupuestos/${budgetId}`);
     return { success: true };
   } catch (error: any) {
-    if (error.name === 'ZodError') return { success: false, error: error.errors[0].message };
+    if (error.name === 'ZodError') return { success: false, error: error.issues?.[0]?.message ?? 'Datos inválidos.' };
     return { success: false, error: 'Error al actualizar.' };
   }
 }
@@ -243,7 +243,8 @@ export async function agregarCapitulo(budgetId: string, nombre: string): Promise
     revalidatePath(`/presupuestos/${budgetId}`);
     return { success: true, data };
   } catch (error: any) {
-    return { success: false, error: error.message };
+    console.error('[agregarCapitulo] error:', error);
+    return { success: false, error: 'No se pudo agregar el capítulo.' };
   }
 }
 
@@ -412,7 +413,7 @@ export async function guardarAPU(
     revalidatePath(`/presupuestos/${budgetId}`);
     return { success: true };
   } catch (error: any) {
-    if (error.name === 'ZodError') return { success: false, error: error.errors[0].message };
+    if (error.name === 'ZodError') return { success: false, error: error.issues?.[0]?.message ?? 'Datos inválidos.' };
     return { success: false, error: 'Error al guardar APU.' };
   }
 }
@@ -589,7 +590,7 @@ export async function actualizarActividad(
     revalidatePath(`/presupuestos/${budgetId}`);
     return { success: true };
   } catch (error: any) {
-    if (error.name === 'ZodError') return { success: false, error: error.errors[0].message };
+    if (error.name === 'ZodError') return { success: false, error: error.issues?.[0]?.message ?? 'Datos inválidos.' };
     return { success: false, error: 'Error al actualizar actividad.' };
   }
 }

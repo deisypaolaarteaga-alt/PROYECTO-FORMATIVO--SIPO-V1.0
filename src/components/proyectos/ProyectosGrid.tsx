@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ProyectoCard } from '@/components/proyectos/ProyectoCard';
 import { EmptyState } from '@/components/shared/EmptyState';
@@ -15,10 +16,22 @@ const FILTROS: { id: Filtro; label: string }[] = [
   { id: 'archivado',   label: 'Archivados'   },
 ];
 
-function filtrarProyectos(projects: any[], filtro: Filtro): any[] {
-  if (filtro === 'todos')      return projects;
-  if (filtro === 'activos')    return projects.filter(p => p.estado === 'borrador' || p.estado === 'en_progreso');
+function filtrarPorEstado(projects: any[], filtro: Filtro): any[] {
+  if (filtro === 'todos')   return projects;
+  if (filtro === 'activos') return projects.filter(p => p.estado === 'borrador' || p.estado === 'en_progreso');
   return projects.filter(p => p.estado === filtro);
+}
+
+function filtrarPorBusqueda(projects: any[], termino: string): any[] {
+  const t = termino.trim().toLowerCase();
+  if (!t) return projects;
+  return projects.filter(p => {
+    const nombre       = (p.nombre                            ?? '').toLowerCase();
+    const ciudad       = (p.ubicacion                         ?? '').toLowerCase();
+    const tipoObra     = (p.tipo_obra                         ?? '').toLowerCase();
+    const clienteNombre = (p.clientes?.nombre_razon_social    ?? p.cliente_nombre ?? '').toLowerCase();
+    return nombre.includes(t) || ciudad.includes(t) || tipoObra.includes(t) || clienteNombre.includes(t);
+  });
 }
 
 interface ProyectosGridProps {
@@ -26,9 +39,11 @@ interface ProyectosGridProps {
 }
 
 export function ProyectosGrid({ projects }: ProyectosGridProps) {
-  const [filtro, setFiltro] = useState<Filtro>('activos');
+  const [filtro,    setFiltro]    = useState<Filtro>('activos');
+  const [busqueda,  setBusqueda]  = useState('');
 
-  const filtrados = filtrarProyectos(projects, filtro);
+  const porEstado  = filtrarPorEstado(projects, filtro);
+  const filtrados  = filtrarPorBusqueda(porEstado, busqueda);
 
   // Contadores por filtro para mostrar badges
   const contadores: Record<Filtro, number> = {
@@ -41,6 +56,18 @@ export function ProyectosGrid({ projects }: ProyectosGridProps) {
 
   return (
     <div className="space-y-4">
+      {/* Búsqueda por nombre */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400 pointer-events-none" />
+        <input
+          type="text"
+          value={busqueda}
+          onChange={e => setBusqueda(e.target.value)}
+          placeholder="Buscar por nombre, ciudad, cliente o tipo de obra…"
+          className="w-full pl-9 pr-4 py-2 text-sm border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+        />
+      </div>
+
       {/* Pills de filtro */}
       <div className="flex flex-wrap gap-2">
         {FILTROS.map(f => {
@@ -72,7 +99,11 @@ export function ProyectosGrid({ projects }: ProyectosGridProps) {
       {/* Contador dinámico */}
       <p className="text-sm text-neutral-500">
         {filtrados.length} proyecto{filtrados.length !== 1 ? 's' : ''}
-        {filtro !== 'activos' && filtro !== 'todos'
+        {busqueda.trim() && filtro !== 'activos' && filtro !== 'todos'
+          ? ` ${FILTROS.find(f => f.id === filtro)?.label.toLowerCase()} con "${busqueda.trim()}"`
+          : busqueda.trim()
+          ? ` con "${busqueda.trim()}"`
+          : filtro !== 'activos' && filtro !== 'todos'
           ? ` ${FILTROS.find(f => f.id === filtro)?.label.toLowerCase()}`
           : ''}
       </p>
@@ -81,9 +112,11 @@ export function ProyectosGrid({ projects }: ProyectosGridProps) {
       {filtrados.length === 0 ? (
         <EmptyState
           icon="folder"
-          title="Sin proyectos"
+          title="Sin resultados"
           description={
-            filtro === 'archivado'
+            busqueda.trim()
+              ? `No se encontraron proyectos con "${busqueda.trim()}". Intenta con otro término.`
+              : filtro === 'archivado'
               ? 'No tienes proyectos archivados.'
               : filtro === 'finalizado'
               ? 'No tienes proyectos finalizados.'
@@ -91,8 +124,8 @@ export function ProyectosGrid({ projects }: ProyectosGridProps) {
               ? 'No tienes proyectos en progreso.'
               : 'Crea tu primer proyecto para empezar a presupuestar.'
           }
-          actionLabel={filtro === 'activos' || filtro === 'todos' ? 'Crear proyecto' : undefined}
-          actionHref={filtro === 'activos' || filtro === 'todos' ? '/proyectos/nuevo' : undefined}
+          actionLabel={!busqueda.trim() && (filtro === 'activos' || filtro === 'todos') ? 'Crear proyecto' : undefined}
+          actionHref={!busqueda.trim() && (filtro === 'activos' || filtro === 'todos') ? '/proyectos/nuevo' : undefined}
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

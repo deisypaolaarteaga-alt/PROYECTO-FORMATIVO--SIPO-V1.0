@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
+import '@/lib/env';
 
 /**
  * Cliente admin con service_role — omite RLS.

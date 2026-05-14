@@ -173,7 +173,7 @@ export function ModalCuadrillaAPU({
                         {isExpanded && c.trabajadores.length > 0 && (
                           <div className="border-t border-concrete px-4 py-2 space-y-1 bg-slate-50/50">
                             {c.trabajadores.map((t, i) => (
-                              <div key={i} className="flex items-center justify-between text-[11px]">
+                              <div key={t.especialidad || i} className="flex items-center justify-between text-[11px]">
                                 <span className="text-charcoal">{t.especialidad} ×{t.cantidad}</span>
                                 <span className="text-stone font-mono">
                                   {formatearCOP(t.jornal_base)} × {t.factor_prestacional.toFixed(4)}

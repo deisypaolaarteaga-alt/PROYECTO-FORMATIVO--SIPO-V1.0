@@ -3,13 +3,14 @@ import { notFound } from 'next/navigation';
 import { Card } from '@/components/shared/Card';
 import { Badge } from '@/components/shared/Badge';
 import { Button } from '@/components/shared/Button';
-import { 
-  Building2, User, MapPin, Phone, Mail, 
+import {
+  Building2, User, MapPin, Phone, Mail,
   Briefcase, Calendar, ChevronLeft, ArrowRight,
   Contact, FileText, Map
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatCurrency } from '@/lib/utils/format';
+import { ClienteDetailActions } from '@/components/clientes/ClienteDetailActions';
 
 export default async function ClienteDetailPage({ params }: { params: { id: string } }) {
   const { id } = await params;
@@ -53,6 +54,7 @@ export default async function ClienteDetailPage({ params }: { params: { id: stri
             </p>
           </div>
         </div>
+        <ClienteDetailActions cliente={cliente as any} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

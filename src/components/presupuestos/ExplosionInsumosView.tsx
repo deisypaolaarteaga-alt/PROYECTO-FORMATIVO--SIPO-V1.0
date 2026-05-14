@@ -195,8 +195,8 @@ function CategoriaTable({
           </thead>
 
           <tbody className="divide-y divide-sand">
-            {items.map((item, idx) => (
-              <FilaInsumo key={idx} item={item} mostrarAccion={esMaterial} />
+            {items.map((item) => (
+              <FilaInsumo key={`${item.tipo}-${item.nombre}`} item={item} mostrarAccion={esMaterial} />
             ))}
           </tbody>
 

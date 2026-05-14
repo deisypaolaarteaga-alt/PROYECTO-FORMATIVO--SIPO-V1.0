@@ -23,8 +23,6 @@ import { DashboardActions } from '@/components/dashboard/DashboardActions';
 export default async function DashboardPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  const iaAvailable = !!process.env.ANTHROPIC_API_KEY;
-
   const { data: profile } = await supabase
     .from('profiles')
     .select('nombre_completo, empresa')
@@ -93,7 +91,7 @@ export default async function DashboardPage() {
           </h1>
           <p className="text-[13px] text-stone capitalize">{hoy}</p>
         </div>
-        <DashboardActions iaAvailable={iaAvailable} />
+        <DashboardActions />
       </div>
 
       {/* ── Métricas ── */}

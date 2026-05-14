@@ -17,7 +17,6 @@ export default async function ProjectDetailPage({ params }: Props) {
   const project = await getProject(id);
   if (!project) notFound();
 
-  const iaAvailable = !!process.env.ANTHROPIC_API_KEY;
   const supabase = await createClient();
   const { data: budgets } = await supabase
     .from('budgets')
@@ -84,8 +83,7 @@ export default async function ProjectDetailPage({ params }: Props) {
           projectTipoObra={project.tipo_obra ?? undefined}
           projectDescripcion={project.descripcion}
           projectUbicacion={project.ubicacion}
-          projectClienteNombre={project.cliente_nombre}
-          iaAvailable={iaAvailable}
+          projectClienteId={project.cliente_id ?? null}
         />
       </div>
 

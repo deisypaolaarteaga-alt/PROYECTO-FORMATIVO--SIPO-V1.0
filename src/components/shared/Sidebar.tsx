@@ -13,7 +13,6 @@ import {
   LogOut,
   Menu,
   X,
-  Bot,
 } from 'lucide-react';
 import { Logo } from '@/components/shared/Logo';
 import { cn } from '@/lib/utils';
@@ -23,8 +22,7 @@ const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/proyectos', icon: FolderOpen, label: 'Proyectos' },
   { href: '/insumos', icon: Package, label: 'Insumos' },
-  { href: '/asistente', icon: Bot, label: 'Asistente IA' },
-  { href: '/perfil', icon: User, label: 'Perfil' },
+{ href: '/perfil', icon: User, label: 'Perfil' },
 ];
 
 /**

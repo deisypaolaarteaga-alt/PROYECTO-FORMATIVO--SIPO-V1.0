@@ -124,8 +124,8 @@ export const registroSchema = z.object({
     .min(8, 'Mínimo 8 caracteres')
     .regex(/[A-Z]/, 'Debe tener al menos una mayúscula')
     .regex(/[0-9]/, 'Debe tener al menos un número')
-    .regex(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`.~]/, 
-      'Debe tener al menos un carácter especial'),   
+    .regex(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~]/, 
+      'Debe tener al menos un carácter especial'),
   confirmar_password: z.string(),
 }).refine(
   (data) => data.password === data.confirmar_password,

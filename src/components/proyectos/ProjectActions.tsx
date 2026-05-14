@@ -2,13 +2,12 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Sparkles, Trash2, Pencil, CheckCircle2, Archive } from 'lucide-react';
+import { Plus, Trash2, Pencil, CheckCircle2, Archive, Play } from 'lucide-react';
 import { Button } from '@/components/shared/Button';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { ModalNuevoPresupuesto } from '@/components/presupuestos/ModalNuevoPresupuesto';
 import { EditarProyectoModal } from '@/components/proyectos/EditarProyectoModal';
 import { deleteProject, cambiarEstadoProyecto } from '@/actions/proyectos';
-import { cn } from '@/lib/utils';
 import type { EstadoProyecto } from '@/types';
 
 interface ProjectActionsProps {
@@ -18,8 +17,7 @@ interface ProjectActionsProps {
   projectTipoObra?: string;
   projectDescripcion?: string | null;
   projectUbicacion?: string | null;
-  projectClienteNombre?: string | null;
-  iaAvailable: boolean;
+  projectClienteId?: string | null;
 }
 
 export function ProjectActions({
@@ -29,13 +27,13 @@ export function ProjectActions({
   projectTipoObra,
   projectDescripcion,
   projectUbicacion,
-  projectClienteNombre,
-  iaAvailable,
+  projectClienteId,
 }: ProjectActionsProps) {
   const router = useRouter();
   const [showModal,        setShowModal]        = useState(false);
   const [showEdit,         setShowEdit]         = useState(false);
   const [confirmDelete,    setConfirmDelete]    = useState(false);
+  const [confirmIniciar,   setConfirmIniciar]   = useState(false);
   const [confirmFinalizar, setConfirmFinalizar] = useState(false);
   const [confirmArchivar,  setConfirmArchivar]  = useState(false);
   const [deleting,         setDeleting]         = useState(false);
@@ -56,6 +54,7 @@ export function ProjectActions({
     setLoadingEstado(true);
     const result = await cambiarEstadoProyecto(projectId, nuevoEstado);
     setLoadingEstado(false);
+    setConfirmIniciar(false);
     setConfirmFinalizar(false);
     setConfirmArchivar(false);
     if (result.success) {
@@ -75,24 +74,20 @@ export function ProjectActions({
           Nuevo presupuesto
         </Button>
 
-        <div className="relative group">
-          <Button
-            variant="primary"
-            size="sm"
-            icon={<Sparkles className="h-4 w-4" />}
-            className={cn(!iaAvailable && "bg-neutral-400 border-neutral-400 cursor-not-allowed opacity-70")}
-            onClick={() => iaAvailable ? setShowModal(true) : null}
-          >
-            Generar con IA
-          </Button>
-          {!iaAvailable && (
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-neutral-800 text-white text-[10px] rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-              Función IA — Próximamente
-            </div>
-          )}
-        </div>
-
         {/* Botón contextual según estado */}
+        {projectEstado === 'borrador' && (
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<Play className="h-4 w-4 text-primary-600" />}
+            className="text-primary-700 hover:bg-primary-50"
+            onClick={() => setConfirmIniciar(true)}
+            disabled={loadingEstado}
+          >
+            Iniciar proyecto
+          </Button>
+        )}
+
         {projectEstado === 'en_progreso' && (
           <Button
             variant="ghost"
@@ -142,7 +137,6 @@ export function ProjectActions({
       <ModalNuevoPresupuesto
         isOpen={showModal}
         onClose={() => setShowModal(false)}
-        iaAvailable={iaAvailable}
         proyectoId={projectId}
         proyectoNombre={projectNombre}
         proyectoTipoObra={projectTipoObra}
@@ -152,13 +146,24 @@ export function ProjectActions({
         isOpen={showEdit}
         onClose={() => setShowEdit(false)}
         proyecto={{
-          id:             projectId,
-          nombre:         projectNombre,
-          descripcion:    projectDescripcion,
-          ubicacion:      projectUbicacion,
-          tipo_obra:      projectTipoObra,
-          cliente_nombre: projectClienteNombre,
+          id:          projectId,
+          nombre:      projectNombre,
+          descripcion: projectDescripcion,
+          ubicacion:   projectUbicacion,
+          tipo_obra:   projectTipoObra,
+          cliente_id:  projectClienteId,
         }}
+      />
+
+      <ConfirmDialog
+        open={confirmIniciar}
+        title="¿Iniciar proyecto?"
+        description="El proyecto pasará al estado En progreso. Podrás comenzar a trabajar activamente en él y sus presupuestos."
+        confirmLabel={loadingEstado ? 'Iniciando…' : 'Sí, iniciar proyecto'}
+        cancelLabel="Cancelar"
+        variant="warning"
+        onConfirm={() => handleCambiarEstado('en_progreso')}
+        onCancel={() => setConfirmIniciar(false)}
       />
 
       <ConfirmDialog

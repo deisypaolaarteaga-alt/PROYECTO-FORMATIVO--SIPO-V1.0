@@ -29,16 +29,18 @@ SIPO (Sistema Inteligente de Presupuestos de Obra) is a Colombian construction b
 ## Commands
 
 ```bash
-npm run dev                  # Dev server on http://localhost:3000
-npm run build                # Production build
-npm start                    # Production server
-npm run migrate              # Apply pending SQL migrations (idempotent, safe to re-run)
-npm run seed:catalogo        # Insert/update reference catalog (Colombia 2025 prices)
-npm run seed:catalogo:reset  # Wipe and re-seed catalog
-npm run seed:apu             # Insert APU reference items into catalogo_apu_items (31 activities)
-npm run seed:apu:reset       # Wipe and re-seed APU reference items
-npx vitest                   # Run calculation engine tests
+pnpm dev                     # Dev server on http://localhost:3000 (--webpack, evita panic de @react-pdf en Windows)
+pnpm build                   # Production build
+pnpm start                   # Production server
+pnpm run migrate             # Apply pending SQL migrations (idempotent, safe to re-run)
+pnpm run seed:catalogo       # Insert/update reference catalog (Colombia 2025 prices)
+pnpm run seed:catalogo:reset # Wipe and re-seed catalog
+pnpm run seed:apu            # Insert APU reference items into catalogo_apu_items (31 activities)
+pnpm run seed:apu:reset      # Wipe and re-seed APU reference items
+pnpm exec vitest             # Run calculation engine tests
 ```
+
+> **Package manager**: El proyecto usa **pnpm** (migrado de npm el 2026-05-14). Usar `pnpm` para todos los comandos. La flag `--webpack` en `pnpm dev` es permanente — Turbopack causa un FATAL panic en Windows con `@react-pdf/renderer`. (Next.js 16 usa `--webpack` para forzar webpack; `--no-turbo` ya no existe).
 
 ## Database Connection
 
@@ -87,8 +89,8 @@ NEXT_PUBLIC_APP_URL
 | `20260511100000_drop_legacy_users.sql` | **Limpieza**: `DROP TABLE IF EXISTS public.users/usuarios CASCADE` — tablas legacy nunca usadas en SIPO | ✅ applied |
 | `20260511110000_fix_apu_costo_precision.sql` | **Bug fix**: Columnas `costo_*` de `apus` a `NUMERIC(15,2)`, `costo_total` GENERATED con `ROUND(...,2)`, `v_resumen_presupuesto` con `ROUND` en toda aritmética | ✅ applied |
 | `20260511120000_seed_trabajadores.sql` | **Seed**: Índice único en `trabajadores.especialidad` + 25 trabajadores de referencia Colombia 2025 (`ON CONFLICT DO NOTHING`) | ✅ applied |
-| `20260511130000_estados_proyecto_presupuesto.sql` | **Actualización**: `projects.estado` cambia constraint a `borrador\|en_progreso\|finalizado\|archivado`; migra `activo/pausado→en_progreso`, `completado→finalizado`; default ahora `borrador` | ⏳ pendiente (`npm run migrate`) |
-| `20260511140000_fix_estados_proyecto.sql` | **Idempotente**: repite el fix de estados con UPDATE antes de ADD CONSTRAINT; segundo guard por si `130000` falló parcialmente | ⏳ pendiente (`npm run migrate`) |
+| `20260511130000_estados_proyecto_presupuesto.sql` | **Actualización**: `projects.estado` cambia constraint a `borrador\|en_progreso\|finalizado\|archivado`; migra `activo/pausado→en_progreso`, `completado→finalizado`; default ahora `borrador` | ⏳ pendiente (`pnpm run migrate`) |
+| `20260511140000_fix_estados_proyecto.sql` | **Idempotente**: repite el fix de estados con UPDATE antes de ADD CONSTRAINT; segundo guard por si `130000` falló parcialmente | ⏳ pendiente (`pnpm run migrate`) |
 | `20260512100000_seed_institucional.sql` | **Seed**: 40+ actividades institucionales (hospitales, escuelas) con APUs base | ✅ applied |
 | `20260512110000_seed_industrial.sql` | **Seed**: 30+ actividades industriales (bodegas, plantas) con APUs base | ✅ applied |
 | `20260512120000_seed_hotelero.sql` | **Seed**: 35+ actividades hoteleras/turismo con APUs base | ✅ applied |
@@ -180,7 +182,7 @@ Always use `decimal.js` for these computations. Fiscal rates by city live in `sr
 | `src/types/index.ts` | All TypeScript interfaces |
 | `supabase/migrations/` | Tracked SQL migrations (timestamped, idempotent) |
 | `scripts/migrate.js` | Migration runner with `schema_migrations` tracking |
-| `scripts/seed-catalogo.ts` | Reference catalog seed (run with `npm run seed:catalogo`) |
+| `scripts/seed-catalogo.ts` | Reference catalog seed (run with `pnpm run seed:catalogo`) |
 | `scripts/verificar-fix.ts` | End-to-end test: simula `crearPresupuestoConPlantilla` completo y verifica chapters+activities+APUs en BD |
 | `scripts/check-catalogo.ts` | Verifica conteos de catálogo y presupuestos recientes via REST API |
 
@@ -207,7 +209,7 @@ Cookie-based Supabase Auth. `src/lib/supabase/middleware.ts` refreshes tokens an
 
 1. Add/update Zod schema in `src/lib/validations/schemas.ts`
 2. Update TypeScript interfaces in `src/types/index.ts`
-3. If DB change needed: create `supabase/migrations/TIMESTAMP_description.sql` (idempotent), add to `migrate.js`, run `npm run migrate`
+3. If DB change needed: create `supabase/migrations/TIMESTAMP_description.sql` (idempotent), add to `migrate.js`, run `pnpm run migrate`
 4. Implement Server Action in `src/actions/` with Zod parse + Supabase call
 5. Build/update UI using `src/components/shared/` primitives
 6. If financial math: use `decimal.js`, add test in `src/lib/calculos/motor-presupuesto.test.ts`
@@ -228,13 +230,19 @@ Token reference: `src/lib/design-tokens.ts`. User accent color stored in `profil
 - `ANTHROPIC_API_KEY` debe estar configurada para funciones IA (`/api/ia/stream`, asistente)
 
 ### Pendiente — features incompletas
-- `ResumenFinancieroModal` existe en `src/components/presupuestos/ResumenFinancieroModal.tsx` pero **no tiene botón disparador** en `EditorPresupuesto.tsx` — el editor solo usa `ResumenFinanciero` (inline). Falta agregar un botón "Ver resumen completo" que abra el modal con `budget` y `subtotalDirecto`.
-- **Migración pendiente de ejecutar**: `npm run migrate` debe correr `20260511130000` + `20260511140000` para actualizar el constraint de `projects.estado` en BD.
+- **Migración pendiente de ejecutar**: `pnpm run migrate` debe correr `20260511130000` + `20260511140000` para actualizar el constraint de `projects.estado` en BD.
+- **Supabase Auth Dashboard**: Verificar en Authentication → URL Configuration que `Site URL = http://localhost:3000` y Redirect URLs incluye `http://localhost:3000/**`. Sin esto el callback de confirmación de email falla.
 
-~~### Pendiente — errores TypeScript (5 archivos, descubiertos 2026-05-13)~~ ✅ 2026-05-13 — todos resueltos, `tsc --noEmit --skipLibCheck` sin errores
+~~- `ResumenFinancieroModal` existe en `src/components/presupuestos/ResumenFinancieroModal.tsx` pero **no tiene botón disparador** en `EditorPresupuesto.tsx`~~ ✅ 2026-05-14 — botón "Dashboard" (BarChart3) implementado en el header del editor con `resumenOpen` state
+
+~~### Pendiente — errores TypeScript (5 archivos, descubiertos 2026-05-13)~~ ✅ 2026-05-13 — todos resueltos, `tsc --noEmit --skipLibCheck` sin errores en source (sólo 2 errores en `scratch/` que no afectan build)
+
+### Pendiente — autenticación (descubierto 2026-05-14)
+- `src/middleware.ts` **creado** ✅ 2026-05-14 — `src/proxy.ts` nunca era ejecutado por Next.js (nombre incorrecto); `middleware.ts` correcto ahora existe en `src/`
+- Pendiente verificar configuración Supabase Dashboard (ver punto arriba)
 
 ### Pendiente — deuda técnica
-~~- Turbopack FATAL panic en Windows con `@react-pdf/renderer` — OS error 5 "Acceso denegado" al crear junction points~~ ✅ 2026-05-13 — `package.json` cambiado a `next dev --no-turbo`
+~~- Turbopack FATAL panic en Windows con `@react-pdf/renderer` — OS error 5 "Acceso denegado" al crear junction points~~ ✅ 2026-05-14 — `package.json` restaurado a `next dev --no-turbo` (flag se perdió al migrar a pnpm)
 ~~- Legacy tables `users`, `usuarios` — verificar que no se usan antes de eliminar~~ ✅ 2026-05-11
 ~~- Imprecisión de punto flotante en `apus.costo_total` GENERATED (ej: `26757.96000000000...`) — columna NUMERIC debería usar escala fija `NUMERIC(15,2)`~~ ✅ 2026-05-11
 ~~- `ResumenFinancieroModal.tsx` líneas 416-425 — fragmento huérfano de versión anterior causaba 14 errores TS1005/TS1109 parse errors~~ ✅ 2026-05-13
@@ -276,4 +284,4 @@ Token reference: `src/lib/design-tokens.ts`. User accent color stored in `profil
 - ~~Fechas sin zona horaria Bogotá~~ — `timeZone: 'America/Bogota'` en todos los `Intl.DateTimeFormat`
 - ~~Template de capítulos ignorada~~ — `crearPresupuesto` recibe `capitulos?: string[]` y los inserta
 - ~~`@types/pg` faltante~~ — ya en `devDependencies`
-- ~~`npm run seed:apu`~~ — 175 filas en `catalogo_apu_items` (31 actividades con ítems de referencia)
+- ~~`pnpm run seed:apu`~~ — 175 filas en `catalogo_apu_items` (31 actividades con ítems de referencia)

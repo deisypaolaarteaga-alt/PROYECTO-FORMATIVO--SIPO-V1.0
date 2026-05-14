@@ -22,8 +22,6 @@ export default async function PresupuestoEditorPage({ params }: Props) {
   }
 
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-  const iaAvailable = !!process.env.ANTHROPIC_API_KEY;
-
   return (
     <div className="flex flex-col h-[calc(100vh-64px-32px)] animate-fade-in">
       <div className="px-6 py-2">
@@ -38,7 +36,7 @@ export default async function PresupuestoEditorPage({ params }: Props) {
         </Link>
       </div>
       <div className="flex-1 overflow-hidden rounded-2xl border border-neutral-100 shadow-sm mx-0">
-        <EditorPresupuesto budget={budget} profile={profile} iaAvailable={iaAvailable} />
+        <EditorPresupuesto budget={budget} profile={profile} />
       </div>
     </div>
   );

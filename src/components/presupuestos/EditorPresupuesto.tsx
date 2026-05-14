@@ -29,7 +29,6 @@ import { BarChart3 } from 'lucide-react';
 interface EditorPresupuestoProps {
   budget: any;
   profile: any;
-  iaAvailable?: boolean;
 }
 
 export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPresupuestoProps) {
@@ -78,6 +77,20 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
     ? utilidadEstimada * (Number(budget.iva_porcentaje) / 100)
     : 0;
   const totalGeneral = subtotalDirecto + valorAIU + valorIVA;
+  
+  const vigenciaDias = Number(budget.vigencia_dias ?? 0);
+  const fechaValidez = budget.created_at && vigenciaDias > 0 ? (() => {
+    const d = new Date(budget.created_at);
+    d.setDate(d.getDate() + vigenciaDias);
+    return d;
+  })() : null;
+
+  const fechaValidezFormateada = fechaValidez ? new Intl.DateTimeFormat('es-CO', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'America/Bogota'
+  }).format(fechaValidez) : null;
 
   const toggleChapter = (id: string) => {
     setExpanded(prev => {
@@ -165,11 +178,18 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
       <div className="bg-white border-b border-concrete px-8 py-4 flex items-center justify-between sticky top-0 z-20">
         <div className="flex items-center gap-4">
           <FileText className="text-steel-mid h-6 w-6" />
-          <InputEditable
-            value={budget.titulo}
-            onChange={(val) => handleUpdateBudget({ titulo: val })}
-            className="text-xl font-bold text-ink w-96"
-          />
+          <div className="flex flex-col">
+            <InputEditable
+              value={budget.titulo}
+              onChange={(val) => handleUpdateBudget({ titulo: val })}
+              className="text-xl font-bold text-ink w-96"
+            />
+            {fechaValidezFormateada && (
+              <p className="text-[11px] text-stone mt-0.5">
+                Válido hasta: <span className="font-semibold">{fechaValidezFormateada}</span>
+              </p>
+            )}
+          </div>
           {isSaving && <Loader2 className="h-4 w-4 animate-spin text-stone" />}
         </div>
         <div className="flex items-center gap-4">

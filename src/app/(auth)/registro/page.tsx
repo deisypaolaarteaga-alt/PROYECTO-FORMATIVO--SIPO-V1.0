@@ -15,7 +15,7 @@ function IndicadorPassword({ password }: { password: string }) {
     { label: 'Mínimo 8 caracteres', ok: password.length >= 8 },
     { label: 'Una mayúscula', ok: /[A-Z]/.test(password) },
     { label: 'Un número', ok: /[0-9]/.test(password) },
-    { label: 'Un carácter especial', ok: /[!@#$%^&*()_+\-=\[\]{}]/.test(password) },
+    { label: 'Un carácter especial', ok: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~]/.test(password) },
   ];
   
   if (!password) return null;

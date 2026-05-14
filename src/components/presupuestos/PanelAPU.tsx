@@ -248,8 +248,8 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
                 </div>
 
                 <div className="space-y-3">
-                  {items.filter(i => i.tipo === 'mano_obra').map((item, idx) => (
-                    <div key={item.id ?? `mo-${idx}`} className="space-y-1">
+                  {items.filter(i => i.tipo === 'mano_obra').map((item) => (
+                    <div key={item.id || `mo-${items.indexOf(item)}`} className="space-y-1">
                       <div className="flex items-center gap-2 group">
                         <InputEditable
                           value={item.nombre}
@@ -336,8 +336,8 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
                 </div>
 
                 <div className="space-y-2">
-                  {items.filter(i => i.tipo === 'material').map((item, idx) => (
-                    <div key={item.id ?? `mat-${idx}`} className="flex items-center gap-2 group">
+                  {items.filter(i => i.tipo === 'material').map((item) => (
+                    <div key={item.id || `mat-${items.indexOf(item)}`} className="flex items-center gap-2 group">
                       <InputEditable
                         value={item.nombre}
                         onChange={(val) => updateItem(items.indexOf(item), { nombre: val })}
@@ -393,8 +393,8 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
                 </div>
 
                 <div className="space-y-2">
-                  {items.filter(i => i.tipo === 'equipo').map((item, idx) => (
-                    <div key={item.id ?? `eq-${idx}`} className="flex items-center gap-2 group">
+                  {items.filter(i => i.tipo === 'equipo').map((item) => (
+                    <div key={item.id || `eq-${items.indexOf(item)}`} className="flex items-center gap-2 group">
                       <InputEditable
                         value={item.nombre}
                         onChange={(val) => updateItem(items.indexOf(item), { nombre: val })}

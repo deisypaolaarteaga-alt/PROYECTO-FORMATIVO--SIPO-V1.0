@@ -8,16 +8,18 @@ import { clienteSchema } from '@/lib/validations/schemas';
 import { crearCliente, actualizarCliente } from '@/actions/clientes';
 import { toast } from 'sonner';
 import { Cliente } from '@/types';
-import { Building2, User, MapPin, Contact, FileText, Phone, Mail } from 'lucide-react';
+import { Building2, User, Contact, FileText, Phone, Mail } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { MunicipioCombobox } from './MunicipioCombobox';
 
 interface ModalClienteProps {
   isOpen: boolean;
   onClose: () => void;
-  cliente?: Cliente; // Si viene, es modo edición
+  cliente?: Cliente;
+  onSuccess?: (nuevoCliente: any) => void;
 }
 
-export function ModalCliente({ isOpen, onClose, cliente }: ModalClienteProps) {
+export function ModalCliente({ isOpen, onClose, cliente, onSuccess }: ModalClienteProps) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     tipo: 'empresa' as 'persona_natural' | 'empresa',
@@ -85,6 +87,7 @@ export function ModalCliente({ isOpen, onClose, cliente }: ModalClienteProps) {
         const res = await crearCliente(validatedData);
         if (res.success) {
           toast.success('Cliente creado correctamente');
+          onSuccess?.(res.data);
           onClose();
         } else {
           toast.error(res.error || 'Error al crear cliente');
@@ -92,7 +95,7 @@ export function ModalCliente({ isOpen, onClose, cliente }: ModalClienteProps) {
       }
     } catch (error: any) {
       if (error.errors) {
-        toast.error(error.errors[0].message);
+        toast.error(error.issues?.[0]?.message ?? 'Error de validación');
       } else {
         toast.error('Error de validación');
       }
@@ -129,13 +132,13 @@ export function ModalCliente({ isOpen, onClose, cliente }: ModalClienteProps) {
             onClick={() => setFormData({ ...formData, tipo: 'empresa' })}
             className={cn(
               "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all",
-              formData.tipo === 'empresa' 
-                ? "bg-white text-stone shadow-sm" 
+              formData.tipo === 'empresa'
+                ? "bg-white text-stone shadow-sm"
                 : "text-mortar hover:text-stone"
             )}
           >
             <Building2 className="h-4 w-4" />
-            Empresa
+            Persona Jurídica
           </button>
         </div>
 
@@ -162,20 +165,11 @@ export function ModalCliente({ isOpen, onClose, cliente }: ModalClienteProps) {
               placeholder="Ej. 900.123.456-7"
             />
 
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                label="Ciudad"
-                value={formData.ciudad}
-                onChange={(e) => setFormData({ ...formData, ciudad: e.target.value })}
-                placeholder="Ej. Bogotá"
-              />
-              <Input
-                label="Departamento"
-                value={formData.departamento}
-                onChange={(e) => setFormData({ ...formData, departamento: e.target.value })}
-                placeholder="Ej. Cundinamarca"
-              />
-            </div>
+            <MunicipioCombobox
+              value={formData.ciudad}
+              onChange={(ciudad) => setFormData({ ...formData, ciudad })}
+              onDepartamentoChange={(departamento) => setFormData(prev => ({ ...prev, departamento }))}
+            />
 
             <Input
               label="Dirección"

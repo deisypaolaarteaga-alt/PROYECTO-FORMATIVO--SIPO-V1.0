@@ -135,7 +135,7 @@ export async function crearCliente(data: z.infer<typeof clienteSchema>): Promise
     return { success: true, data: newCliente };
   } catch (error: any) {
     console.error('[crearCliente] error:', error);
-    return { success: false, error: error.message || 'Error al crear cliente' };
+    return { success: false, error: 'No se pudo crear el cliente.' };
   }
 }
 
@@ -143,10 +143,11 @@ export async function crearCliente(data: z.infer<typeof clienteSchema>): Promise
  * Actualizar datos de un cliente
  */
 export async function actualizarCliente(
-  clienteId: string, 
+  clienteId: string,
   data: Partial<z.infer<typeof clienteSchema>>
 ): Promise<ActionResult> {
   try {
+    const validated = clienteSchema.partial().parse(data);
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { success: false, error: 'No autorizado' };
@@ -154,7 +155,7 @@ export async function actualizarCliente(
     const { error } = await supabase
       .from('clientes')
       .update({
-        ...data,
+        ...validated,
         updated_at: new Date().toISOString()
       })
       .eq('id', clienteId)
@@ -167,7 +168,7 @@ export async function actualizarCliente(
     return { success: true };
   } catch (error: any) {
     console.error('[actualizarCliente] error:', error);
-    return { success: false, error: error.message || 'Error al actualizar cliente' };
+    return { success: false, error: 'No se pudo actualizar el cliente.' };
   }
 }
 

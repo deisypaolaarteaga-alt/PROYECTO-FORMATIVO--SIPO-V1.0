@@ -231,23 +231,47 @@ export function ModalCatalogo({ isOpen, onClose, budgetId, onImported }: ModalCa
 
                     {/* Actividades expandidas */}
                     {isExpanded && actCount > 0 && (
-                      <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-2 space-y-1">
-                        {cap.catalogo_actividades?.map(act => {
+                      <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-1.5 space-y-1">
+                        {cap.catalogo_actividades?.map((act, actIdx) => {
                           const tieneAPU = (act.catalogo_apu_items?.length ?? 0) > 0;
+                          
+                          const pRef = Number(act.precio_referencia_nacional || 0);
+                          const pMin = Number(act.rango_min || 0);
+                          const pMax = Number(act.rango_max || 0);
+
+                          const hasRef = pRef > 0;
+                          const hasRange = pMin > 0 && pMax > 0;
+
+                          // Debug temporal para verificar que los datos llegan al componente
+                          if (actIdx === 0) console.log('DEBUG Catalogo Actividad:', { nombre: act.nombre, pRef, hasRef });
+
                           return (
-                            <div key={act.id} className="flex items-center justify-between py-1.5 text-[12px]">
-                              <span className="text-slate-600 truncate flex-1 mr-4">{act.nombre}</span>
-                              <div className="flex items-center gap-2 shrink-0">
-                                {tieneAPU && (
-                                  <span className="text-[9px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded uppercase tracking-wide">
-                                    APU
-                                  </span>
-                                )}
-                                <span className="text-[10px] text-slate-400 uppercase font-mono">{act.unidad}</span>
-                                <span className="font-medium text-slate-700 w-28 text-right">
-                                  {formatearCOP(Number(act.precio_referencia_nacional))}
-                                </span>
+                            <div key={act.id || `act-${actIdx}`} className="py-2 border-b border-slate-200/50 last:border-0">
+                              <div className="flex items-center justify-between text-[12px]">
+                                <span className="text-slate-800 font-medium truncate flex-1 mr-4">{act.nombre}</span>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  {tieneAPU && (
+                                    <span className="text-[9px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded uppercase tracking-wide">
+                                      APU
+                                    </span>
+                                  )}
+                                  <span className="text-[10px] text-slate-400 uppercase font-mono">{act.unidad}</span>
+                                  {hasRef && (
+                                    <span className="font-bold text-slate-900 w-24 text-right">
+                                      {formatearCOP(pRef)}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
+                              {hasRef && (
+                                <p className="text-[10px] text-slate-600 mt-1 font-medium bg-slate-100/50 px-2 py-0.5 rounded-md inline-block">
+                                  Ref: <span className="text-blue-700 font-bold">{formatearCOP(pRef)}</span>
+                                  {hasRange && (
+                                    <> · Rango: <span className="text-slate-700 font-bold">{formatearCOP(pMin)} – {formatearCOP(pMax)}</span></>
+                                  )}
+                                  <span className="ml-1">/ {act.unidad}</span>
+                                </p>
+                              )}
                             </div>
                           );
                         })}

@@ -6,7 +6,6 @@ import {
   Plus,
   Folder,
   FileText,
-  Sparkles,
   ChevronRight,
   ArrowLeft,
   Layout,
@@ -58,7 +57,6 @@ function normalizarTipo(tipoObra?: string | null): TipoObraCatalogo {
 interface ModalNuevoPresupuestoProps {
   isOpen: boolean;
   onClose: () => void;
-  iaAvailable?: boolean;
   proyectoId?: string;
   proyectoNombre?: string;
   proyectoTipoObra?: string;
@@ -67,7 +65,6 @@ interface ModalNuevoPresupuestoProps {
 export function ModalNuevoPresupuesto({
   isOpen,
   onClose,
-  iaAvailable = false,
   proyectoId,
   proyectoNombre,
   proyectoTipoObra,
@@ -320,9 +317,8 @@ export function ModalNuevoPresupuesto({
 
                   <div className="grid grid-cols-1 gap-3">
                     {[
-                      { id: 'blank',    label: 'Presupuesto en blanco',            desc: 'Creación manual desde cero',                                icon: FileText,  disabled: false },
-                      { id: 'template', label: 'Plantilla sugerida',               desc: 'Capítulos predefinidos por tipo de obra',                   icon: Layout,    disabled: false },
-                      { id: 'ai',       label: 'Generar con Inteligencia Artificial', desc: iaAvailable ? 'Sugerencia automática por tipo de obra' : 'Función IA — Próximamente', icon: Sparkles, disabled: !iaAvailable }
+                      { id: 'blank',    label: 'Presupuesto en blanco', desc: 'Creación manual desde cero',               icon: FileText, disabled: false },
+                      { id: 'template', label: 'Plantilla sugerida',    desc: 'Capítulos predefinidos por tipo de obra',  icon: Layout,   disabled: false },
                     ].map(opt => (
                       <button
                         key={opt.id}

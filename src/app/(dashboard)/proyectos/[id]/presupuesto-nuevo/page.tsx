@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { use, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { crearPresupuesto } from '@/actions/presupuestos';
 import { Card } from '@/components/shared/Card';
@@ -13,6 +13,7 @@ import Link from 'next/link';
 interface Props { params: Promise<{ id: string }> }
 
 export default function NuevoPresupuestoPage({ params }: Props) {
+  const { id } = use(params);
   const [loading, setLoading] = useState(false);
   const [nombre, setNombre] = useState('');
   const router = useRouter();
@@ -20,8 +21,7 @@ export default function NuevoPresupuestoPage({ params }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    
-    const { id } = await params;
+
     const res = await crearPresupuesto(id, nombre);
     
     if (res.data) {
@@ -41,7 +41,7 @@ export default function NuevoPresupuestoPage({ params }: Props) {
       <h1 className="text-2xl font-bold text-neutral-900">Nuevo presupuesto</h1>
 
       <Card padding="lg">
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4">
           <Input
             label="Nombre del presupuesto"
             value={nombre}

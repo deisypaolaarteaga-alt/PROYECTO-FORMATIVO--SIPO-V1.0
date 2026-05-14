@@ -3,14 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
     "migrate": "node scripts/migrate.js",
-    "seed:catalogo": "npx tsx scripts/seed-catalogo.ts",
-    "seed:catalogo:reset": "npx tsx scripts/seed-catalogo.ts --reset",
-    "seed:apu": "npx tsx scripts/seed-apu-items.ts",
-    "seed:apu:reset": "npx tsx scripts/seed-apu-items.ts --reset"
+    "seed:catalogo": "tsx scripts/seed-catalogo.ts",
+    "seed:catalogo:reset": "tsx scripts/seed-catalogo.ts --reset",
+    "seed:apu": "tsx scripts/seed-apu-items.ts",
+    "seed:apu:reset": "tsx scripts/seed-apu-items.ts --reset"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.92.0",
@@ -45,6 +45,7 @@
     "dotenv": "^17.4.2",
     "pg": "^8.20.0",
     "tailwindcss": "^4",
+    "tsx": "^4.19.3",
     "typescript": "^5",
     "vitest": "^4.1.5"
   }

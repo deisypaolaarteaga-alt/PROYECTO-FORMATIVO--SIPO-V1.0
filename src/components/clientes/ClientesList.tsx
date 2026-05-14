@@ -1,14 +1,14 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/shared/Button';
 import { Input } from '@/components/shared/Input';
 import { Badge } from '@/components/shared/Badge';
 import { Card } from '@/components/shared/Card';
 import { ModalCliente } from './ModalCliente';
-import { 
-  Plus, Search, Building2, User, MapPin, 
-  Phone, Mail, Briefcase, ChevronRight, MoreVertical,
+import {
+  Plus, Search, Building2, User, MapPin,
+  Phone, Mail, Briefcase, MoreVertical,
   Edit, Trash2, ExternalLink
 } from 'lucide-react';
 import { 
@@ -28,11 +28,14 @@ interface ClientesListProps {
 
 export function ClientesList({ initialClientes }: ClientesListProps) {
   const [clientes, setClientes] = useState(initialClientes);
+
+  useEffect(() => {
+    setClientes(initialClientes);
+  }, [initialClientes]);
   const [busqueda, setBusqueda] = useState('');
   const [filtroTipo, setFiltroTipo] = useState('todos');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [clienteAEditar, setClienteAEditar] = useState<any>(undefined);
-  const [isPending, startTransition] = useTransition();
 
   // Filtrado local para respuesta inmediata
   const clientesFiltrados = clientes.filter(c => {
@@ -86,8 +89,8 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
             className="h-10 px-3 py-2 bg-white border border-concrete rounded-lg text-sm outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/20"
           >
             <option value="todos">Todos los tipos</option>
-            <option value="empresa">🏢 Empresas</option>
-            <option value="persona_natural">👤 Personas Naturales</option>
+            <option value="empresa">🏢 Persona Jurídica</option>
+            <option value="persona_natural">👤 Persona Natural</option>
           </select>
 
           <Button icon={<Plus className="h-4 w-4" />} onClick={handleNuevo}>
@@ -104,13 +107,13 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
           </div>
           <h3 className="text-lg font-semibold text-stone">No hay clientes</h3>
           <p className="text-mortar text-sm max-w-xs mb-6">
-            {busqueda || filtroTipo !== 'todos' 
-              ? 'No se encontraron clientes con los filtros aplicados.' 
+            {busqueda || filtroTipo !== 'todos'
+              ? 'No se encontraron clientes con los filtros aplicados.'
               : 'Aún no tienes clientes registrados en tu catálogo.'}
           </p>
-          {!busqueda && filtroTipo === 'todos' && (
-            <Button onClick={handleNuevo}>Registrar primer cliente</Button>
-          )}
+          <Button icon={<Plus className="h-4 w-4" />} onClick={handleNuevo}>
+            Nuevo Cliente
+          </Button>
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -122,7 +125,7 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
                   <div className="flex items-center gap-2">
                     {cliente.tipo === 'empresa' ? (
                       <Badge className="bg-blue-50 text-blue-700 border border-blue-100 py-0.5 px-2 text-[10px]">
-                        <Building2 className="h-3 w-3 mr-1" /> Empresa
+                        <Building2 className="h-3 w-3 mr-1" /> Persona Jurídica
                       </Badge>
                     ) : (
                       <Badge className="bg-amber-50 text-amber-700 border border-amber-100 py-0.5 px-2 text-[10px]">

@@ -1,26 +1,124 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/shared/Button';
-import { Input } from '@/components/shared/Input';
-import { Badge } from '@/components/shared/Badge';
-import { Card } from '@/components/shared/Card';
-import { ModalCliente } from './ModalCliente';
+import { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
-  Plus, Search, Building2, User, MapPin,
-  Phone, Mail, Briefcase, MoreVertical,
-  Edit, Trash2, ExternalLink
+  Search, Building2, User, MoreVertical,
+  Edit, Trash2, ExternalLink, Plus, Download,
+  ChevronLeft, ChevronRight, SlidersHorizontal,
+  ChevronDown,
 } from 'lucide-react';
-import { 
-  DropdownMenu, 
-  DropdownMenuTrigger, 
-  DropdownMenuContent, 
-  DropdownMenuItem 
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
 } from '@/components/shared/DropdownMenu';
+import { ModalCliente } from './ModalCliente';
 import { desactivarCliente } from '@/actions/clientes';
 import { toast } from 'sonner';
-import { formatCurrency } from '@/lib/utils/format';
-import Link from 'next/link';
+import { formatCurrency } from '@/lib/utils';
+
+const PAGE_SIZE = 10;
+
+const AVATAR_COLORS = [
+  { bg: 'bg-[#FEF3C7]', text: 'text-[#D97706]' },
+  { bg: 'bg-[#DBEAFE]', text: 'text-[#1D4ED8]' },
+  { bg: 'bg-[#D1FAE5]', text: 'text-[#065F46]' },
+  { bg: 'bg-[#FCE7F3]', text: 'text-[#9D174D]' },
+  { bg: 'bg-[#EDE9FE]', text: 'text-[#5B21B6]' },
+  { bg: 'bg-[#FFE4E6]', text: 'text-[#BE123C]' },
+];
+
+function getInitials(nombre: string): string {
+  const words = nombre.trim().split(/\s+/);
+  if (words.length === 1) return words[0].substring(0, 2).toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
+}
+
+function getAvatarColor(id: string) {
+  const sum = id.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  return AVATAR_COLORS[sum % AVATAR_COLORS.length];
+}
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 2) return 'Hace un momento';
+  if (mins < 60) return `Hace ${mins} min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `Hace ${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `Hace ${days} día${days > 1 ? 's' : ''}`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `Hace ${weeks} semana${weeks > 1 ? 's' : ''}`;
+  return `Hace ${Math.floor(weeks / 4)} mes(es)`;
+}
+
+function DonutChart({ total, empresa, natural }: { total: number; empresa: number; natural: number }) {
+  const R = 52;
+  const C = 2 * Math.PI * R;
+  const GAP = 4; // px gap between segments
+  if (total === 0) {
+    return (
+      <div className="relative w-36 h-36 mx-auto">
+        <svg viewBox="0 0 160 160" className="w-full h-full">
+          <circle cx="80" cy="80" r={R} fill="none" stroke="#F3F4F6" strokeWidth="18" />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-2xl font-bold text-[#111827]">0</span>
+          <span className="text-[11px] text-[#6B7280]">Total</span>
+        </div>
+      </div>
+    );
+  }
+
+  const empresaArc = (empresa / total) * C;
+  const naturalArc = (natural / total) * C;
+  const showGap = empresa > 0 && natural > 0;
+  const gap = showGap ? GAP : 0;
+
+  return (
+    <div className="relative w-36 h-36 mx-auto">
+      <svg viewBox="0 0 160 160" className="w-full h-full">
+        {/* Track */}
+        <circle cx="80" cy="80" r={R} fill="none" stroke="#F3F4F6" strokeWidth="18" />
+        {/* Empresa segment (blue) */}
+        {empresa > 0 && (
+          <circle
+            cx="80" cy="80" r={R} fill="none"
+            stroke="#1E6FB8" strokeWidth="18"
+            strokeLinecap="round"
+            strokeDasharray={`${Math.max(0, empresaArc - gap)} ${C - Math.max(0, empresaArc - gap)}`}
+            style={{ transform: 'rotate(-90deg)', transformOrigin: '80px 80px' }}
+          />
+        )}
+        {/* Natural segment (green) */}
+        {natural > 0 && (
+          <circle
+            cx="80" cy="80" r={R} fill="none"
+            stroke="#2D7A45" strokeWidth="18"
+            strokeLinecap="round"
+            strokeDasharray={`${Math.max(0, naturalArc - gap)} ${C - Math.max(0, naturalArc - gap)}`}
+            strokeDashoffset={-(empresaArc)}
+            style={{ transform: 'rotate(-90deg)', transformOrigin: '80px 80px' }}
+          />
+        )}
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+        <span className="text-2xl font-bold text-[#111827]">{total}</span>
+        <span className="text-[11px] text-[#6B7280]">Total</span>
+      </div>
+    </div>
+  );
+}
+
+const TIPO_OPTIONS = [
+  { value: 'todos', label: 'Todos los tipos' },
+  { value: 'empresa', label: 'Persona Jurídica' },
+  { value: 'persona_natural', label: 'Persona Natural' },
+];
 
 interface ClientesListProps {
   initialClientes: any[];
@@ -28,206 +126,447 @@ interface ClientesListProps {
 
 export function ClientesList({ initialClientes }: ClientesListProps) {
   const [clientes, setClientes] = useState(initialClientes);
+  useEffect(() => setClientes(initialClientes), [initialClientes]);
 
-  useEffect(() => {
-    setClientes(initialClientes);
-  }, [initialClientes]);
   const [busqueda, setBusqueda] = useState('');
   const [filtroTipo, setFiltroTipo] = useState('todos');
+  const [pagina, setPagina] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [clienteAEditar, setClienteAEditar] = useState<any>(undefined);
 
-  // Filtrado local para respuesta inmediata
-  const clientesFiltrados = clientes.filter(c => {
-    const matchesBusqueda = 
-      c.nombre_razon_social.toLowerCase().includes(busqueda.toLowerCase()) ||
-      (c.nit_cedula || '').includes(busqueda);
-    const matchesTipo = filtroTipo === 'todos' || c.tipo === filtroTipo;
-    return matchesBusqueda && matchesTipo;
-  });
+  const router = useRouter();
 
-  const handleNuevo = () => {
-    setClienteAEditar(undefined);
-    setIsModalOpen(true);
-  };
+  const clientesFiltrados = useMemo(() => {
+    return clientes.filter(c => {
+      const q = busqueda.toLowerCase();
+      const matchBusqueda = q === '' ||
+        c.nombre_razon_social.toLowerCase().includes(q) ||
+        (c.nit_cedula || '').toLowerCase().includes(q) ||
+        (c.nombre_contacto || '').toLowerCase().includes(q);
+      const matchTipo = filtroTipo === 'todos' || c.tipo === filtroTipo;
+      return matchBusqueda && matchTipo;
+    });
+  }, [clientes, busqueda, filtroTipo]);
 
-  const handleEditar = (cliente: any) => {
-    setClienteAEditar(cliente);
-    setIsModalOpen(true);
-  };
+  const totalPaginas = Math.max(1, Math.ceil(clientesFiltrados.length / PAGE_SIZE));
+  const paginaActual = Math.min(pagina, totalPaginas);
+  const clientesPagina = clientesFiltrados.slice(
+    (paginaActual - 1) * PAGE_SIZE,
+    paginaActual * PAGE_SIZE,
+  );
 
-  const handleDesactivar = async (id: string) => {
-    if (confirm('¿Estás seguro de desactivar este cliente?')) {
-      const res = await desactivarCliente(id);
-      if (res.success) {
-        toast.success('Cliente desactivado');
-        setClientes(clientes.filter(c => c.id !== id));
-      } else {
-        toast.error(res.error);
-      }
+  const totalEmpresa = clientes.filter(c => c.tipo === 'empresa').length;
+  const totalNatural = clientes.filter(c => c.tipo === 'persona_natural').length;
+  const actividadReciente = useMemo(() =>
+    [...clientes]
+      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+      .slice(0, 5),
+    [clientes],
+  );
+
+  function handleFiltro(tipo: string) { setFiltroTipo(tipo); setPagina(1); }
+  function handleBusqueda(q: string) { setBusqueda(q); setPagina(1); }
+
+  async function handleDesactivar(id: string, nombre: string) {
+    if (!confirm(`¿Desactivar a "${nombre}"? Ya no aparecerá en el listado.`)) return;
+    const res = await desactivarCliente(id);
+    if (res.success) {
+      toast.success('Cliente desactivado');
+      setClientes(prev => prev.filter(c => c.id !== id));
+    } else {
+      toast.error(res.error || 'Error al desactivar');
     }
-  };
+  }
+
+  function handleExportar() {
+    const headers = ['Nombre/Razón Social', 'NIT/Cédula', 'Tipo', 'Contacto', 'Cargo', 'Email', 'Teléfono', 'Ciudad', 'Proyectos', 'Inversión Total'];
+    const rows = clientes.map(c => [
+      c.nombre_razon_social, c.nit_cedula || '',
+      c.tipo === 'empresa' ? 'Persona Jurídica' : 'Persona Natural',
+      c.nombre_contacto || '', c.cargo_contacto || '',
+      c.email || '', c.telefono || '', c.ciudad || '',
+      c.total_proyectos || 0, c.valor_total_proyectos || 0,
+    ]);
+    const csv = [headers, ...rows]
+      .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `clientes-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const tipoLabel = TIPO_OPTIONS.find(o => o.value === filtroTipo)?.label ?? 'Todos los tipos';
 
   return (
-    <div className="space-y-6">
-      {/* Header & Filters */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex-1 max-w-md relative">
-          <Input
-            placeholder="Buscar por nombre o NIT..."
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            icon={<Search className="h-4 w-4 text-mortar" />}
-            className="pl-10"
-          />
-        </div>
-        
-        <div className="flex items-center gap-3">
-          <select 
-            value={filtroTipo}
-            onChange={(e) => setFiltroTipo(e.target.value)}
-            className="h-10 px-3 py-2 bg-white border border-concrete rounded-lg text-sm outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/20"
-          >
-            <option value="todos">Todos los tipos</option>
-            <option value="empresa">🏢 Persona Jurídica</option>
-            <option value="persona_natural">👤 Persona Natural</option>
-          </select>
+    <div className="flex flex-col lg:flex-row gap-6 items-start">
+      {/* ── Left: filters + table ── */}
+      <div className="flex-1 min-w-0 space-y-3">
 
-          <Button icon={<Plus className="h-4 w-4" />} onClick={handleNuevo}>
+        {/* ── Toolbar ── */}
+        <div className="flex flex-wrap gap-2.5 items-center">
+          {/* Search */}
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#9CA3AF] pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Buscar por nombre, NIT o contacto..."
+              value={busqueda}
+              onChange={e => handleBusqueda(e.target.value)}
+              className="w-full pl-9 pr-4 h-10 border border-[#E5E7EB] rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-[#D95510]/20 focus:border-[#D95510] placeholder:text-[#9CA3AF] text-[#374151]"
+            />
+          </div>
+
+          {/* Tipo filter — styled dropdown trigger */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="h-10 px-3.5 flex items-center gap-2 border border-[#E5E7EB] rounded-lg text-sm bg-white text-[#374151] hover:bg-[#F9FAFB] transition-colors whitespace-nowrap">
+                <SlidersHorizontal className="h-3.5 w-3.5 text-[#6B7280]" />
+                {tipoLabel}
+                <ChevronDown className="h-3.5 w-3.5 text-[#9CA3AF]" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {TIPO_OPTIONS.map(opt => (
+                <DropdownMenuItem
+                  key={opt.value}
+                  onClick={() => handleFiltro(opt.value)}
+                  className={filtroTipo === opt.value ? 'font-semibold text-[#D95510]' : ''}
+                >
+                  {opt.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <div className="flex-1" />
+
+          {/* Exportar */}
+          <button
+            onClick={handleExportar}
+            disabled={clientes.length === 0}
+            className="h-10 px-4 flex items-center gap-2 border border-[#E5E7EB] rounded-lg text-sm text-[#374151] bg-white hover:bg-[#F9FAFB] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Download className="h-4 w-4 text-[#6B7280]" />
+            Exportar
+          </button>
+
+          {/* Nuevo Cliente */}
+          <button
+            onClick={() => { setClienteAEditar(undefined); setIsModalOpen(true); }}
+            className="h-10 px-4 flex items-center gap-2 bg-[#D95510] text-white rounded-lg text-sm font-semibold hover:bg-[#C44A0C] active:bg-[#B33E09] transition-colors shadow-sm"
+          >
+            <Plus className="h-4 w-4" />
             Nuevo Cliente
-          </Button>
+          </button>
+        </div>
+
+        {/* ── Table card ── */}
+        <div className="bg-white border border-[#E5E7EB] rounded-2xl overflow-hidden shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
+          {clientesFiltrados.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center px-6">
+              <div className="bg-[#F3F4F6] p-4 rounded-full mb-4">
+                <User className="h-8 w-8 text-[#9CA3AF]" />
+              </div>
+              <h3 className="font-semibold text-[#111827] mb-1">No hay clientes</h3>
+              <p className="text-sm text-[#6B7280] max-w-xs">
+                {busqueda || filtroTipo !== 'todos'
+                  ? 'No se encontraron clientes con los filtros aplicados.'
+                  : 'Aún no tienes clientes registrados. Crea el primero.'}
+              </p>
+              {!busqueda && filtroTipo === 'todos' && (
+                <button
+                  onClick={() => { setClienteAEditar(undefined); setIsModalOpen(true); }}
+                  className="mt-5 h-10 px-4 flex items-center gap-2 bg-[#D95510] text-white rounded-lg text-sm font-semibold hover:bg-[#C44A0C] transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                  Nuevo Cliente
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b-2 border-[#F3F4F6] bg-[#F8F9FA]">
+                    <th className="px-5 py-3.5 text-left text-[10px] font-bold text-[#6B7280] uppercase tracking-widest">
+                      Cliente
+                    </th>
+                    <th className="px-4 py-3.5 text-left text-[10px] font-bold text-[#6B7280] uppercase tracking-widest">
+                      Tipo
+                    </th>
+                    <th className="px-4 py-3.5 text-left text-[10px] font-bold text-[#6B7280] uppercase tracking-widest">
+                      Contacto
+                    </th>
+                    <th className="px-4 py-3.5 text-center text-[10px] font-bold text-[#6B7280] uppercase tracking-widest">
+                      Proyectos
+                    </th>
+                    <th className="px-4 py-3.5 text-right text-[10px] font-bold text-[#6B7280] uppercase tracking-widest">
+                      Inversión Total
+                    </th>
+                    <th className="px-4 py-3.5 text-left text-[10px] font-bold text-[#6B7280] uppercase tracking-widest">
+                      Estado
+                    </th>
+                    <th className="px-3 py-3.5 text-right text-[10px] font-bold text-[#6B7280] uppercase tracking-widest">
+                      Acciones
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#F3F4F6]">
+                  {clientesPagina.map(cliente => {
+                    const initials = getInitials(cliente.nombre_razon_social);
+                    const av = getAvatarColor(cliente.id);
+                    return (
+                      <tr
+                        key={cliente.id}
+                        className="hover:bg-[#FAFAFA] transition-colors group"
+                      >
+                        {/* Cliente */}
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-9 h-9 rounded-full ${av.bg} ${av.text} flex items-center justify-center text-xs font-bold flex-shrink-0 ring-1 ring-black/5`}>
+                              {initials}
+                            </div>
+                            <div className="min-w-0">
+                              <Link
+                                href={`/clientes/${cliente.id}`}
+                                className="font-semibold text-[#111827] hover:text-[#D95510] transition-colors truncate block leading-tight"
+                              >
+                                {cliente.nombre_razon_social}
+                              </Link>
+                              <p className="text-xs text-[#9CA3AF] mt-0.5 truncate">
+                                {cliente.nit_cedula || 'Sin NIT/Cédula'}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Tipo */}
+                        <td className="px-4 py-3.5 whitespace-nowrap">
+                          {cliente.tipo === 'empresa' ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-[#EFF6FF] text-[#1E6FB8] border border-[#BFDBFE]">
+                              <Building2 className="h-3 w-3 flex-shrink-0" />
+                              Persona Jurídica
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-[#F3F4F6] text-[#6B7280] border border-[#E5E7EB]">
+                              <User className="h-3 w-3 flex-shrink-0" />
+                              Persona Natural
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Contacto */}
+                        <td className="px-4 py-3.5 max-w-[180px]">
+                          <p className="text-[#374151] font-medium truncate">
+                            {cliente.nombre_contacto || <span className="text-[#D1D5DB] font-normal">Sin contacto</span>}
+                          </p>
+                          {cliente.email && (
+                            <p className="text-xs text-[#9CA3AF] truncate mt-0.5">{cliente.email}</p>
+                          )}
+                        </td>
+
+                        {/* Proyectos */}
+                        <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                          <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${
+                            (cliente.total_proyectos || 0) > 0
+                              ? 'bg-[#F0FDF4] text-[#2D7A45]'
+                              : 'bg-[#F3F4F6] text-[#9CA3AF]'
+                          }`}>
+                            {cliente.total_proyectos || 0}
+                          </span>
+                        </td>
+
+                        {/* Inversión Total */}
+                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                          <span className="font-semibold text-[#111827] tabular-nums">
+                            {formatCurrency(cliente.valor_total_proyectos || 0)}
+                          </span>
+                        </td>
+
+                        {/* Estado — pill badge */}
+                        <td className="px-4 py-3.5 whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#F0FDF4] text-[#15803D] border border-[#BBF7D0]">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#22C55E] flex-shrink-0" />
+                            Activo
+                          </span>
+                        </td>
+
+                        {/* Acciones */}
+                        <td className="px-3 py-3.5 text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button className="p-1.5 rounded-lg hover:bg-[#F3F4F6] text-[#9CA3AF] hover:text-[#374151] opacity-40 group-hover:opacity-100 focus:opacity-100 transition-all">
+                                <MoreVertical className="h-4 w-4" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem asChild>
+                                <Link href={`/clientes/${cliente.id}`}>
+                                  <ExternalLink className="h-4 w-4 mr-2" />
+                                  Ver detalle
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => { setClienteAEditar(cliente); setIsModalOpen(true); }}
+                              >
+                                <Edit className="h-4 w-4 mr-2" />
+                                Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleDesactivar(cliente.id, cliente.nombre_razon_social)}
+                                className="text-red-600 focus:bg-red-50 focus:text-red-700"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Desactivar
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Footer */}
+          {clientesFiltrados.length > 0 && (
+            <div className="px-5 py-3.5 border-t border-[#F3F4F6] bg-[#FAFAFA] flex items-center justify-between gap-4">
+              <span className="text-sm text-[#6B7280]">
+                {clientesFiltrados.length <= PAGE_SIZE
+                  ? `${clientesFiltrados.length} cliente${clientesFiltrados.length !== 1 ? 's' : ''}`
+                  : `Mostrando ${(paginaActual - 1) * PAGE_SIZE + 1}–${Math.min(paginaActual * PAGE_SIZE, clientesFiltrados.length)} de ${clientesFiltrados.length} clientes`}
+              </span>
+
+              {totalPaginas > 1 && (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setPagina(p => Math.max(1, p - 1))}
+                    disabled={paginaActual === 1}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg text-[#374151] hover:bg-[#F3F4F6] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  {Array.from({ length: Math.min(totalPaginas, 5) }, (_, i) => {
+                    let p: number;
+                    if (totalPaginas <= 5) p = i + 1;
+                    else if (paginaActual <= 3) p = i + 1;
+                    else if (paginaActual >= totalPaginas - 2) p = totalPaginas - 4 + i;
+                    else p = paginaActual - 2 + i;
+                    return (
+                      <button
+                        key={p}
+                        onClick={() => setPagina(p)}
+                        className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-medium transition-colors ${
+                          p === paginaActual
+                            ? 'bg-[#D95510] text-white shadow-sm'
+                            : 'text-[#374151] hover:bg-[#F3F4F6]'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    );
+                  })}
+                  <button
+                    onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))}
+                    disabled={paginaActual === totalPaginas}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg text-[#374151] hover:bg-[#F3F4F6] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Grid */}
-      {clientesFiltrados.length === 0 ? (
-        <Card className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="bg-steel-fog p-4 rounded-full mb-4">
-            <User className="h-8 w-8 text-mortar" />
-          </div>
-          <h3 className="text-lg font-semibold text-stone">No hay clientes</h3>
-          <p className="text-mortar text-sm max-w-xs mb-6">
-            {busqueda || filtroTipo !== 'todos'
-              ? 'No se encontraron clientes con los filtros aplicados.'
-              : 'Aún no tienes clientes registrados en tu catálogo.'}
-          </p>
-          <Button icon={<Plus className="h-4 w-4" />} onClick={handleNuevo}>
-            Nuevo Cliente
-          </Button>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {clientesFiltrados.map((cliente) => (
-            <Card key={cliente.id} className="group hover:border-[var(--accent-primary)]/30 transition-all p-0 overflow-hidden flex flex-col">
-              {/* Card Header */}
-              <div className="p-5 flex justify-between items-start border-b border-concrete/50">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    {cliente.tipo === 'empresa' ? (
-                      <Badge className="bg-blue-50 text-blue-700 border border-blue-100 py-0.5 px-2 text-[10px]">
-                        <Building2 className="h-3 w-3 mr-1" /> Persona Jurídica
-                      </Badge>
-                    ) : (
-                      <Badge className="bg-amber-50 text-amber-700 border border-amber-100 py-0.5 px-2 text-[10px]">
-                        <User className="h-3 w-3 mr-1" /> Persona Natural
-                      </Badge>
-                    )}
-                  </div>
-                  <h3 className="font-bold text-stone leading-tight group-hover:text-[var(--accent-primary)] transition-colors">
-                    {cliente.nombre_razon_social}
-                  </h3>
-                  <p className="text-xs text-mortar">
-                    {cliente.nit_cedula || 'Sin NIT/Cédula'}
-                  </p>
+      {/* ── Right: Sidebar ── */}
+      <div className="w-full lg:w-72 flex-shrink-0 space-y-4">
+
+        {/* Distribución */}
+        <div className="bg-white border border-[#E5E7EB] rounded-2xl p-5 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
+          <h3 className="font-semibold text-[#111827] mb-5 text-sm">
+            Distribución por tipo de cliente
+          </h3>
+          <DonutChart total={clientes.length} empresa={totalEmpresa} natural={totalNatural} />
+          <div className="mt-5 space-y-2">
+            {[
+              { color: 'bg-[#1E6FB8]', label: 'Persona Jurídica', count: totalEmpresa },
+              { color: 'bg-[#2D7A45]', label: 'Persona Natural', count: totalNatural },
+            ].map(({ color, label, count }) => (
+              <div key={label} className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <span className={`w-2.5 h-2.5 rounded-full ${color} flex-shrink-0`} />
+                  <span className="text-[#374151]">{label}</span>
                 </div>
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="p-2 hover:bg-steel-fog rounded-lg text-mortar transition-colors">
-                      <MoreVertical className="h-4 w-4" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem asChild>
-                      <Link href={`/clientes/${cliente.id}`}>
-                        <ExternalLink className="h-4 w-4 mr-2" /> Ver detalle
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleEditar(cliente)}>
-                      <Edit className="h-4 w-4 mr-2" /> Editar
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleDesactivar(cliente.id)} className="text-danger-text focus:bg-danger-text/10">
-                      <Trash2 className="h-4 w-4 mr-2" /> Desactivar
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <span className="font-semibold text-[#111827]">
+                  {count}
+                  {clientes.length > 0 && (
+                    <span className="text-[#9CA3AF] font-normal ml-1 text-xs">
+                      ({Math.round((count / clientes.length) * 100)}%)
+                    </span>
+                  )}
+                </span>
               </div>
+            ))}
+          </div>
+        </div>
 
-              {/* Card Body */}
-              <div className="p-5 flex-1 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <p className="text-[10px] uppercase font-bold text-mortar tracking-wider">Ubicación</p>
-                    <div className="flex items-center text-xs text-stone">
-                      <MapPin className="h-3 w-3 mr-1 text-mortar" />
-                      {cliente.ciudad || 'N/A'}
+        {/* Actividad reciente */}
+        <div className="bg-white border border-[#E5E7EB] rounded-2xl p-5 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
+          <h3 className="font-semibold text-[#111827] mb-4 text-sm">Actividad reciente</h3>
+
+          {actividadReciente.length === 0 ? (
+            <p className="text-sm text-[#9CA3AF] text-center py-4">Sin actividad reciente</p>
+          ) : (
+            <div className="divide-y divide-[#F3F4F6]">
+              {actividadReciente.map(c => {
+                const isNew = Math.abs(
+                  new Date(c.updated_at).getTime() - new Date(c.created_at).getTime()
+                ) < 120_000;
+                const av = getAvatarColor(c.id);
+                return (
+                  <div key={c.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                    <div className={`w-8 h-8 rounded-lg ${av.bg} ${av.text} flex items-center justify-center flex-shrink-0 text-[10px] font-bold ring-1 ring-black/5`}>
+                      {getInitials(c.nombre_razon_social)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-[#111827] leading-tight">
+                        {isNew ? 'Nuevo cliente registrado' : 'Cliente actualizado'}
+                      </p>
+                      <p className="text-xs text-[#6B7280] truncate mt-0.5">{c.nombre_razon_social}</p>
+                      <p className="text-[10px] text-[#9CA3AF] mt-0.5">{timeAgo(c.updated_at)}</p>
                     </div>
                   </div>
-                  <div className="space-y-1 text-right">
-                    <p className="text-[10px] uppercase font-bold text-mortar tracking-wider">Contacto</p>
-                    <p className="text-xs text-stone font-medium truncate">
-                      {cliente.nombre_contacto || 'No asignado'}
-                    </p>
-                  </div>
-                </div>
+                );
+              })}
+            </div>
+          )}
 
-                <div className="flex items-center gap-3 pt-2">
-                  {cliente.telefono && (
-                    <a 
-                      href={`tel:${cliente.telefono}`}
-                      className="p-2 bg-steel-fog hover:bg-[var(--accent-primary)]/10 hover:text-[var(--accent-primary)] rounded-full transition-colors"
-                      title={cliente.telefono}
-                    >
-                      <Phone className="h-4 w-4" />
-                    </a>
-                  )}
-                  {cliente.email && (
-                    <a 
-                      href={`mailto:${cliente.email}`}
-                      className="p-2 bg-steel-fog hover:bg-[var(--accent-primary)]/10 hover:text-[var(--accent-primary)] rounded-full transition-colors"
-                      title={cliente.email}
-                    >
-                      <Mail className="h-4 w-4" />
-                    </a>
-                  )}
-                </div>
-              </div>
-
-              {/* Card Footer (Stats) */}
-              <div className="bg-steel-fog/30 p-4 border-t border-concrete/50 flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Briefcase className="h-3.5 w-3.5 text-mortar" />
-                  <span className="text-xs font-semibold text-stone">
-                    {cliente.total_proyectos || 0}
-                  </span>
-                  <span className="text-[10px] text-mortar uppercase font-medium">Proyectos</span>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] text-mortar uppercase font-medium leading-none mb-1">Inversión Total</p>
-                  <p className="text-sm font-bold text-stone">
-                    {formatCurrency(cliente.valor_total_proyectos || 0)}
-                  </p>
-                </div>
-              </div>
-            </Card>
-          ))}
+          {actividadReciente.length > 0 && (
+            <div className="mt-4 pt-3 border-t border-[#F3F4F6]">
+              <Link
+                href="/clientes"
+                className="text-sm font-semibold text-[#D95510] hover:text-[#C44A0C] transition-colors"
+              >
+                Ver toda la actividad →
+              </Link>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
-      <ModalCliente 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+      <ModalCliente
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
         cliente={clienteAEditar}
+        onSuccess={() => router.refresh()}
       />
     </div>
   );

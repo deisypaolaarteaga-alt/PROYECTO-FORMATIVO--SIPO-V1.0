@@ -45,14 +45,12 @@ export default function InsumosPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
-  // ── Modal insumo propio ─────────────────────────────────────────────────
   const [showInsumoModal, setShowInsumoModal] = useState(false);
   const [editItem, setEditItem] = useState<UserMaterial | null>(null);
   const [savingInsumo, setSavingInsumo] = useState(false);
   const [insumoError, setInsumoError] = useState('');
   const [deletingInsumoId, setDeletingInsumoId] = useState<string | null>(null);
 
-  // ── Modal cuadrilla ─────────────────────────────────────────────────────
   const [showCuadrillaModal, setShowCuadrillaModal] = useState(false);
   const [trabajadoresDisponibles, setTrabajadoresDisponibles] = useState<any[]>([]);
   const [loadingTrabajadores, setLoadingTrabajadores] = useState(false);
@@ -63,7 +61,6 @@ export default function InsumosPage() {
   const [cuadrillaError, setCuadrillaError] = useState('');
   const [deletingCuadrillaId, setDeletingCuadrillaId] = useState<string | null>(null);
   const cuadrillaFormRef = useRef<HTMLFormElement>(null);
-  // ── Importar desde catálogo Mano de Obra ────────────────────────────────
   const [laborCatalog, setLaborCatalog] = useState<any[]>([]);
   const [busquedaLabor, setBusquedaLabor] = useState('');
   const [showLaborImport, setShowLaborImport] = useState(false);
@@ -88,7 +85,6 @@ export default function InsumosPage() {
     }
   }
 
-  // ── Handlers insumo ────────────────────────────────────────────────────
   function openCreateInsumo() {
     setEditItem(null);
     setInsumoError('');
@@ -127,7 +123,6 @@ export default function InsumosPage() {
     loadData();
   }
 
-  // ── Handlers cuadrilla ─────────────────────────────────────────────────
   async function openCreateCuadrilla() {
     setCuadrillaError('');
     setTrabajadoresSeleccionados([]);
@@ -137,7 +132,6 @@ export default function InsumosPage() {
     setBusquedaLabor('');
     setShowCuadrillaModal(true);
     if (tab !== 'crews') setTab('crews');
-    // Carga trabajadores y catálogo labor en paralelo la primera vez
     const promises: Promise<void>[] = [];
     if (trabajadoresDisponibles.length === 0) {
       setLoadingTrabajadores(true);
@@ -162,11 +156,9 @@ export default function InsumosPage() {
       return;
     }
     const t = result.trabajador;
-    // Añadir al catálogo disponible si aún no está
     if (!trabajadoresDisponibles.some(td => td.id === t.id)) {
       setTrabajadoresDisponibles(prev => [...prev, t]);
     }
-    // Añadir directamente a la selección si no está
     if (!trabajadoresSeleccionados.some(ts => ts.id === t.id)) {
       setTrabajadoresSeleccionados(prev => [...prev, {
         id: t.id,
@@ -185,7 +177,7 @@ export default function InsumosPage() {
   function agregarTrabajador() {
     const t = trabajadoresDisponibles.find(t => t.id === trabajadorElegido);
     if (!t) return;
-    if (trabajadoresSeleccionados.some(s => s.id === t.id)) return; // ya está
+    if (trabajadoresSeleccionados.some(s => s.id === t.id)) return;
     setTrabajadoresSeleccionados(prev => [...prev, {
       id: t.id,
       especialidad: t.especialidad,
@@ -232,7 +224,6 @@ export default function InsumosPage() {
     loadData();
   }
 
-  // ── Costo jornada de una cuadrilla ────────────────────────────────────
   function costoJornadaCuadrilla(cuadrilla: any): number {
     return (cuadrilla.trabajadores || []).reduce(
       (s: number, t: any) => s + t.jornal_base * t.factor_prestacional * t.cantidad, 0
@@ -243,22 +234,31 @@ export default function InsumosPage() {
     (item.nombre || item.especialidad || '').toLowerCase().includes(search.toLowerCase())
   );
 
+  /* Clases de icono por pestaña */
+  const tabIconClass: Record<string, string> = {
+    material:  'bg-[#FAF0EB] text-[#D95510]',
+    labor:     'bg-[#EBF2FA] text-[#1E4D8C]',
+    equipment: 'bg-[#EBFAF0] text-[#166534]',
+    user:      'bg-[#FEF3E2] text-[#7A4B00]',
+    crews:     'bg-[#E4E7EC] text-[#4B5563]',
+  };
+
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8 animate-fade-in">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight uppercase">Catálogo de Insumos</h1>
-          <p className="text-slate-500 mt-1">Gestiona los materiales, cuadrillas y equipos base para tus presupuestos.</p>
+          <h1 className="text-2xl font-bold text-[#1F2937] tracking-tight">Catálogo de Insumos</h1>
+          <p className="text-[#6B7A8D] mt-1 text-sm">Gestiona los materiales, cuadrillas y equipos base para tus presupuestos.</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6B7A8D]" />
             <input
               placeholder="Filtrar por nombre..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:border-blue-600 outline-none w-64 transition-all"
+              className="pl-10 pr-4 py-2 bg-white border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none w-64 transition-all"
             />
           </div>
           <Button
@@ -271,22 +271,22 @@ export default function InsumosPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-px overflow-x-auto custom-scrollbar">
+      <div className="flex items-center gap-1 border-b border-[#D0D4DB] pb-px overflow-x-auto">
         {[
-          { id: 'material', label: 'Materiales', icon: Package },
-          { id: 'labor', label: 'Mano de Obra', icon: Users },
-          { id: 'equipment', label: 'Equipos', icon: Drill },
-          { id: 'user', label: 'Mis Insumos', icon: Star },
-          { id: 'crews', label: 'Cuadrillas', icon: ShieldCheck },
+          { id: 'material',  label: 'Materiales',   icon: Package    },
+          { id: 'labor',     label: 'Mano de Obra',  icon: Users      },
+          { id: 'equipment', label: 'Equipos',       icon: Drill      },
+          { id: 'user',      label: 'Mis Insumos',   icon: Star       },
+          { id: 'crews',     label: 'Cuadrillas',    icon: ShieldCheck },
         ].map(t => (
           <button
             key={t.id}
             onClick={() => setTab(t.id as TabId)}
             className={cn(
-              "flex items-center gap-2 px-6 py-4 text-sm font-bold transition-all relative",
+              "flex items-center gap-2 px-5 py-3 text-sm font-semibold transition-all relative whitespace-nowrap",
               tab === t.id
-                ? "text-blue-600 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-1 after:bg-blue-600 after:rounded-t-full"
-                : "text-slate-400 hover:text-slate-600"
+                ? "text-[#D95510] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-[#D95510] after:rounded-t-full"
+                : "text-[#6B7A8D] hover:text-[#4B5563]"
             )}
           >
             <t.icon className="h-4 w-4" />
@@ -296,67 +296,65 @@ export default function InsumosPage() {
       </div>
 
       {/* Content */}
-      <Card padding="none" className="overflow-hidden border-slate-200 shadow-sm bg-white">
+      <Card padding="none" className="overflow-hidden border-[#D0D4DB] bg-white">
         {loading ? (
           <div className="py-24 flex flex-col items-center justify-center gap-4">
-            <Loader2 className="h-8 w-8 text-blue-600 animate-spin" />
-            <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Cargando catálogo...</p>
+            <Loader2 className="h-8 w-8 text-[#D95510] animate-spin" />
+            <p className="text-sm font-semibold text-[#6B7A8D] uppercase tracking-widest">Cargando catálogo...</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            {/* ── Tabla genérica: material | labor | equipment | user ── */}
+            {/* Tabla genérica: material | labor | equipment | user */}
             {tab !== 'crews' && (
               <table className="w-full text-left">
-                <thead className="bg-slate-50/80 border-b border-slate-200">
+                <thead className="bg-[#DDE0E6] border-b border-[#D0D4DB]">
                   <tr>
-                    <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest">Descripción</th>
-                    <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest">Unidad / Categoría</th>
-                    <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-right">Precio Ref. (COP)</th>
-                    <th className="px-6 py-4 w-24"></th>
+                    <th className="px-6 py-3 text-[9px] font-bold text-[#6B7A8D] uppercase tracking-wide">Descripción</th>
+                    <th className="px-6 py-3 text-[9px] font-bold text-[#6B7A8D] uppercase tracking-wide">Unidad / Categoría</th>
+                    <th className="px-6 py-3 text-[9px] font-bold text-[#6B7A8D] uppercase tracking-wide text-right">Precio Ref. (COP)</th>
+                    <th className="px-6 py-3 w-24"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-[#E4E7EC]">
                   {filteredData.map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group">
+                    <tr key={item.id} className="bg-[#E4E7EC] hover:bg-[#DDE0E6] transition-colors group">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className={cn(
-                            "h-8 w-8 rounded flex items-center justify-center shrink-0",
-                            tab === 'material' ? "bg-emerald-50 text-emerald-600" :
-                            tab === 'labor' ? "bg-blue-50 text-blue-600" :
-                            tab === 'equipment' ? "bg-purple-50 text-purple-600" : "bg-orange-50 text-orange-600"
+                            "h-8 w-8 rounded-lg flex items-center justify-center shrink-0",
+                            tabIconClass[tab] ?? tabIconClass.material
                           )}>
-                            {tab === 'material' ? <Package className="h-4 w-4" /> :
-                             tab === 'labor' ? <Users className="h-4 w-4" /> :
-                             tab === 'equipment' ? <Drill className="h-4 w-4" /> : <Star className="h-4 w-4" />}
+                            {tab === 'material'  ? <Package className="h-4 w-4" /> :
+                             tab === 'labor'     ? <Users   className="h-4 w-4" /> :
+                             tab === 'equipment' ? <Drill   className="h-4 w-4" /> : <Star className="h-4 w-4" />}
                           </div>
                           <div>
-                            <p className="text-sm font-bold text-slate-800">{item.nombre || item.especialidad}</p>
-                            <p className="text-[10px] text-slate-400 font-medium">{item.departamento || 'Referencia Nacional'}</p>
+                            <p className="text-sm font-semibold text-[#1F2937]">{item.nombre || item.especialidad}</p>
+                            <p className="text-[10px] text-[#6B7A8D] font-medium">{item.departamento || 'Referencia Nacional'}</p>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded uppercase">{item.unidad || 'Día'}</span>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase">{item.categoria || item.oficio || item.tipo}</span>
+                          <span className="text-xs font-semibold text-[#4B5563] bg-[#DDE0E6] px-2 py-0.5 rounded uppercase">{item.unidad || 'Día'}</span>
+                          <span className="text-[10px] text-[#6B7A8D] font-semibold uppercase">{item.categoria || item.oficio || item.tipo}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <p className="text-sm font-black text-slate-900">{formatearCOP(item.precio_referencia || item.precio_diario || item.precio_unitario || item.jornal_base)}</p>
+                        <p className="text-sm font-bold text-[#1F2937] tabular-nums">{formatearCOP(item.precio_referencia || item.precio_diario || item.precio_unitario || item.jornal_base)}</p>
                       </td>
                       <td className="px-6 py-4 text-right">
                         {tab === 'user' ? (
                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => openEditInsumo(item as UserMaterial)} className="p-2 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600" title="Editar">
+                            <button onClick={() => openEditInsumo(item as UserMaterial)} className="p-2 hover:bg-[#DDE0E6] rounded-lg text-[#6B7A8D] hover:text-[#4B5563]" title="Editar">
                               <Edit2 className="h-3.5 w-3.5" />
                             </button>
-                            <button onClick={() => handleDeleteInsumo(item.id)} disabled={deletingInsumoId === item.id} className="p-2 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-500 disabled:opacity-40" title="Eliminar">
+                            <button onClick={() => handleDeleteInsumo(item.id)} disabled={deletingInsumoId === item.id} className="p-2 hover:bg-[#FEF0F0] rounded-lg text-[#6B7A8D] hover:text-[#991B1B] disabled:opacity-40" title="Eliminar">
                               {deletingInsumoId === item.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                             </button>
                           </div>
                         ) : (
-                          <span className="text-[9px] font-black text-slate-300 uppercase tracking-tighter">Sistema</span>
+                          <span className="text-[9px] font-bold text-[#C8CDD6] uppercase tracking-tighter">Sistema</span>
                         )}
                       </td>
                     </tr>
@@ -365,28 +363,28 @@ export default function InsumosPage() {
               </table>
             )}
 
-            {/* ── Tabla específica: cuadrillas ── */}
+            {/* Tabla específica: cuadrillas */}
             {tab === 'crews' && (
               <table className="w-full text-left">
-                <thead className="bg-slate-50/80 border-b border-slate-200">
+                <thead className="bg-[#DDE0E6] border-b border-[#D0D4DB]">
                   <tr>
-                    <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest">Cuadrilla</th>
-                    <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest">Trabajadores</th>
-                    <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-widest text-right">Costo / Jornada (COP)</th>
-                    <th className="px-6 py-4 w-24"></th>
+                    <th className="px-6 py-3 text-[9px] font-bold text-[#6B7A8D] uppercase tracking-wide">Cuadrilla</th>
+                    <th className="px-6 py-3 text-[9px] font-bold text-[#6B7A8D] uppercase tracking-wide">Trabajadores</th>
+                    <th className="px-6 py-3 text-[9px] font-bold text-[#6B7A8D] uppercase tracking-wide text-right">Costo / Jornada (COP)</th>
+                    <th className="px-6 py-3 w-24"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-[#E4E7EC]">
                   {filteredData.map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group">
+                    <tr key={item.id} className="bg-[#E4E7EC] hover:bg-[#DDE0E6] transition-colors group">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded bg-teal-50 text-teal-600 flex items-center justify-center shrink-0">
+                          <div className="h-8 w-8 rounded-lg bg-[#E4E7EC] border border-[#C8CDD6] text-[#4B5563] flex items-center justify-center shrink-0">
                             <ShieldCheck className="h-4 w-4" />
                           </div>
                           <div>
-                            <p className="text-sm font-bold text-slate-800">{item.nombre}</p>
-                            <p className="text-[10px] text-slate-400 font-medium uppercase">
+                            <p className="text-sm font-semibold text-[#1F2937]">{item.nombre}</p>
+                            <p className="text-[10px] text-[#6B7A8D] font-medium uppercase">
                               {item.categoria_actividad || 'Sin categoría'} · {item.es_sistema ? 'Sistema' : 'Personalizada'}
                             </p>
                           </div>
@@ -395,23 +393,23 @@ export default function InsumosPage() {
                       <td className="px-6 py-4">
                         <div className="flex flex-wrap gap-1">
                           {(item.trabajadores || []).slice(0, 3).map((t: any, i: number) => (
-                            <span key={i} className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded uppercase">
+                            <span key={i} className="text-[10px] font-semibold text-[#4B5563] bg-[#DDE0E6] px-2 py-0.5 rounded uppercase">
                               {t.cantidad > 1 ? `${t.cantidad}×` : ''}{t.especialidad}
                             </span>
                           ))}
                           {(item.trabajadores || []).length > 3 && (
-                            <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded">
+                            <span className="text-[10px] font-semibold text-[#6B7A8D] bg-[#ECEEF2] px-2 py-0.5 rounded">
                               +{item.trabajadores.length - 3} más
                             </span>
                           )}
                           {(item.trabajadores || []).length === 0 && (
-                            <span className="text-[10px] text-slate-300">Sin trabajadores</span>
+                            <span className="text-[10px] text-[#6B7A8D]">Sin trabajadores</span>
                           )}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <p className="text-sm font-black text-slate-900">{formatearCOP(costoJornadaCuadrilla(item))}</p>
-                        <p className="text-[10px] text-slate-400">con prestaciones</p>
+                        <p className="text-sm font-bold text-[#1F2937] tabular-nums">{formatearCOP(costoJornadaCuadrilla(item))}</p>
+                        <p className="text-[10px] text-[#6B7A8D]">con prestaciones</p>
                       </td>
                       <td className="px-6 py-4 text-right">
                         {!item.es_sistema ? (
@@ -419,14 +417,14 @@ export default function InsumosPage() {
                             <button
                               onClick={() => handleDeleteCuadrilla(item.id)}
                               disabled={deletingCuadrillaId === item.id}
-                              className="p-2 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-500 disabled:opacity-40"
+                              className="p-2 hover:bg-[#FEF0F0] rounded-lg text-[#6B7A8D] hover:text-[#991B1B] disabled:opacity-40"
                               title="Eliminar"
                             >
                               {deletingCuadrillaId === item.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                             </button>
                           </div>
                         ) : (
-                          <span className="text-[9px] font-black text-slate-300 uppercase tracking-tighter">Sistema</span>
+                          <span className="text-[9px] font-bold text-[#C8CDD6] uppercase tracking-tighter">Sistema</span>
                         )}
                       </td>
                     </tr>
@@ -438,25 +436,25 @@ export default function InsumosPage() {
             {/* Estado vacío */}
             {filteredData.length === 0 && (
               <div className="py-24 flex flex-col items-center justify-center text-center px-6">
-                <div className="h-16 w-16 rounded-full bg-slate-50 flex items-center justify-center mb-4">
-                  {tab === 'user' ? <Star className="h-8 w-8 text-slate-200" /> :
-                   tab === 'crews' ? <ShieldCheck className="h-8 w-8 text-slate-200" /> :
-                   <Info className="h-8 w-8 text-slate-200" />}
+                <div className="h-16 w-16 rounded-full bg-[#ECEEF2] flex items-center justify-center mb-4">
+                  {tab === 'user'  ? <Star       className="h-8 w-8 text-[#C8CDD6]" /> :
+                   tab === 'crews' ? <ShieldCheck className="h-8 w-8 text-[#C8CDD6]" /> :
+                   <Info className="h-8 w-8 text-[#C8CDD6]" />}
                 </div>
-                <h3 className="text-lg font-bold text-slate-800">
-                  {tab === 'user' ? 'Aún no tienes insumos propios' :
+                <h3 className="text-base font-semibold text-[#1F2937]">
+                  {tab === 'user'  ? 'Aún no tienes insumos propios' :
                    tab === 'crews' ? 'No hay cuadrillas disponibles' :
                    'No se encontraron resultados'}
                 </h3>
-                <p className="text-slate-500 text-sm max-w-xs mt-1">
-                  {tab === 'user' ? 'Haz clic en "Agregar Propio" para crear tu primer insumo personalizado.' :
+                <p className="text-[#6B7A8D] text-sm max-w-xs mt-1">
+                  {tab === 'user'  ? 'Haz clic en "Agregar Propio" para crear tu primer insumo personalizado.' :
                    tab === 'crews' ? 'Crea tu primera cuadrilla personalizada o verifica que el catálogo base esté cargado.' :
                    'Intenta con otra palabra clave o cambia de pestaña.'}
                 </p>
                 {(tab === 'user' || tab === 'crews') && (
                   <button
                     onClick={tab === 'crews' ? openCreateCuadrilla : openCreateInsumo}
-                    className="mt-4 flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors"
+                    className="mt-4 flex items-center gap-2 px-4 py-2 bg-[#D95510] text-white rounded-lg text-sm font-semibold hover:bg-[#C04A0D] transition-colors"
                   >
                     <Plus className="h-4 w-4" />
                     {tab === 'crews' ? 'Crear Cuadrilla' : 'Agregar Insumo Propio'}
@@ -469,40 +467,40 @@ export default function InsumosPage() {
       </Card>
 
       {/* Info Box */}
-      <div className="bg-blue-600 rounded-3xl p-8 text-white relative overflow-hidden shadow-xl">
+      <div className="bg-[#1A2535] rounded-2xl p-8 text-white relative overflow-hidden">
         <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
           <div className="space-y-2 text-center md:text-left">
-            <h2 className="text-2xl font-black uppercase tracking-tight italic">Base de Datos 2026 Integrada</h2>
-            <p className="text-blue-100 text-sm max-w-xl font-medium opacity-90">
+            <h2 className="text-xl font-bold tracking-tight">Base de Datos 2026 Integrada</h2>
+            <p className="text-[#F0A882] text-sm max-w-xl font-medium opacity-90">
               SIPO incluye por defecto los precios de referencia de la metodología IDU / INVIAS actualizados.
               Puedes agregar tus propios insumos y cuadrillas personalizadas para un control total de costos.
             </p>
           </div>
-          <ShieldCheck className="h-24 w-24 text-blue-400/30 absolute right-8 top-1/2 -translate-y-1/2" />
+          <ShieldCheck className="h-24 w-24 text-white/10 absolute right-8 top-1/2 -translate-y-1/2" />
         </div>
       </div>
 
-      {/* ══ MODAL: Insumo propio ══ */}
+      {/* MODAL: Insumo propio */}
       {showInsumoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeInsumoModal} />
           <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
-              <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#D0D4DB] bg-[#ECEEF2]">
+              <h2 className="text-sm font-bold text-[#1F2937] uppercase tracking-wider">
                 {editItem ? 'Editar Insumo' : 'Nuevo Insumo Propio'}
               </h2>
-              <button onClick={closeInsumoModal} className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors">
-                <X className="h-4 w-4 text-slate-500" />
+              <button onClick={closeInsumoModal} className="p-1.5 hover:bg-[#DDE0E6] rounded-lg transition-colors">
+                <X className="h-4 w-4 text-[#6B7A8D]" />
               </button>
             </div>
             <form onSubmit={handleInsumoSubmit} className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Nombre <span className="text-red-500">*</span></label>
-                <input name="nombre" defaultValue={editItem?.nombre || ''} required maxLength={200} placeholder="Ej: Cemento Portland Tipo I" className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:border-blue-500 outline-none transition-all" />
+                <label className="block text-xs font-bold text-[#4B5563] uppercase tracking-wider mb-1.5">Nombre <span className="text-[#991B1B]">*</span></label>
+                <input name="nombre" defaultValue={editItem?.nombre || ''} required maxLength={200} placeholder="Ej: Cemento Portland Tipo I" className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Tipo <span className="text-red-500">*</span></label>
-                <select name="tipo" defaultValue={editItem?.tipo || 'material'} required className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:border-blue-500 outline-none transition-all bg-white">
+                <label className="block text-xs font-bold text-[#4B5563] uppercase tracking-wider mb-1.5">Tipo <span className="text-[#991B1B]">*</span></label>
+                <select name="tipo" defaultValue={editItem?.tipo || 'material'} required className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all bg-white">
                   <option value="material">Material</option>
                   <option value="mano_obra">Mano de Obra</option>
                   <option value="equipo">Equipo</option>
@@ -510,22 +508,22 @@ export default function InsumosPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Unidad <span className="text-red-500">*</span></label>
-                  <input name="unidad" defaultValue={editItem?.unidad || ''} required maxLength={20} placeholder="kg, m², día" className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:border-blue-500 outline-none transition-all" />
+                  <label className="block text-xs font-bold text-[#4B5563] uppercase tracking-wider mb-1.5">Unidad <span className="text-[#991B1B]">*</span></label>
+                  <input name="unidad" defaultValue={editItem?.unidad || ''} required maxLength={20} placeholder="kg, m², día" className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Precio Unit. <span className="text-red-500">*</span></label>
-                  <input name="precio_unitario" type="number" defaultValue={editItem?.precio_unitario ?? ''} required min={0} step="0.01" placeholder="0" className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:border-blue-500 outline-none transition-all" />
+                  <label className="block text-xs font-bold text-[#4B5563] uppercase tracking-wider mb-1.5">Precio Unit. <span className="text-[#991B1B]">*</span></label>
+                  <input name="precio_unitario" type="number" defaultValue={editItem?.precio_unitario ?? ''} required min={0} step="0.01" placeholder="0" className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all" />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Descripción <span className="text-slate-400 font-normal normal-case">(opcional)</span></label>
-                <textarea name="descripcion" defaultValue={editItem?.descripcion || ''} maxLength={500} rows={2} placeholder="Especificaciones adicionales..." className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:border-blue-500 outline-none transition-all resize-none" />
+                <label className="block text-xs font-bold text-[#4B5563] uppercase tracking-wider mb-1.5">Descripción <span className="text-[#6B7A8D] font-normal normal-case">(opcional)</span></label>
+                <textarea name="descripcion" defaultValue={editItem?.descripcion || ''} maxLength={500} rows={2} placeholder="Especificaciones adicionales..." className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all resize-none" />
               </div>
-              {insumoError && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg border border-red-100">{insumoError}</p>}
+              {insumoError && <p className="text-xs text-[#991B1B] bg-[#FEF0F0] px-3 py-2 rounded-lg border border-[#F5C2C2]">{insumoError}</p>}
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={closeInsumoModal} className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors">Cancelar</button>
-                <button type="submit" disabled={savingInsumo} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors disabled:opacity-60">
+                <button type="button" onClick={closeInsumoModal} className="flex-1 px-4 py-2.5 border border-[#C8CDD6] rounded-lg text-sm font-semibold text-[#4B5563] hover:bg-[#E4E7EC] transition-colors">Cancelar</button>
+                <button type="submit" disabled={savingInsumo} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-[#D95510] text-white rounded-lg text-sm font-semibold hover:bg-[#C04A0D] transition-colors disabled:opacity-60">
                   {savingInsumo ? <><Loader2 className="h-4 w-4 animate-spin" /> Guardando...</> : <><Save className="h-4 w-4" /> {editItem ? 'Guardar Cambios' : 'Crear Insumo'}</>}
                 </button>
               </div>
@@ -534,53 +532,49 @@ export default function InsumosPage() {
         </div>
       )}
 
-      {/* ══ MODAL: Nueva cuadrilla ══ */}
+      {/* MODAL: Nueva cuadrilla */}
       {showCuadrillaModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeCuadrillaModal} />
           <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50 shrink-0">
-              <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider">Nueva Cuadrilla Personalizada</h2>
-              <button onClick={closeCuadrillaModal} className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors">
-                <X className="h-4 w-4 text-slate-500" />
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#D0D4DB] bg-[#ECEEF2] shrink-0">
+              <h2 className="text-sm font-bold text-[#1F2937] uppercase tracking-wider">Nueva Cuadrilla Personalizada</h2>
+              <button onClick={closeCuadrillaModal} className="p-1.5 hover:bg-[#DDE0E6] rounded-lg transition-colors">
+                <X className="h-4 w-4 text-[#6B7A8D]" />
               </button>
             </div>
 
-            {/* Form */}
             <form ref={cuadrillaFormRef} onSubmit={handleCuadrillaSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
-              {/* Nombre y Categoría */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
-                  <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Nombre <span className="text-red-500">*</span></label>
-                  <input name="nombre" required maxLength={150} placeholder="Ej: Cuadrilla Mampostería" className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:border-blue-500 outline-none transition-all" />
+                  <label className="block text-xs font-bold text-[#4B5563] uppercase tracking-wider mb-1.5">Nombre <span className="text-[#991B1B]">*</span></label>
+                  <input name="nombre" required maxLength={150} placeholder="Ej: Cuadrilla Mampostería" className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Categoría</label>
-                  <input name="categoria_actividad" maxLength={100} placeholder="Ej: Mampostería" className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:border-blue-500 outline-none transition-all" />
+                  <label className="block text-xs font-bold text-[#4B5563] uppercase tracking-wider mb-1.5">Categoría</label>
+                  <input name="categoria_actividad" maxLength={100} placeholder="Ej: Mampostería" className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5">Descripción</label>
-                  <input name="descripcion" maxLength={300} placeholder="Opcional" className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:border-blue-500 outline-none transition-all" />
+                  <label className="block text-xs font-bold text-[#4B5563] uppercase tracking-wider mb-1.5">Descripción</label>
+                  <input name="descripcion" maxLength={300} placeholder="Opcional" className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all" />
                 </div>
               </div>
 
-              {/* Selector de trabajadores */}
               <div className="space-y-3">
-                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider">
-                  Trabajadores <span className="text-red-500">*</span>
+                <label className="block text-xs font-bold text-[#4B5563] uppercase tracking-wider">
+                  Trabajadores <span className="text-[#991B1B]">*</span>
                 </label>
 
                 {loadingTrabajadores ? (
-                  <div className="flex items-center gap-2 text-sm text-slate-400">
-                    <Loader2 className="h-4 w-4 animate-spin" /> Cargando trabajadores...
+                  <div className="flex items-center gap-2 text-sm text-[#6B7A8D]">
+                    <Loader2 className="h-4 w-4 animate-spin text-[#D95510]" /> Cargando trabajadores...
                   </div>
                 ) : (
                   <div className="flex gap-2">
                     <select
                       value={trabajadorElegido}
                       onChange={e => setTrabajadorElegido(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-sm focus:border-blue-500 outline-none bg-white"
+                      className="flex-1 px-3 py-2 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none bg-white"
                     >
                       <option value="">Selecciona un trabajador...</option>
                       {trabajadoresDisponibles.map(t => (
@@ -595,26 +589,25 @@ export default function InsumosPage() {
                       onChange={e => setCantidadTrabajador(Math.max(1, parseInt(e.target.value) || 1))}
                       min={1}
                       max={20}
-                      className="w-16 px-2 py-2 border border-slate-200 rounded-xl text-sm text-center focus:border-blue-500 outline-none"
+                      className="w-16 px-2 py-2 border border-[#C8CDD6] rounded-lg text-sm text-center focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none"
                       title="Cantidad"
                     />
                     <button
                       type="button"
                       onClick={agregarTrabajador}
                       disabled={!trabajadorElegido}
-                      className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 disabled:opacity-40 transition-colors"
+                      className="flex items-center gap-1.5 px-3 py-2 bg-[#D95510] text-white rounded-lg text-sm font-semibold hover:bg-[#C04A0D] disabled:opacity-40 transition-colors"
                     >
                       <UserPlus className="h-4 w-4" /> Agregar
                     </button>
                   </div>
                 )}
 
-                {/* Importar desde catálogo Mano de Obra */}
-                <div className="border-t border-slate-100 pt-3">
+                <div className="border-t border-[#D0D4DB] pt-3">
                   <button
                     type="button"
                     onClick={() => setShowLaborImport(p => !p)}
-                    className="flex items-center gap-2 text-xs font-bold text-blue-600 hover:text-blue-700 uppercase tracking-wider transition-colors"
+                    className="flex items-center gap-2 text-xs font-semibold text-[#D95510] hover:text-[#C04A0D] uppercase tracking-wider transition-colors"
                   >
                     <UserPlus className="h-3.5 w-3.5" />
                     {showLaborImport ? 'Ocultar catálogo' : '¿No encuentras el trabajador? Importar desde Mano de Obra'}
@@ -626,18 +619,18 @@ export default function InsumosPage() {
                         placeholder="Buscar en catálogo de mano de obra..."
                         value={busquedaLabor}
                         onChange={e => setBusquedaLabor(e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:border-blue-500 outline-none transition-all"
+                        className="w-full px-3 py-2 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all"
                       />
-                      <div className="max-h-44 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100">
+                      <div className="max-h-44 overflow-y-auto border border-[#D0D4DB] rounded-lg divide-y divide-[#E4E7EC]">
                         {laborCatalog
                           .filter(l => (l.nombre || '').toLowerCase().includes(busquedaLabor.toLowerCase()))
                           .map(l => {
                             const yaAgregado = trabajadoresSeleccionados.some(t => t.especialidad === l.nombre);
                             return (
-                              <div key={l.id} className="flex items-center justify-between px-3 py-2.5 hover:bg-slate-50">
+                              <div key={l.id} className="flex items-center justify-between px-3 py-2.5 hover:bg-[#ECEEF2]">
                                 <div>
-                                  <p className="text-xs font-bold text-slate-700">{l.nombre}</p>
-                                  <p className="text-[10px] text-slate-400">
+                                  <p className="text-xs font-semibold text-[#1F2937]">{l.nombre}</p>
+                                  <p className="text-[10px] text-[#6B7A8D]">
                                     {formatearCOP(l.precio_diario)}/día · {l.oficio || 'Mano de obra'}
                                   </p>
                                 </div>
@@ -645,7 +638,7 @@ export default function InsumosPage() {
                                   type="button"
                                   disabled={importandoLaborId === l.id || yaAgregado}
                                   onClick={() => handleImportarLabor(l)}
-                                  className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-blue-600 hover:bg-blue-50 rounded-lg disabled:opacity-40 transition-colors uppercase"
+                                  className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-[#D95510] hover:bg-[#FAF0EB] rounded-lg disabled:opacity-40 transition-colors uppercase"
                                   title={yaAgregado ? 'Ya agregado' : 'Importar como trabajador'}
                                 >
                                   {importandoLaborId === l.id
@@ -658,9 +651,9 @@ export default function InsumosPage() {
                           })
                         }
                         {laborCatalog.filter(l => (l.nombre || '').toLowerCase().includes(busquedaLabor.toLowerCase())).length === 0 && (
-                          <p className="text-xs text-slate-400 text-center py-6">
+                          <p className="text-xs text-[#6B7A8D] text-center py-6">
                             {laborCatalog.length === 0
-                              ? 'El catálogo de mano de obra está vacío. Ejecuta npm run seed:catalogo.'
+                              ? 'El catálogo de mano de obra está vacío. Ejecuta pnpm run seed:catalogo.'
                               : 'No se encontraron resultados para la búsqueda.'}
                           </p>
                         )}
@@ -669,23 +662,22 @@ export default function InsumosPage() {
                   )}
                 </div>
 
-                {/* Lista de trabajadores seleccionados */}
                 {trabajadoresSeleccionados.length > 0 && (
-                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="border border-[#D0D4DB] rounded-lg overflow-hidden">
                     {trabajadoresSeleccionados.map((t, i) => (
-                      <div key={t.id} className={cn("flex items-center justify-between px-4 py-3 text-sm", i > 0 && "border-t border-slate-100")}>
+                      <div key={t.id} className={cn("flex items-center justify-between px-4 py-3 text-sm bg-[#E4E7EC]", i > 0 && "border-t border-[#D0D4DB]")}>
                         <div>
-                          <span className="font-bold text-slate-800">{t.cantidad > 1 ? `${t.cantidad}× ` : ''}{t.especialidad}</span>
-                          <span className="text-slate-400 ml-2 text-xs">{t.categoria} · {formatearCOP(t.jornal_base * t.factor_prestacional * t.cantidad)}/día c/prest.</span>
+                          <span className="font-semibold text-[#1F2937]">{t.cantidad > 1 ? `${t.cantidad}× ` : ''}{t.especialidad}</span>
+                          <span className="text-[#6B7A8D] ml-2 text-xs">{t.categoria} · {formatearCOP(t.jornal_base * t.factor_prestacional * t.cantidad)}/día c/prest.</span>
                         </div>
-                        <button type="button" onClick={() => quitarTrabajador(t.id)} className="p-1.5 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-500 transition-colors">
+                        <button type="button" onClick={() => quitarTrabajador(t.id)} className="p-1.5 hover:bg-[#FEF0F0] rounded-lg text-[#6B7A8D] hover:text-[#991B1B] transition-colors">
                           <Minus className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     ))}
-                    <div className="px-4 py-2 bg-slate-50 border-t border-slate-200 text-right">
-                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Costo jornada total: </span>
-                      <span className="text-sm font-black text-slate-800">
+                    <div className="px-4 py-2 bg-[#DDE0E6] border-t border-[#D0D4DB] text-right">
+                      <span className="text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider">Costo jornada total: </span>
+                      <span className="text-sm font-bold text-[#1F2937] tabular-nums">
                         {formatearCOP(trabajadoresSeleccionados.reduce((s, t) => s + t.jornal_base * t.factor_prestacional * t.cantidad, 0))}
                       </span>
                     </div>
@@ -693,15 +685,13 @@ export default function InsumosPage() {
                 )}
               </div>
 
-              {/* Error */}
               {cuadrillaError && (
-                <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg border border-red-100">{cuadrillaError}</p>
+                <p className="text-xs text-[#991B1B] bg-[#FEF0F0] px-3 py-2 rounded-lg border border-[#F5C2C2]">{cuadrillaError}</p>
               )}
 
-              {/* Botones */}
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={closeCuadrillaModal} className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors">Cancelar</button>
-                <button type="submit" disabled={savingCuadrilla} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors disabled:opacity-60">
+                <button type="button" onClick={closeCuadrillaModal} className="flex-1 px-4 py-2.5 border border-[#C8CDD6] rounded-lg text-sm font-semibold text-[#4B5563] hover:bg-[#E4E7EC] transition-colors">Cancelar</button>
+                <button type="submit" disabled={savingCuadrilla} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-[#D95510] text-white rounded-lg text-sm font-semibold hover:bg-[#C04A0D] transition-colors disabled:opacity-60">
                   {savingCuadrilla ? <><Loader2 className="h-4 w-4 animate-spin" /> Creando...</> : <><Save className="h-4 w-4" /> Crear Cuadrilla</>}
                 </button>
               </div>

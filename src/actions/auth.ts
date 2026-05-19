@@ -157,6 +157,31 @@ export async function resetPassword(formData: FormData): Promise<ActionResult> {
 }
 
 /**
+ * Cambiar contraseña desde el perfil (usuario autenticado)
+ */
+export async function cambiarContrasena(
+  nuevaContrasena: string,
+  confirmarContrasena: string
+): Promise<ActionResult> {
+  if (nuevaContrasena.length < 8)
+    return { success: false, error: 'La contraseña debe tener al menos 8 caracteres.' };
+  if (nuevaContrasena !== confirmarContrasena)
+    return { success: false, error: 'Las contraseñas no coinciden.' };
+
+  const supabase = await createClient();
+  const { data: { user }, error: authErr } = await supabase.auth.getUser();
+  if (authErr || !user) return { success: false, error: 'Sin sesión activa.' };
+
+  const { error } = await supabase.auth.updateUser({ password: nuevaContrasena });
+  if (error) {
+    console.error('cambiarContrasena error:', error);
+    return { success: false, error: 'Error al cambiar la contraseña. Intenta de nuevo.' };
+  }
+
+  return { success: true, message: 'Contraseña actualizada correctamente.' };
+}
+
+/**
  * Actualizar contraseña (desde link de recuperación)
  */
 export async function updatePassword(formData: FormData): Promise<ActionResult> {

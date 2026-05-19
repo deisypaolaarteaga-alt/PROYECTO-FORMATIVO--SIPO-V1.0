@@ -10,7 +10,10 @@
     "seed:catalogo": "tsx scripts/seed-catalogo.ts",
     "seed:catalogo:reset": "tsx scripts/seed-catalogo.ts --reset",
     "seed:apu": "tsx scripts/seed-apu-items.ts",
-    "seed:apu:reset": "tsx scripts/seed-apu-items.ts --reset"
+    "seed:apu:reset": "tsx scripts/seed-apu-items.ts --reset",
+    "seed:catalogo-items": "tsx scripts/seed_catalogo_items_2026.ts",
+    "seed:catalogo-items:reset": "tsx scripts/seed_catalogo_items_2026.ts --reset",
+    "seed:catalogo-items:dry": "tsx scripts/seed_catalogo_items_2026.ts --dry-run"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.92.0",
@@ -33,6 +36,7 @@
     "remark-gfm": "^4.0.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
+    "xlsx": "^0.18.5",
     "zod": "^4.4.1",
     "zustand": "^5.0.12"
   },

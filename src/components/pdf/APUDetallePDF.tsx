@@ -41,7 +41,8 @@ const styles = StyleSheet.create({
   
   // Tablas
   section: {
-    marginBottom: 15,
+    marginBottom: 12,
+    marginTop: 4,
   },
   sectionTitle: {
     fontSize: 10,
@@ -130,6 +131,17 @@ const styles = StyleSheet.create({
     color: '#1C2B3A',
   },
   
+  notaReferencia: {
+    marginTop: 8,
+    paddingTop: 6,
+    paddingHorizontal: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#E2DDD6',
+    fontSize: 7,
+    color: '#888888',
+    fontStyle: 'italic',
+    lineHeight: 1.4,
+  },
   footer: {
     position: 'absolute',
     bottom: 20,
@@ -177,13 +189,15 @@ export const APUDetallePDF = ({ projectName, activity, parametros, chapterNumber
   const costoHM = subtotalMO * (pctHM / 100);
   const costoEPP = subtotalMO * (pctEPP / 100);
 
-  const costoDirectoUnitario = apu.costo_total; 
-  // (El costo_total del APU ya suma materiales, MO, Equipos, HM y EPP divididos por rendimiento).
-  // La fórmula colombiana es: Costo Total = Suma(Mat + MO + Eq + HM + EPP) / Rendimiento.
-  // Aquí mostraremos los subtotales ajustados por rendimiento si se desea, o los totales de cuadrilla.
-  // La visualización IDU estándar muestra la "cantidad" como (Rendimiento o Consumo) para llegar al valor unitario.
+  const costoDirectoUnitario = apu.costo_total;
 
-  // Como la DB SIPO ya guarda el precio_unitario en el ítem (costo por unidad de actividad), usamos eso.
+  // Numeración dinámica de secciones — solo se incrementa si la sección existe
+  let sectionNum = 0;
+
+  // Detecta si algún ítem tiene nombre genérico (importado del catálogo sin editar)
+  const tieneItemsGenericos = [...itemsEquipo, ...itemsMaterial, ...itemsMO].some(
+    item => /actividad general|sin definir|por definir/i.test(item.nombre || '')
+  );
 
   return (
     <Page size="LETTER" style={styles.page} wrap={false} break>
@@ -216,10 +230,10 @@ export const APUDetallePDF = ({ projectName, activity, parametros, chapterNumber
         </View>
       </View>
 
-      {/* 1. Equipos */}
-      {itemsEquipo.length > 0 && (
+      {/* Equipos */}
+      {itemsEquipo.length > 0 && (() => { sectionNum++; return (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>1. EQUIPOS</Text>
+          <Text style={styles.sectionTitle}>{sectionNum}. EQUIPOS</Text>
           <View style={styles.table}>
             <View style={styles.tableHeader}>
               <Text style={[styles.colDesc, { fontWeight: 'bold' }]}>Descripción</Text>
@@ -243,12 +257,12 @@ export const APUDetallePDF = ({ projectName, activity, parametros, chapterNumber
             </View>
           </View>
         </View>
-      )}
+      ); })()}
 
-      {/* 2. Materiales */}
-      {itemsMaterial.length > 0 && (
+      {/* Materiales */}
+      {itemsMaterial.length > 0 && (() => { sectionNum++; return (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>2. MATERIALES</Text>
+          <Text style={styles.sectionTitle}>{sectionNum}. MATERIALES</Text>
           <View style={styles.table}>
             <View style={styles.tableHeader}>
               <Text style={[styles.colDesc, { fontWeight: 'bold' }]}>Descripción</Text>
@@ -272,12 +286,12 @@ export const APUDetallePDF = ({ projectName, activity, parametros, chapterNumber
             </View>
           </View>
         </View>
-      )}
+      ); })()}
 
-      {/* 3. Mano de Obra */}
-      {itemsMO.length > 0 && (
+      {/* Mano de Obra */}
+      {itemsMO.length > 0 && (() => { sectionNum++; return (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>3. MANO DE OBRA</Text>
+          <Text style={styles.sectionTitle}>{sectionNum}. MANO DE OBRA</Text>
           <View style={styles.table}>
             <View style={styles.tableHeader}>
               <Text style={[styles.colDesc, { fontWeight: 'bold' }]}>Cargo</Text>
@@ -304,11 +318,18 @@ export const APUDetallePDF = ({ projectName, activity, parametros, chapterNumber
               <Text style={[styles.subtotalValue, { color: '#666' }]}>{formatoCOP(costoHM)}</Text>
             </View>
             <View style={styles.subtotalRow}>
-              <Text style={[styles.subtotalLabel, { color: '#666' }]}>Elementos Seg. Ind (EPP) ({pctEPP}% sobre MO):</Text>
+              <Text style={[styles.subtotalLabel, { color: '#666' }]}>Elementos Seg. Ind. (EPP) ({pctEPP}% sobre MO):</Text>
               <Text style={[styles.subtotalValue, { color: '#666' }]}>{formatoCOP(costoEPP)}</Text>
             </View>
           </View>
         </View>
+      ); })()}
+
+      {/* Nota aclaratoria — precios de referencia */}
+      {tieneItemsGenericos && (
+        <Text style={styles.notaReferencia}>
+          * Algunos ítems contienen precios de referencia INVIAS/IDU 2025. Deben verificarse y actualizarse con cotización real del mercado local antes de presentar la oferta.
+        </Text>
       )}
 
       {/* Resumen APU */}

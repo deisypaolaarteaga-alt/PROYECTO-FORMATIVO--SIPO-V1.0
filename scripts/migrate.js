@@ -78,6 +78,11 @@ const migrationFiles = [
   'supabase/migrations/20260512210002_fix_catalogo_apu_precios_v3.sql',
   'supabase/migrations/20260512300000_clientes.sql',
   'supabase/migrations/20260514100000_fix_audit_log_rls.sql',
+  'supabase/migrations/20260516100000_update_trabajadores_2026.sql',
+  'supabase/migrations/20260516200000_proveedores.sql',
+  'supabase/migrations/20260516300000_fix_materials_duplicados.sql',
+  'supabase/migrations/20260517100000_budget_aprobacion.sql',
+  'supabase/migrations/20260517200000_drop_legacy_estado_check.sql',
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

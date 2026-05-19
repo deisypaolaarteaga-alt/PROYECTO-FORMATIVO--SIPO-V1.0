@@ -110,6 +110,20 @@ export const clienteSchema = z.object({
   notas: z.string().max(500).optional(),
 });
 
+// ============ Proveedor schema ============
+
+export const proveedorSchema = z.object({
+  tipo: z.enum(['persona', 'empresa']),
+  nombre_razon_social: z.string().min(2, 'Nombre requerido').max(200),
+  nit_cedula: z.string().max(20).optional(),
+  categoria: z.enum(['ferreteria', 'contratista', 'equipos', 'laboratorio', 'transporte', 'servicios', 'otro']),
+  ciudad: z.string().max(100).optional(),
+  email: z.union([z.string().email('Email inválido'), z.literal('')]).optional(),
+  telefono: z.string().max(20).optional(),
+  sitio_web: z.union([z.string().url('URL inválida'), z.literal('')]).optional(),
+  notas: z.string().max(500).optional(),
+});
+
 // ============ Auth schemas ============
 
 export const loginSchema = z.object({

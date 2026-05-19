@@ -353,13 +353,26 @@ export async function guardarAPU(
     let apuId = payload.id;
 
     if (!apuId) {
-      const { data, error } = await supabase
+      // Buscar APU existente para esta actividad antes de crear uno nuevo (evita duplicados al guardar varias veces)
+      const { data: existing } = await supabase
         .from('apus')
-        .insert({ activity_id: activityId, budget_id: budgetId, user_id: user.id, rendimiento: payload.rendimiento })
-        .select()
-        .single();
-      if (error) throw error;
-      apuId = data.id;
+        .select('id')
+        .eq('activity_id', activityId)
+        .eq('user_id', user.id)
+        .is('deleted_at', null)
+        .maybeSingle();
+
+      if (existing) {
+        apuId = existing.id;
+      } else {
+        const { data, error } = await supabase
+          .from('apus')
+          .insert({ activity_id: activityId, budget_id: budgetId, user_id: user.id, rendimiento: payload.rendimiento })
+          .select()
+          .single();
+        if (error) throw error;
+        apuId = data.id;
+      }
     }
 
     // Reemplazar ítems del APU (hard delete válido — son detalles del APU, no entidades independientes)
@@ -531,7 +544,6 @@ export async function cambiarEstadoPresupuesto(
       .update({ estado: nuevoEstado, updated_at: new Date().toISOString() })
       .eq('id', budgetId)
       .eq('user_id', user.id);
-
     if (error) throw error;
 
     // Auto-avanzar proyecto a 'en_progreso' si acaba de aprobarse el presupuesto
@@ -599,6 +611,110 @@ export async function actualizarActividad(
  * Sincroniza el precio unitario de un ítem de APU vinculado a una cuadrilla.
  * Recalcula el costo_dia actual de la cuadrilla y actualiza el ítem.
  */
+/**
+ * Aprueba un presupuesto (en_revision → aprobado).
+ * El trigger fn_increment_budget_version llena aprobado_en automáticamente.
+ * Avanza el proyecto a 'en_progreso' si aún está en borrador.
+ * Usa admin client: la política RLS budgets_update_lock bloquea UPDATEs
+ * a presupuestos aprobados para usuarios normales.
+ */
+export async function aprobarPresupuesto(budgetId: string): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'No autorizado' };
+
+    const { data: budget } = await supabase
+      .from('budgets')
+      .select('estado, project_id')
+      .eq('id', budgetId)
+      .eq('user_id', user.id)
+      .is('deleted_at', null)
+      .single();
+
+    if (!budget) return { success: false, error: 'Presupuesto no encontrado.' };
+    if (budget.estado !== 'en_revision') {
+      return { success: false, error: 'Solo se pueden aprobar presupuestos en revisión.' };
+    }
+
+    const admin = createAdminClient();
+    const { error } = await admin
+      .from('budgets')
+      .update({ estado: 'aprobado', updated_at: new Date().toISOString() })
+      .eq('id', budgetId)
+      .eq('user_id', user.id);
+
+    if (error) throw error;
+
+    const { data: proyecto } = await supabase
+      .from('projects')
+      .select('estado')
+      .eq('id', budget.project_id)
+      .eq('user_id', user.id)
+      .single();
+
+    if (proyecto?.estado === 'borrador') {
+      await admin
+        .from('projects')
+        .update({ estado: 'en_progreso', updated_at: new Date().toISOString() })
+        .eq('id', budget.project_id)
+        .eq('user_id', user.id);
+    }
+
+    revalidatePath(`/proyectos/${budget.project_id}`);
+    revalidatePath(`/presupuestos/${budgetId}`);
+    revalidatePath('/proyectos');
+    return { success: true };
+  } catch (error) {
+    console.error('[aprobarPresupuesto] error:', error);
+    return { success: false, error: 'No se pudo aprobar el presupuesto.' };
+  }
+}
+
+/**
+ * Reabre un presupuesto aprobado, regresándolo a borrador.
+ * El trigger fn_increment_budget_version limpia aprobado_en = NULL automáticamente.
+ * Usa admin client: la política RLS budgets_update_lock bloquea UPDATEs
+ * a presupuestos aprobados para usuarios normales.
+ */
+export async function reabrirPresupuesto(budgetId: string): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'No autorizado' };
+
+    const { data: budget } = await supabase
+      .from('budgets')
+      .select('estado, project_id')
+      .eq('id', budgetId)
+      .eq('user_id', user.id)
+      .is('deleted_at', null)
+      .single();
+
+    if (!budget) return { success: false, error: 'Presupuesto no encontrado.' };
+    if (budget.estado !== 'aprobado') {
+      return { success: false, error: 'Solo se pueden reabrir presupuestos aprobados.' };
+    }
+
+    const admin = createAdminClient();
+    const { error } = await admin
+      .from('budgets')
+      .update({ estado: 'borrador', updated_at: new Date().toISOString() })
+      .eq('id', budgetId)
+      .eq('user_id', user.id);
+
+    if (error) throw error;
+
+    revalidatePath(`/proyectos/${budget.project_id}`);
+    revalidatePath(`/presupuestos/${budgetId}`);
+    revalidatePath('/proyectos');
+    return { success: true };
+  } catch (error) {
+    console.error('[reabrirPresupuesto] error:', error);
+    return { success: false, error: 'No se pudo reabrir el presupuesto.' };
+  }
+}
+
 export async function sincronizarPrecioCuadrilla(
   apuItemId: string,
   budgetId: string

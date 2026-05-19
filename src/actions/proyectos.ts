@@ -48,21 +48,58 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
 }
 
 /**
- * Obtiene todos los proyectos activos del usuario
+ * Obtiene todos los proyectos activos del usuario con datos enriquecidos:
+ * valor_total, fecha_vence_proxima, presupuestos_count, presupuesto_estado_reciente.
  */
 export async function getProjects() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
 
-  const { data } = await supabase
+  const { data: projects } = await supabase
     .from('projects')
-    .select('*, budgets(count), clientes(nombre_razon_social)')
+    .select('*, budgets(id, estado, created_at, vigencia_dias), clientes(nombre_razon_social)')
     .eq('user_id', user.id)
     .is('deleted_at', null)
     .order('updated_at', { ascending: false });
 
-  return data || [];
+  if (!projects || projects.length === 0) return [];
+
+  // Recolectar todos los budget IDs para consulta en lote
+  const allBudgetIds = projects
+    .flatMap((p: any) => (p.budgets ?? []).map((b: any) => b.id))
+    .filter(Boolean) as string[];
+
+  // Obtener total_oferta desde v_resumen_presupuesto en una sola query
+  const resumenMap: Record<string, number> = {};
+  if (allBudgetIds.length > 0) {
+    const { data: resumenes } = await supabase
+      .from('v_resumen_presupuesto')
+      .select('budget_id, total_oferta')
+      .in('budget_id', allBudgetIds);
+
+    for (const r of resumenes ?? []) {
+      resumenMap[r.budget_id] = Number(r.total_oferta ?? 0);
+    }
+  }
+
+  return projects.map((p: any) => {
+    const budgets: any[] = p.budgets ?? [];
+
+    const presupuestos_count = budgets.length;
+    const presupuesto_estado_reciente = budgets[0]?.estado ?? null;
+    const valor_total = budgets.reduce((sum, b) => sum + (resumenMap[b.id] ?? 0), 0);
+
+    // Fecha de vencimiento más próxima entre presupuestos con vigencia definida
+    const fechas = budgets
+      .filter(b => b.created_at && b.vigencia_dias)
+      .map(b => new Date(b.created_at).getTime() + Number(b.vigencia_dias) * 86400000);
+    const fecha_vence_proxima = fechas.length > 0
+      ? new Date(Math.min(...fechas)).toISOString()
+      : null;
+
+    return { ...p, presupuestos_count, presupuesto_estado_reciente, valor_total, fecha_vence_proxima };
+  });
 }
 
 /**

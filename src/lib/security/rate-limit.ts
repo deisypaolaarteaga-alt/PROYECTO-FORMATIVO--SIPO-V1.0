@@ -4,8 +4,7 @@
  * LIMITACIÓN CONOCIDA: En entornos serverless (Vercel, AWS Lambda) este Map
  * se resetea en cada cold start y no se comparte entre instancias, por lo que
  * el límite no es efectivo en producción distribuida.
- * Para producción real, migrar los contadores a la tabla `ai_usage` en Supabase
- * (o una tabla `rate_limit_counters` dedicada).
+ * Para producción real, migrar los contadores a una tabla `rate_limit_counters` en Supabase.
  * En desarrollo con un solo proceso Next.js funciona correctamente.
  */
 

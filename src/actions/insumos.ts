@@ -103,8 +103,20 @@ export async function searchInsumos(query: string, type?: string) {
     results.push(...(data || []).map((d: any) => ({ ...d, source: 'materials' })));
   }
   if (!type || type === 'mano_obra') {
-    const { data } = await supabase.from('labor').select('*').ilike('nombre', `%${query}%`).limit(10);
-    results.push(...(data || []).map((d: any) => ({ ...d, source: 'labor', unidad: d.unidad || 'día' })));
+    const { data } = await supabase
+      .from('trabajadores')
+      .select('id, especialidad, categoria, jornal_con_prestaciones, ciudad_referencia')
+      .ilike('especialidad', `%${query}%`)
+      .eq('activo', true)
+      .limit(10);
+    results.push(...(data || []).map((d: any) => ({
+      id:              d.id,
+      nombre:          d.especialidad,
+      precio_unitario: d.jornal_con_prestaciones,
+      unidad:          'jornal',
+      categoria:       d.categoria,
+      source:          'labor',
+    })));
   }
   if (!type || type === 'equipo') {
     const { data } = await supabase.from('equipment').select('*').ilike('nombre', `%${query}%`).limit(10);

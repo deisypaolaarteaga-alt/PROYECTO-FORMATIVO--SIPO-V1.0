@@ -13,11 +13,11 @@ interface EstadoBadgeProps {
 }
 
 const ESTADOS_CONFIG: Record<EstadoPresupuesto, { label: string; styles: string }> = {
-  borrador:    { label: 'Borrador',    styles: 'bg-draft-bg text-draft-text' },
-  en_revision: { label: 'En Revisión', styles: 'bg-warning-bg text-warning-text' },
-  aprobado:    { label: 'Aprobado',    styles: 'bg-success-bg text-success-text' },
-  rechazado:   { label: 'Rechazado',   styles: 'bg-danger-bg text-danger-text' },
-  archivado:   { label: 'Archivado',   styles: 'bg-concrete text-stone' },
+  borrador:    { label: 'Borrador',    styles: 'bg-[#E4E7EC] text-[#4B5563]' },
+  en_revision: { label: 'En Revisión', styles: 'bg-[#FEF3E2] text-[#7A4B00]' },
+  aprobado:    { label: 'Aprobado',    styles: 'bg-[#EBFAF0] text-[#166534]' },
+  rechazado:   { label: 'Rechazado',   styles: 'bg-[#FEF0F0] text-[#991B1B]' },
+  archivado:   { label: 'Archivado',   styles: 'bg-[#E4E7EC] text-[#6B7A8D] border border-[#C8CDD6]' },
 };
 
 export function EstadoBadge({ estado, fechaActualizacion, mostrarFecha, className }: EstadoBadgeProps) {

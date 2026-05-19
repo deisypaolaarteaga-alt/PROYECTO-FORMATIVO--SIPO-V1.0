@@ -238,20 +238,44 @@ const styles = StyleSheet.create({
   
   // Firmas
   signatureSection: {
-    marginTop: 60,
+    marginTop: 50,
+  },
+  signatureIntro: {
+    fontSize: 8,
+    color: '#555555',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 1.5,
+  },
+  signatureRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   signatureBox: {
-    width: 200,
-    borderTopWidth: 1,
+    width: '44%',
+    borderTopWidth: 1.5,
     borderTopColor: '#1C2B3A',
-    paddingTop: 8,
+    paddingTop: 10,
     alignItems: 'center',
   },
   signatureText: {
     fontSize: 9,
     color: '#333333',
+    marginBottom: 3,
+    textAlign: 'center',
+  },
+  signatureName: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#1C2B3A',
+    marginBottom: 3,
+    textAlign: 'center',
+  },
+  signatureRole: {
+    fontSize: 8,
+    color: '#666666',
+    textAlign: 'center',
     marginBottom: 2,
   },
 
@@ -430,6 +454,9 @@ export const PresupuestoPDF = ({ budget, profile, options, children }: Props) =>
                   const vrUnit = Number(act.precio_unitario) || 0;
                   const cant = Number(act.cantidad) || 0;
                   const vrTotal = vrUnit * cant;
+                  const pctCDAct = costoDirecto.greaterThan(0)
+                    ? D(vrTotal).dividedBy(costoDirecto).times(100).toDecimalPlaces(1).toNumber()
+                    : null;
                   return (
                     <View key={act.id || j} style={[styles.tableRow, j % 2 === 1 ? styles.tableRowAlternate : {}]}>
                       <Text style={[styles.colN, { fontSize: 8 }]}>{ch.numero}.{j + 1}</Text>
@@ -438,7 +465,9 @@ export const PresupuestoPDF = ({ budget, profile, options, children }: Props) =>
                       <Text style={[styles.colCant, { fontSize: 8 }]}>{cant}</Text>
                       <Text style={[styles.colVrUnit, { fontSize: 8 }]}>{formatoCOP(vrUnit)}</Text>
                       <Text style={[styles.colVrTotal, { fontSize: 8 }]}>{formatoCOP(vrTotal)}</Text>
-                      <Text style={[styles.colPctCD, { fontSize: 8 }]}></Text>
+                      <Text style={[styles.colPctCD, { fontSize: 8 }]}>
+                        {pctCDAct !== null ? `${pctCDAct.toFixed(1)}%` : '—'}
+                      </Text>
                     </View>
                   );
                 })}
@@ -546,28 +575,48 @@ export const PresupuestoPDF = ({ budget, profile, options, children }: Props) =>
 
         {/* Firmas */}
         <View style={styles.signatureSection} wrap={false}>
-          <View style={styles.signatureBox}>
-            <Text style={[styles.signatureText, { fontWeight: 'bold' }]}>
-              {profile.nombre_completo || '[Nombre no configurado]'}
-            </Text>
-            {(profile.cargo || profile.profesion) && (
-              <Text style={styles.signatureText}>{profile.cargo || profile.profesion}</Text>
-            )}
-            {profile.matricula_profesional && (
-              <Text style={styles.signatureText}>M.P. {profile.matricula_profesional}</Text>
-            )}
-          </View>
-          <View style={styles.signatureBox}>
-            <Text style={[styles.signatureText, { fontWeight: 'bold' }]}>
-              {options?.clienteNombre || 
-               (budget.projects as any)?.clientes?.nombre_contacto || 
-               (budget.projects as any)?.clientes?.nombre_razon_social || 
-               (budget.projects as any)?.cliente_nombre || 
-               'Cliente'}
-            </Text>
-            <Text style={styles.signatureText}>
-              {(budget.projects as any)?.clientes?.cargo_contacto || 'Aceptación y Firma'}
-            </Text>
+          <Text style={styles.signatureIntro}>
+            El presente presupuesto ha sido elaborado con base en precios del mercado colombiano vigentes.{'\n'}
+            La aceptación de este documento implica conformidad con el alcance, cantidades y condiciones técnicas descritas.
+          </Text>
+          <View style={styles.signatureRow}>
+            <View style={{ width: '44%', alignItems: 'center' }}>
+              <View style={{ height: 48, marginBottom: 4, width: '100%', alignItems: 'center', justifyContent: 'flex-end' }}>
+                {profile.firma_url ? (
+                  <Image src={profile.firma_url} style={{ height: 44, objectFit: 'contain' }} />
+                ) : null}
+              </View>
+              <View style={{ borderTopWidth: 1.5, borderTopColor: '#1C2B3A', width: '100%', paddingTop: 10, alignItems: 'center' }}>
+                <Text style={styles.signatureName}>
+                  {profile.nombre_completo || '[Nombre no configurado]'}
+                </Text>
+                {(profile.cargo_firma || profile.profesion) && (
+                  <Text style={styles.signatureRole}>{profile.cargo_firma ?? profile.profesion}</Text>
+                )}
+                <Text style={styles.signatureRole}>{profile.empresa || 'Contratista'}</Text>
+                <Text style={[styles.signatureRole, { marginTop: 4 }]}>Elaboró y Presentó</Text>
+              </View>
+            </View>
+            <View style={styles.signatureBox}>
+              <Text style={styles.signatureName}>
+                {options?.clienteNombre ||
+                 (budget.projects as any)?.clientes?.nombre_contacto ||
+                 (budget.projects as any)?.clientes?.nombre_razon_social ||
+                 (budget.projects as any)?.cliente_nombre ||
+                 'Cliente / Contratante'}
+              </Text>
+              {(budget.projects as any)?.clientes?.cargo_contacto && (
+                <Text style={styles.signatureRole}>
+                  {(budget.projects as any).clientes.cargo_contacto}
+                </Text>
+              )}
+              {(budget.projects as any)?.clientes?.nit_cedula && (
+                <Text style={styles.signatureRole}>
+                  NIT/C.C. {(budget.projects as any).clientes.nit_cedula}
+                </Text>
+              )}
+              <Text style={[styles.signatureRole, { marginTop: 4 }]}>Aceptó y Firmó</Text>
+            </View>
           </View>
         </View>
 

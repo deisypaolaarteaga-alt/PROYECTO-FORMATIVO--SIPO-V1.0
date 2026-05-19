@@ -18,13 +18,14 @@ const TIPO_CONFIG: Record<TipoAPUItem, {
   Icon: React.ComponentType<{ className?: string }>;
   color: string;
   bgColor: string;
+  barColor: string;
   borderColor: string;
 }> = {
-  material:          { label: 'Materiales',        Icon: Package, color: 'text-burn-orange',  bgColor: 'bg-burn-pale',  borderColor: 'border-burn-orange/30' },
-  mano_obra:         { label: 'Mano de Obra',       Icon: Hammer,  color: 'text-steel-mid',    bgColor: 'bg-steel-fog',  borderColor: 'border-steel-mid/30'   },
-  equipo:            { label: 'Equipos',            Icon: Truck,   color: 'text-success-text', bgColor: 'bg-success-bg', borderColor: 'border-success-border' },
-  herramienta_menor: { label: 'Herramienta Menor',  Icon: Wrench,  color: 'text-warning-text', bgColor: 'bg-warning-bg', borderColor: 'border-warning-border' },
-  epp:               { label: 'EPP',                Icon: Shield,  color: 'text-stone',        bgColor: 'bg-sand',       borderColor: 'border-concrete'       },
+  material:          { label: 'Materiales',        Icon: Package, color: 'text-burn-orange',  bgColor: 'bg-burn-pale',  barColor: 'bg-burn-orange',  borderColor: 'border-burn-orange/30' },
+  mano_obra:         { label: 'Mano de Obra',       Icon: Hammer,  color: 'text-steel-mid',    bgColor: 'bg-steel-fog',  barColor: 'bg-steel-mid',    borderColor: 'border-steel-mid/30'   },
+  equipo:            { label: 'Equipos',            Icon: Truck,   color: 'text-success-text', bgColor: 'bg-success-bg', barColor: 'bg-green-500',    borderColor: 'border-success-border' },
+  herramienta_menor: { label: 'Herramienta Menor',  Icon: Wrench,  color: 'text-warning-text', bgColor: 'bg-warning-bg', barColor: 'bg-amber-400',    borderColor: 'border-warning-border' },
+  epp:               { label: 'EPP',                Icon: Shield,  color: 'text-stone',        bgColor: 'bg-sand',       barColor: 'bg-gray-400',     borderColor: 'border-concrete'       },
 };
 
 const ORDEN_TIPOS: TipoAPUItem[] = ['material', 'mano_obra', 'equipo', 'herramienta_menor', 'epp'];
@@ -133,6 +134,7 @@ export function ExplosionInsumosView({ budgetId }: Props) {
           tipo={tipo}
           items={porTipo.get(tipo)!}
           subtotal={data.totales[tipo]}
+          granTotal={data.totales.gran_total}
         />
       ))}
 
@@ -149,34 +151,52 @@ function CategoriaTable({
   tipo,
   items,
   subtotal,
+  granTotal,
 }: {
   tipo: TipoAPUItem;
   items: InsumoExplotado[];
   subtotal: number;
+  granTotal: number;
 }) {
   const cfg = TIPO_CONFIG[tipo];
   const { Icon } = cfg;
   const esMaterial = tipo === 'material';
+  const pctGrupo = granTotal > 0 ? (subtotal / granTotal) * 100 : 0;
 
   return (
     <div className={cn('rounded-xl border overflow-hidden', cfg.borderColor)}>
 
       {/* Header de categoría */}
-      <div className={cn('px-6 py-4 flex items-center justify-between', cfg.bgColor)}>
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-white/60 flex items-center justify-center">
-            <Icon className={cn('h-4 w-4', cfg.color)} />
+      <div className={cn('px-6 pt-4 pb-3', cfg.bgColor)}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-white/60 flex items-center justify-center">
+              <Icon className={cn('h-4 w-4', cfg.color)} />
+            </div>
+            <span className={cn('font-semibold text-sm uppercase tracking-wider', cfg.color)}>
+              {cfg.label}
+            </span>
+            <span className="text-xs text-stone font-medium bg-white/70 px-2 py-0.5 rounded-full">
+              {items.length} {items.length === 1 ? 'ítem' : 'ítems'}
+            </span>
           </div>
-          <span className={cn('font-semibold text-sm uppercase tracking-wider', cfg.color)}>
-            {cfg.label}
-          </span>
-          <span className="text-xs text-stone font-medium bg-white/70 px-2 py-0.5 rounded-full">
-            {items.length} {items.length === 1 ? 'ítem' : 'ítems'}
-          </span>
+          <div className="text-right">
+            <p className="text-[10px] text-stone uppercase tracking-wider font-medium">Subtotal</p>
+            <p className={cn('text-base font-bold tabular-nums', cfg.color)}>{formatearCOP(subtotal)}</p>
+          </div>
         </div>
-        <div className="text-right">
-          <p className="text-[10px] text-stone uppercase tracking-wider font-medium">Subtotal</p>
-          <p className={cn('text-base font-bold tabular-nums', cfg.color)}>{formatearCOP(subtotal)}</p>
+        {/* Barra de progreso — peso del grupo sobre CD total */}
+        <div className="mt-3 space-y-1">
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] text-stone font-medium">Peso sobre Costo Directo</span>
+            <span className={cn('text-[11px] font-bold tabular-nums', cfg.color)}>{pctGrupo.toFixed(1)}%</span>
+          </div>
+          <div className="h-1.5 bg-white/50 rounded-full overflow-hidden">
+            <div
+              className={cn('h-full rounded-full transition-all duration-700', cfg.barColor)}
+              style={{ width: `${pctGrupo}%` }}
+            />
+          </div>
         </div>
       </div>
 
@@ -190,13 +210,19 @@ function CategoriaTable({
               <th className="px-4 py-3 text-right font-medium w-36">Cantidad Total</th>
               <th className="px-4 py-3 text-right font-medium w-36">Precio Unit.</th>
               <th className="px-4 py-3 text-right font-medium w-40">Total</th>
+              <th className="px-4 py-3 text-right font-medium w-20">% CD</th>
               {esMaterial && <th className="px-4 py-3 w-44" />}
             </tr>
           </thead>
 
           <tbody className="divide-y divide-sand">
             {items.map((item) => (
-              <FilaInsumo key={`${item.tipo}-${item.nombre}`} item={item} mostrarAccion={esMaterial} />
+              <FilaInsumo
+                key={`${item.tipo}-${item.nombre}`}
+                item={item}
+                mostrarAccion={esMaterial}
+                granTotal={granTotal}
+              />
             ))}
           </tbody>
 
@@ -210,6 +236,9 @@ function CategoriaTable({
               </td>
               <td className={cn('px-4 py-3 text-right font-bold tabular-nums', cfg.color)}>
                 {formatearCOP(subtotal)}
+              </td>
+              <td className={cn('px-4 py-3 text-right text-xs font-bold tabular-nums', cfg.color)}>
+                {pctGrupo.toFixed(1)}%
               </td>
               {esMaterial && <td />}
             </tr>
@@ -225,10 +254,14 @@ function CategoriaTable({
 function FilaInsumo({
   item,
   mostrarAccion,
+  granTotal,
 }: {
   item: InsumoExplotado;
   mostrarAccion: boolean;
+  granTotal: number;
 }) {
+  const pctCD = granTotal > 0 ? ((item.subtotal_total / granTotal) * 100) : 0;
+
   return (
     <tr className="hover:bg-sand/60 transition-colors duration-100 group">
       <td className="px-6 py-3.5">
@@ -247,6 +280,11 @@ function FilaInsumo({
       </td>
       <td className="px-4 py-3.5 text-right font-bold text-ink tabular-nums">
         {formatearCOP(item.subtotal_total)}
+      </td>
+      <td className="px-4 py-3.5 text-right">
+        <span className="text-xs font-semibold text-stone tabular-nums">
+          {pctCD >= 0.1 ? `${pctCD.toFixed(1)}%` : '<0.1%'}
+        </span>
       </td>
       {mostrarAccion && (
         <td className="px-4 py-3.5 text-right">

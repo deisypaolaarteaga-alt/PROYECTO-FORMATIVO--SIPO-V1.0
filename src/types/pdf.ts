@@ -18,6 +18,8 @@ export interface ConfigPDFProfesional {
   /** Cargo o título profesional del firmante (ej: "Ingeniero Civil"). No existe aún en la BD — campo reservado. */
   cargo?: string | null;
   profesion?: string | null;
+  cargo_firma?: string | null;
+  firma_url?: string | null;
 }
 
 export interface ParametrosFiscales {

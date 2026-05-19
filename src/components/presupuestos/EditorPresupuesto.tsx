@@ -1,34 +1,49 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ChevronDown, ChevronRight, Plus, Trash2,
-  Loader2, FileText, Settings, BookOpen, Package
+  Loader2, FileText, Settings, BookOpen, Package,
+  Calendar, Check, Copy, GripVertical, MoreHorizontal, TrendingUp,
+  CheckCircle2, LockOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/shared/Button';
 import { InputPrecio } from '@/components/shared/InputPrecio';
 import { InputEditable } from '@/components/shared/InputEditable';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
-import { 
-  agregarCapitulo, agregarActividad, 
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
+  DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel,
+} from '@/components/shared/DropdownMenu';
+import {
+  agregarCapitulo, agregarActividad,
   actualizarActividad, actualizarPresupuesto,
-  eliminarActividad, eliminarCapitulo 
+  eliminarActividad, eliminarCapitulo,
+  aprobarPresupuesto, reabrirPresupuesto,
 } from '@/actions/presupuestos';
 import { formatearCOP } from '@/lib/utils/formato-cop';
 import { PanelAPU } from './PanelAPU';
 import { ResumenFinanciero } from './ResumenFinanciero';
+import { ResumenFinancieroTab } from './ResumenFinancieroTab';
 import { BotonExportarPDF } from '@/components/pdf/BotonExportarPDF';
+import { BotonExportarExcel } from '@/components/pdf/BotonExportarExcel';
 import { ModalCatalogo } from './ModalCatalogo';
 import { BotonEnviarRevision } from './BotonEnviarRevision';
+import { EstadoBadge } from './EstadoBadge';
 import { ExplosionInsumosView } from './ExplosionInsumosView';
-import { ResumenFinancieroModal } from './ResumenFinancieroModal';
-import { BarChart3 } from 'lucide-react';
 
 interface EditorPresupuestoProps {
   budget: any;
   profile: any;
+}
+
+function formatRelativeTime(date: Date): string {
+  const s = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (s < 10) return 'ahora mismo';
+  if (s < 60) return `hace ${s}s`;
+  return `hace ${Math.floor(s / 60)}m`;
 }
 
 export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPresupuestoProps) {
@@ -37,19 +52,37 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
     new Set(initialBudget.chapters?.map((c: any) => c.id) || [])
   );
 
-  // Sincroniza el estado local cuando router.refresh() trae datos nuevos del servidor
   useEffect(() => {
     setBudget(initialBudget);
     setExpanded(new Set(initialBudget.chapters?.map((c: any) => c.id) || []));
   }, [initialBudget]);
-  const [activeTab, setActiveTab] = useState<'estructura' | 'insumos'>('estructura');
+
+  const [activeTab, setActiveTab] = useState<'estructura' | 'insumos' | 'resumen'>('estructura');
   const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [, forceRefreshTime] = useState(0);
   const [activeApuActivity, setActiveApuActivity] = useState<any | null>(null);
-  const [confirmState, setConfirmState] = useState<{ title: string; description?: string; onConfirm: () => void } | null>(null);
+  const [confirmState, setConfirmState] = useState<{
+    title: string; description?: string; onConfirm: () => void;
+    confirmLabel?: string; variant?: 'danger' | 'warning';
+  } | null>(null);
   const [catalogoOpen, setCatalogoOpen] = useState(false);
-  const [resumenOpen, setResumenOpen] = useState(false);
   const [bannerCiudadIgnorado, setBannerCiudadIgnorado] = useState(false);
+  const [isChangingEstado, setIsChangingEstado] = useState(false);
+
+  // Drag & drop (local reorder solo — sin persistir en BD)
+  const [dragSrcActId, setDragSrcActId] = useState<string | null>(null);
+  const [dragSrcChId, setDragSrcChId] = useState<string | null>(null);
+  const [dragOverActId, setDragOverActId] = useState<string | null>(null);
+
   const router = useRouter();
+
+  // Actualizar "hace Xs" cada 10s mientras hay lastSaved
+  useEffect(() => {
+    if (!lastSaved) return;
+    const id = setInterval(() => forceRefreshTime(n => n + 1), 10_000);
+    return () => clearInterval(id);
+  }, [lastSaved]);
 
   const ciudadPerfil = (profile?.ciudad || '').trim().toLowerCase();
   const ciudadObra   = (budget.ciudad_ica || '').trim().toLowerCase();
@@ -59,37 +92,51 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
     ciudadObra   !== '' &&
     ciudadPerfil !== ciudadObra;
 
+  const estaAprobado   = budget.estado === 'aprobado';
+  const estaEnRevision = budget.estado === 'en_revision';
+  const bloqueado      = estaAprobado;
+
+  const fechaAprobada = budget.aprobado_en
+    ? new Intl.DateTimeFormat('es-CO', {
+        day: '2-digit', month: 'long', year: 'numeric',
+        timeZone: 'America/Bogota',
+      }).format(new Date(budget.aprobado_en))
+    : null;
+
   const askConfirm = (title: string, description: string, onConfirm: () => void) =>
     setConfirmState({ title, description, onConfirm });
 
-  // --- CÁLCULOS SIMPLES ---
+  // ── CÁLCULOS ──────────────────────────────────────────────────────────────
   const subtotalDirecto = (budget.chapters || []).reduce((acc: number, ch: any) => {
-    const chTotal = (ch.activities || []).reduce((s: number, a: any) => s + (Number(a.cantidad) * Number(a.precio_unitario) || 0), 0);
+    const chTotal = (ch.activities || []).reduce((s: number, a: any) =>
+      s + (Number(a.cantidad) * Number(a.precio_unitario) || 0), 0);
     return acc + chTotal;
   }, 0);
 
   const aiuTotalPct = Number(budget.administracion_pct ?? 10)
     + Number(budget.imprevistos_pct ?? 5)
     + Number(budget.utilidad_pct ?? 10);
-  const valorAIU = subtotalDirecto * (aiuTotalPct / 100);
+  const valorAIU        = subtotalDirecto * (aiuTotalPct / 100);
   const utilidadEstimada = subtotalDirecto * (Number(budget.utilidad_pct ?? 10) / 100);
-  const valorIVA = budget.iva_porcentaje > 0
-    ? utilidadEstimada * (Number(budget.iva_porcentaje) / 100)
-    : 0;
-  const totalGeneral = subtotalDirecto + valorAIU + valorIVA;
-  
+  const subtotalConAIU  = subtotalDirecto + valorAIU;
+  const ivaPct          = budget.iva_porcentaje != null ? Number(budget.iva_porcentaje) : 0;
+  let valorIVA = 0;
+  switch (budget.metodo_iva) {
+    case 'sobre_utilidad': valorIVA = utilidadEstimada  * ivaPct / 100; break;
+    case 'sobre_aiu':      valorIVA = valorAIU          * ivaPct / 100; break;
+    case 'sobre_total':    valorIVA = subtotalConAIU    * ivaPct / 100; break;
+    default:               valorIVA = 0;
+  }
+  const totalGeneral = subtotalConAIU + valorIVA;
+
   const vigenciaDias = Number(budget.vigencia_dias ?? 0);
   const fechaValidez = budget.created_at && vigenciaDias > 0 ? (() => {
     const d = new Date(budget.created_at);
     d.setDate(d.getDate() + vigenciaDias);
     return d;
   })() : null;
-
   const fechaValidezFormateada = fechaValidez ? new Intl.DateTimeFormat('es-CO', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'America/Bogota'
+    day: '2-digit', month: 'short', year: 'numeric', timeZone: 'America/Bogota',
   }).format(fechaValidez) : null;
 
   const toggleChapter = (id: string) => {
@@ -100,13 +147,13 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
     });
   };
 
-  // --- ACCIONES ---
+  // ── ACCIONES ──────────────────────────────────────────────────────────────
   const handleAddChapter = async () => {
     const res = await agregarCapitulo(budget.id, 'Nuevo capítulo');
     if (res.data) {
       setBudget((prev: any) => ({
         ...prev,
-        chapters: [...(prev.chapters || []), { ...(res.data as Record<string, unknown>), activities: [] }]
+        chapters: [...(prev.chapters || []), { ...(res.data as Record<string, unknown>), activities: [] }],
       }));
       setExpanded(prev => new Set(prev).add((res.data as any).id));
     }
@@ -119,26 +166,25 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
         ...prev,
         chapters: prev.chapters.map((c: any) =>
           c.id === chId ? { ...c, activities: [...(c.activities || []), res.data] } : c
-        )
+        ),
       }));
     }
   };
 
   const handleUpdateAct = async (actId: string, chId: string, fields: any) => {
-    // Optimistic update
     setBudget((prev: any) => ({
       ...prev,
       chapters: prev.chapters.map((c: any) =>
         c.id === chId ? {
           ...c,
-          activities: c.activities.map((a: any) => a.id === actId ? { ...a, ...fields } : a)
+          activities: c.activities.map((a: any) => a.id === actId ? { ...a, ...fields } : a),
         } : c
-      )
+      ),
     }));
-    
     setIsSaving(true);
     await actualizarActividad(actId, budget.id, fields);
     setIsSaving(false);
+    setLastSaved(new Date());
   };
 
   const handleUpdateBudget = async (fields: any) => {
@@ -146,6 +192,14 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
     setIsSaving(true);
     await actualizarPresupuesto(budget.id, fields);
     setIsSaving(false);
+    setLastSaved(new Date());
+  };
+
+  const handleAprobar = async () => {
+    setIsChangingEstado(true);
+    const res = await aprobarPresupuesto(budget.id);
+    setIsChangingEstado(false);
+    if (res.success) router.refresh();
   };
 
   const handleDeleteActivity = (actId: string, chId: string) => {
@@ -156,7 +210,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
         ...prev,
         chapters: prev.chapters.map((c: any) =>
           c.id === chId ? { ...c, activities: c.activities.filter((a: any) => a.id !== actId) } : c
-        )
+        ),
       }));
     });
   };
@@ -167,84 +221,234 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
       await eliminarCapitulo(chId, budget.id);
       setBudget((prev: any) => ({
         ...prev,
-        chapters: prev.chapters.filter((c: any) => c.id !== chId)
+        chapters: prev.chapters.filter((c: any) => c.id !== chId),
       }));
     });
   };
 
+  const handleDuplicateActivity = async (act: any, chId: string) => {
+    const res = await agregarActividad(chId, budget.id);
+    if (!res.data) return;
+    const newAct = res.data as any;
+    const fields = {
+      nombre: `${act.nombre || act.descripcion || 'Actividad'} (copia)`,
+      unidad: act.unidad,
+      cantidad: act.cantidad,
+      precio_unitario: act.precio_unitario,
+    };
+    await actualizarActividad(newAct.id, budget.id, fields);
+    setBudget((prev: any) => ({
+      ...prev,
+      chapters: prev.chapters.map((c: any) =>
+        c.id === chId
+          ? { ...c, activities: [...c.activities, { ...newAct, ...fields }] }
+          : c
+      ),
+    }));
+  };
+
+  const handleMoveActivity = async (actId: string, fromChId: string, toChId: string) => {
+    if (fromChId === toChId) return;
+    const act = budget.chapters
+      .find((c: any) => c.id === fromChId)
+      ?.activities.find((a: any) => a.id === actId);
+    if (!act) return;
+    setBudget((prev: any) => ({
+      ...prev,
+      chapters: prev.chapters.map((c: any) => {
+        if (c.id === fromChId) return { ...c, activities: c.activities.filter((a: any) => a.id !== actId) };
+        if (c.id === toChId)   return { ...c, activities: [...c.activities, { ...act, chapter_id: toChId }] };
+        return c;
+      }),
+    }));
+    await actualizarActividad(actId, budget.id, { chapter_id: toChId });
+  };
+
+  // ── DRAG & DROP (reorden local, mismo capítulo) ────────────────────────────
+  const handleDragStart = (e: React.DragEvent, actId: string, chId: string) => {
+    setDragSrcActId(actId);
+    setDragSrcChId(chId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, actId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (actId !== dragOverActId) setDragOverActId(actId);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetActId: string, targetChId: string) => {
+    e.preventDefault();
+    if (!dragSrcActId || !dragSrcChId || dragSrcChId !== targetChId || dragSrcActId === targetActId) {
+      setDragOverActId(null);
+      return;
+    }
+    setBudget((prev: any) => ({
+      ...prev,
+      chapters: prev.chapters.map((c: any) => {
+        if (c.id !== targetChId) return c;
+        const acts = [...c.activities];
+        const srcIdx = acts.findIndex((a: any) => a.id === dragSrcActId);
+        const tgtIdx = acts.findIndex((a: any) => a.id === targetActId);
+        if (srcIdx === -1 || tgtIdx === -1) return c;
+        const [moved] = acts.splice(srcIdx, 1);
+        acts.splice(tgtIdx, 0, moved);
+        return { ...c, activities: acts };
+      }),
+    }));
+    setDragSrcActId(null);
+    setDragSrcChId(null);
+    setDragOverActId(null);
+  };
+
+  const handleDragEnd = () => {
+    setDragSrcActId(null);
+    setDragSrcChId(null);
+    setDragOverActId(null);
+  };
+
+  const tabs = [
+    { key: 'estructura', label: 'Estructura',             icon: FileText    },
+    { key: 'insumos',    label: 'Explosión de Insumos',   icon: Package     },
+    { key: 'resumen',    label: 'Resumen Financiero',      icon: TrendingUp  },
+  ] as const;
+
   return (
-    <div className="flex flex-col h-full bg-sand font-sans">
-      {/* Header simple */}
-      <div className="bg-white border-b border-concrete px-8 py-4 flex items-center justify-between sticky top-0 z-20">
-        <div className="flex items-center gap-4">
-          <FileText className="text-steel-mid h-6 w-6" />
-          <div className="flex flex-col">
-            <InputEditable
-              value={budget.titulo}
-              onChange={(val) => handleUpdateBudget({ titulo: val })}
-              className="text-xl font-bold text-ink w-96"
-            />
-            {fechaValidezFormateada && (
-              <p className="text-[11px] text-stone mt-0.5">
-                Válido hasta: <span className="font-semibold">{fechaValidezFormateada}</span>
-              </p>
-            )}
+    <div className="flex flex-col h-full bg-[#ECEEF2] font-sans">
+
+      {/* ── HEADER ─────────────────────────────────────────────────────────── */}
+      <div className="bg-white border-b border-[#D0D4DB] px-6 py-4 sticky top-0 z-20 shadow-sm">
+        <div className="flex items-start justify-between gap-6">
+
+          {/* Izquierda: título + estado + fecha */}
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="mt-0.5 h-9 w-9 rounded-lg bg-[#E4E7EC] flex items-center justify-center shrink-0">
+              <FileText className="h-5 w-5 text-[#6B7A8D]" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                {estaAprobado ? (
+                  <span className="text-xl font-bold text-[#1F2937] max-w-sm truncate">{budget.titulo}</span>
+                ) : (
+                  <InputEditable
+                    value={budget.titulo}
+                    onChange={(val) => handleUpdateBudget({ titulo: val })}
+                    className="text-xl font-bold text-[#1F2937] max-w-sm"
+                  />
+                )}
+                <EstadoBadge
+                  estado={budget.estado ?? 'borrador'}
+                  fechaActualizacion={budget.updated_at}
+                />
+              </div>
+              {fechaValidezFormateada && (
+                <p className="flex items-center gap-1.5 text-[11px] text-[#6B7A8D] mt-1">
+                  <Calendar className="h-3 w-3" />
+                  Válido hasta <span className="font-semibold text-[#1F2937]">{fechaValidezFormateada}</span>
+                </p>
+              )}
+            </div>
           </div>
-          {isSaving && <Loader2 className="h-4 w-4 animate-spin text-stone" />}
-        </div>
-        <div className="flex items-center gap-4">
-          <BotonEnviarRevision
-            budgetId={budget.id}
-            proyectoId={budget.project_id}
-            estado={budget.estado ?? 'borrador'}
-          />
-          <div className="flex flex-col items-end">
-            <p className="text-[10px] text-stone uppercase font-bold tracking-widest mb-1">Total Presupuesto</p>
+
+          {/* Derecha: indicadores + acciones + total */}
+          <div className="flex flex-col items-end gap-2 shrink-0">
+            {/* Fila superior: guardado + PDF + acciones de estado */}
             <div className="flex items-center gap-3">
-              <p className="text-2xl font-black text-ink">{formatearCOP(totalGeneral)}</p>
-              <button
-                onClick={() => setResumenOpen(true)}
-                className="h-10 px-4 bg-burn-orange/10 text-burn-orange hover:bg-burn-orange hover:text-white rounded-xl transition-all duration-200 flex items-center gap-2 group shadow-sm border border-burn-orange/20"
-                title="Ver Dashboard de Inteligencia"
-              >
-                <BarChart3 className="h-5 w-5 group-hover:scale-110 transition-transform" />
-                <span className="text-xs font-black uppercase tracking-tight">Dashboard</span>
-              </button>
+              {/* Indicador guardado — solo mientras el editor es editable */}
+              {!bloqueado && (
+                <div className="h-7 flex items-center">
+                  {isSaving ? (
+                    <span className="flex items-center gap-1.5 text-[11px] text-[#6B7A8D]">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Guardando…
+                    </span>
+                  ) : lastSaved ? (
+                    <span className="flex items-center gap-1.5 text-[11px] text-[#6B7A8D]">
+                      <Check className="h-3.5 w-3.5 text-[#166534]" />
+                      Guardado {formatRelativeTime(lastSaved)}
+                    </span>
+                  ) : null}
+                </div>
+              )}
+
+              <BotonExportarExcel budget={budget} profile={profile} />
+              <BotonExportarPDF budget={budget} profile={profile} />
+
+              {/* Marcar como aprobado — solo cuando en revisión */}
+              {estaEnRevision && (
+                <button
+                  onClick={handleAprobar}
+                  disabled={isChangingEstado}
+                  className="inline-flex items-center gap-1.5 h-8 px-3 text-[13px] font-semibold rounded-lg bg-[#D95510] hover:bg-[#C04A0D] text-white disabled:opacity-60 transition-colors"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  {isChangingEstado ? 'Aprobando…' : 'Marcar como aprobado'}
+                </button>
+              )}
+
+              {/* Reabrir para edición — solo cuando aprobado */}
+              {estaAprobado && (
+                <button
+                  onClick={() => setConfirmState({
+                    title: '¿Reabrir para edición?',
+                    description: 'El presupuesto volverá a borrador y podrá editarse nuevamente. La fecha de aprobación se borrará.',
+                    confirmLabel: 'Sí, reabrir',
+                    variant: 'warning',
+                    onConfirm: async () => {
+                      setConfirmState(null);
+                      setIsChangingEstado(true);
+                      await reabrirPresupuesto(budget.id);
+                      setIsChangingEstado(false);
+                      router.refresh();
+                    },
+                  })}
+                  disabled={isChangingEstado}
+                  className="inline-flex items-center gap-1.5 h-8 px-3 text-[13px] font-semibold rounded-lg border border-[#6B7A8D]/30 text-[#6B7A8D] hover:text-[#1F2937] hover:border-[#1F2937] disabled:opacity-60 transition-colors"
+                >
+                  <LockOpen className="h-4 w-4" />
+                  Reabrir para edición
+                </button>
+              )}
+
+              {/* Enviar a revisión — solo cuando borrador */}
+              <BotonEnviarRevision
+                budgetId={budget.id}
+                proyectoId={budget.project_id}
+                estado={budget.estado ?? 'borrador'}
+              />
+            </div>
+
+            {/* Fila inferior: total */}
+            <div className="text-right">
+              <p className="text-[10px] text-[#6B7A8D] uppercase font-bold tracking-widest">Total Presupuesto</p>
+              <p className="text-3xl font-black text-[#1F2937] leading-none">{formatearCOP(totalGeneral)}</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Barra de pestañas */}
-      <div className="bg-white border-b border-concrete px-8 flex items-center gap-0">
-        <button
-          onClick={() => setActiveTab('estructura')}
-          className={cn(
-            'px-4 py-3.5 text-sm font-medium transition-colors duration-150 border-b-2 -mb-px flex items-center gap-2',
-            activeTab === 'estructura'
-              ? 'border-burn-orange text-ink'
-              : 'border-transparent text-stone hover:text-ink'
-          )}
-        >
-          <FileText className="h-4 w-4" />
-          Estructura
-        </button>
-        <button
-          onClick={() => setActiveTab('insumos')}
-          className={cn(
-            'px-4 py-3.5 text-sm font-medium transition-colors duration-150 border-b-2 -mb-px flex items-center gap-2',
-            activeTab === 'insumos'
-              ? 'border-burn-orange text-ink'
-              : 'border-transparent text-stone hover:text-ink'
-          )}
-        >
-          <Package className="h-4 w-4" />
-          Explosión de Insumos
-        </button>
+      {/* ── TABS ──────────────────────────────────────────────────────────── */}
+      <div className="bg-white border-b border-[#D0D4DB] px-6 flex items-center gap-0">
+        {tabs.map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => setActiveTab(key)}
+            className={cn(
+              'px-4 py-3.5 text-sm font-medium transition-colors duration-150 border-b-2 -mb-px flex items-center gap-2 whitespace-nowrap',
+              activeTab === key
+                ? 'border-[#D95510] text-[#1F2937]'
+                : 'border-transparent text-[#6B7A8D] hover:text-[#1F2937]'
+            )}
+          >
+            <Icon className="h-4 w-4" />
+            {label}
+          </button>
+        ))}
       </div>
 
+      {/* ── BANNER CIUDAD ─────────────────────────────────────────────────── */}
       {mostrarBannerCiudad && (
-        <div className="bg-warning-bg border-b border-warning-border px-8 py-3 flex items-start justify-between gap-4">
+        <div className="bg-warning-bg border-b border-warning-border px-6 py-3 flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <span className="text-warning-text mt-0.5 shrink-0">⚠</span>
             <p className="text-sm text-warning-text">
@@ -255,226 +459,379 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
           </div>
           <button
             onClick={() => setBannerCiudadIgnorado(true)}
-            className="text-xs text-warning-text hover:text-ink font-medium whitespace-nowrap shrink-0 transition-colors duration-150"
+            className="text-xs text-warning-text hover:text-[#1F2937] font-medium whitespace-nowrap shrink-0 transition-colors duration-150"
           >
             Ignorar
           </button>
         </div>
       )}
 
+      {/* ── BANNER APROBADO ───────────────────────────────────────────────── */}
+      {estaAprobado && (
+        <div className="bg-success-bg border-b border-success-border px-6 py-3 flex items-center gap-3">
+          <CheckCircle2 className="h-5 w-5 text-success-text shrink-0" />
+          <p className="text-sm text-success-text font-medium">
+            Presupuesto aprobado
+            {fechaAprobada && <> el <strong>{fechaAprobada}</strong></>}
+          </p>
+        </div>
+      )}
+
+      {/* ── TAB: EXPLOSIÓN DE INSUMOS ──────────────────────────────────────── */}
       {activeTab === 'insumos' && (
         <div className="flex-1 overflow-y-auto p-8">
           <ExplosionInsumosView budgetId={budget.id} />
         </div>
       )}
 
+      {/* ── TAB: RESUMEN FINANCIERO ────────────────────────────────────────── */}
+      {activeTab === 'resumen' && (
+        <div className="flex-1 overflow-y-auto p-8">
+          <ResumenFinancieroTab budget={budget} subtotalDirecto={subtotalDirecto} />
+        </div>
+      )}
+
+      {/* ── TAB: ESTRUCTURA ───────────────────────────────────────────────── */}
       {activeTab === 'estructura' && (
-      <div className="flex-1 overflow-y-auto p-8 space-y-6">
-        {/* Capítulos */}
-        {(budget.chapters || []).map((ch: any, idx: number) => {
-          const isExpanded = expanded.has(ch.id);
-          const chTotal = (ch.activities || []).reduce((s: number, a: any) => s + (Number(a.cantidad) * Number(a.precio_unitario) || 0), 0);
+        <div className="flex-1 overflow-y-auto p-6 lg:p-8">
+        <fieldset
+          disabled={bloqueado}
+          className={cn('border-0 p-0 m-0 min-w-0 block w-full space-y-5', bloqueado && 'opacity-70')}
+        >
 
-          return (
-            <div key={ch.id || `ch-${idx}`} className="bg-white rounded-xl border border-concrete overflow-hidden">
-              <div
-                className="bg-sand px-6 py-4 flex items-center justify-between cursor-pointer hover:bg-concrete/20 transition-colors duration-150"
-                onClick={() => toggleChapter(ch.id)}
-              >
-                <div className="flex items-center gap-3">
-                  {isExpanded ? <ChevronDown className="h-5 w-5 text-stone" /> : <ChevronRight className="h-5 w-5 text-stone" />}
-                  <span className="h-7 w-7 rounded bg-primary/10 flex items-center justify-center shrink-0 text-[11px] font-bold text-primary">
-                    {String(idx + 1).padStart(2, '0')}
-                  </span>
-                  <span className="font-semibold text-ink">{ch.nombre.replace(/^\d{2,3}\.\s*/, '')}</span>
-                </div>
-                <div className="flex items-center gap-6">
-                  <span className="font-semibold text-ink">{formatearCOP(chTotal)}</span>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDeleteChapter(ch.id); }}
-                    className="text-mortar hover:text-danger-text transition-colors duration-150"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
+          {/* Capítulos */}
+          {(budget.chapters || []).map((ch: any, idx: number) => {
+            const isExpanded = expanded.has(ch.id);
+            const chTotal = (ch.activities || []).reduce(
+              (s: number, a: any) => s + (Number(a.cantidad) * Number(a.precio_unitario) || 0), 0
+            );
+            const pctCD = subtotalDirecto > 0
+              ? ((chTotal / subtotalDirecto) * 100).toFixed(1)
+              : null;
+            const otrosCapitulos = (budget.chapters || []).filter((c: any) => c.id !== ch.id);
 
-              {isExpanded && (
-                <div className="p-0">
-                  <table className="w-full text-sm text-left">
-                    <thead className="text-xs text-stone uppercase bg-white border-b border-concrete">
-                      <tr>
-                        <th className="px-6 py-3 font-medium">Descripción</th>
-                        <th className="px-6 py-3 font-medium w-24">Unid.</th>
-                        <th className="px-6 py-3 font-medium w-32 text-right">Cantidad</th>
-                        <th className="px-6 py-3 font-medium w-40 text-right">Precio Unit.</th>
-                        <th className="px-6 py-3 font-medium w-40 text-right">Total</th>
-                        <th className="px-6 py-3 w-16"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-sand">
-                      {(ch.activities || []).map((act: any, aIdx: number) => (
-                        <tr key={act.id || `act-${aIdx}`} className="hover:bg-steel-fog/40 transition-colors duration-150">
-                          <td className="px-6 py-3">
-                            <InputEditable
-                              value={act.nombre || act.descripcion}
-                              onChange={(val) => handleUpdateAct(act.id, ch.id, { nombre: val })}
-                              className="text-ink"
-                            />
-                          </td>
-                          <td className="px-6 py-3">
-                            <select
-                              value={act.unidad}
-                              onChange={(e) => handleUpdateAct(act.id, ch.id, { unidad: e.target.value })}
-                              className="bg-transparent border-none focus:ring-0 p-0 text-stone text-xs font-medium"
-                            >
-                              {['m²', 'ml', 'm³', 'kg', 'gl', 'un', 'pza', 'glb'].map(u => (
-                                <option key={u} value={u}>{u}</option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="px-6 py-3">
-                            <input
-                              type="number"
-                              value={act.cantidad}
-                              onFocus={(e) => e.target.select()}
-                              onChange={(e) => handleUpdateAct(act.id, ch.id, { cantidad: parseFloat(e.target.value) || 0 })}
-                              className="w-full bg-transparent border-none focus:ring-0 p-0 text-right text-ink"
-                            />
-                          </td>
-                          <td className="px-6 py-3">
-                            <InputPrecio
-                              value={act.precio_unitario}
-                              onChange={(val) => handleUpdateAct(act.id, ch.id, { precio_unitario: val })}
-                              className="text-right text-ink font-medium"
-                            />
-                          </td>
-                          <td className="px-6 py-3 text-right font-semibold text-ink">
-                            {formatearCOP(Number(act.cantidad) * Number(act.precio_unitario))}
-                          </td>
-                          <td className="px-6 py-3 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                onClick={() => setActiveApuActivity(act)}
-                                className="text-mortar hover:text-steel-mid transition-colors duration-150"
-                                title="Análisis de Precios Unitarios (APU)"
-                              >
-                                <Settings className="h-3.5 w-3.5" />
-                              </button>
-                              <button onClick={() => handleDeleteActivity(act.id, ch.id)} className="text-mortar hover:text-danger-text transition-colors duration-150">
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  <div className="p-4 bg-white border-t border-sand">
+            return (
+              <div key={ch.id || `ch-${idx}`} className="bg-white rounded-xl border border-[#D0D4DB] overflow-hidden shadow-sm">
+
+                {/* Header capítulo */}
+                <div
+                  className="bg-[#DDE0E6] px-5 py-3.5 flex items-center justify-between cursor-pointer hover:bg-[#D0D4DB]/60 transition-colors duration-150"
+                  onClick={() => toggleChapter(ch.id)}
+                >
+                  <div className="flex items-center gap-3">
+                    {isExpanded
+                      ? <ChevronDown className="h-4 w-4 text-[#6B7A8D] shrink-0" />
+                      : <ChevronRight className="h-4 w-4 text-[#6B7A8D] shrink-0" />}
+                    <span className="h-6 w-6 rounded bg-[#FAF0EB] flex items-center justify-center shrink-0 text-[10px] font-bold text-[#D95510]">
+                      {String(idx + 1).padStart(2, '0')}
+                    </span>
+                    <span className="font-semibold text-[#4B5563] text-[11px] uppercase">
+                      {ch.nombre.replace(/^\d{2,3}\.\s*/, '')}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                    <span className="font-semibold text-[#4B5563] text-sm tabular-nums">{formatearCOP(chTotal)}</span>
+                    {pctCD && (
+                      <span className="text-[11px] font-bold text-[#D95510] bg-[#FAF0EB] px-2 py-0.5 rounded-full border border-[#D95510]/20">
+                        {pctCD}% CD
+                      </span>
+                    )}
                     <button
-                      onClick={() => handleAddActivity(ch.id)}
-                      className="text-burn-orange hover:text-burn-deep text-xs font-semibold flex items-center gap-2 transition-colors duration-150"
+                      onClick={() => handleDeleteChapter(ch.id)}
+                      className="text-[#6B7A8D] hover:text-[#991B1B] transition-colors duration-150 p-1 rounded"
                     >
-                      <Plus className="h-4 w-4" /> AGREGAR ACTIVIDAD
+                      <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>
-              )}
-            </div>
-          );
-        })}
 
-        <div className="flex gap-3">
-          <Button onClick={handleAddChapter} variant="secondary" className="flex-1 border-dashed border-2 py-8 bg-sand hover:bg-concrete/20 transition-colors duration-150">
-            <Plus className="mr-2 h-5 w-5" /> AGREGAR NUEVO CAPÍTULO
-          </Button>
-          <Button onClick={() => setCatalogoOpen(true)} variant="outline" className="border-dashed border-2 py-8 px-6">
-            <BookOpen className="mr-2 h-5 w-5" /> IMPORTAR DEL CATÁLOGO
-          </Button>
-        </div>
+                {/* Tabla de actividades */}
+                {isExpanded && (
+                  <div>
+                    <table className="w-full text-sm text-left">
+                      <thead className="text-[9px] text-[#6B7A8D] uppercase tracking-wide bg-[#DDE0E6] border-b border-[#D0D4DB]">
+                        <tr>
+                          <th className="w-8 px-2 py-2.5" />
+                          <th className="px-4 py-2.5 font-medium">Descripción</th>
+                          <th className="px-3 py-2.5 font-medium w-20">Unid.</th>
+                          <th className="px-3 py-2.5 font-medium w-28 text-right">Cantidad</th>
+                          <th className="px-3 py-2.5 font-medium w-36 text-right">Precio Unit.</th>
+                          <th className="px-3 py-2.5 font-medium w-36 text-right">Total</th>
+                          <th className="px-3 py-2.5 w-28 text-right">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#E4E7EC]">
+                        {(ch.activities || []).map((act: any, aIdx: number) => (
+                          <tr
+                            key={act.id || `act-${aIdx}`}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, act.id, ch.id)}
+                            onDragOver={(e) => handleDragOver(e, act.id)}
+                            onDrop={(e) => handleDrop(e, act.id, ch.id)}
+                            onDragEnd={handleDragEnd}
+                            className={cn(
+                              'group transition-colors duration-100',
+                              dragOverActId === act.id && dragSrcChId === ch.id
+                                ? 'border-t-2 border-[#D95510] bg-[#FAF0EB]/30'
+                                : 'hover:bg-[#DDE0E6]',
+                              dragSrcActId === act.id && 'opacity-40'
+                            )}
+                          >
+                            {/* Drag handle */}
+                            <td className="px-2 py-2.5 text-center">
+                              <GripVertical className="h-4 w-4 text-[#C8CDD6] group-hover:text-[#6B7A8D] cursor-grab active:cursor-grabbing mx-auto transition-colors" />
+                            </td>
 
-        {/* Resumen Financiero Simple */}
-        <div className="grid gap-8 xl:grid-cols-[1.8fr_1fr] pt-8">
-          <div className="space-y-6">
-            <div className="bg-white p-8 rounded-xl border border-concrete space-y-6">
-              <h3 className="text-base font-semibold text-ink flex items-center gap-2">
-                <Settings className="text-steel-mid h-5 w-5" /> Configuración de Cascada
-              </h3>
+                            {/* Descripción */}
+                            <td className="px-4 py-2.5">
+                              <div className="rounded hover:bg-[#E4E7EC] focus-within:ring-1 focus-within:ring-[#6B7A8D]/30 transition-colors px-1 -mx-1 cursor-text">
+                                <InputEditable
+                                  value={act.nombre || act.descripcion}
+                                  onChange={(val) => handleUpdateAct(act.id, ch.id, { nombre: val })}
+                                  className="text-[#1F2937] w-full"
+                                />
+                              </div>
+                            </td>
 
-              <div className="grid grid-cols-2 gap-8">
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-stone uppercase">Administración (AIU %)</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      value={budget.aiu_porcentaje}
-                      onChange={(e) => handleUpdateBudget({ aiu_porcentaje: parseFloat(e.target.value) || 0 })}
-                      className="w-full h-12 bg-sand border-concrete rounded-lg focus:ring-[var(--accent-primary)] font-semibold text-lg text-ink"
-                    />
-                    <span className="text-xl font-semibold text-mortar">%</span>
+                            {/* Unidad */}
+                            <td className="px-3 py-2.5">
+                              <select
+                                value={act.unidad}
+                                onChange={(e) => handleUpdateAct(act.id, ch.id, { unidad: e.target.value })}
+                                className="bg-transparent border-none focus:ring-0 p-0 text-[#6B7A8D] text-xs font-medium cursor-pointer hover:text-[#1F2937] transition-colors"
+                              >
+                                {['m²', 'ml', 'm³', 'kg', 'gl', 'un', 'pza', 'glb'].map(u => (
+                                  <option key={u} value={u}>{u}</option>
+                                ))}
+                              </select>
+                            </td>
+
+                            {/* Cantidad */}
+                            <td className="px-3 py-2.5">
+                              <div className="rounded hover:bg-[#E4E7EC] focus-within:ring-1 focus-within:ring-[#6B7A8D]/30 transition-colors px-1 -mx-1 cursor-text">
+                                <input
+                                  type="number"
+                                  value={act.cantidad}
+                                  onFocus={(e) => e.target.select()}
+                                  onChange={(e) => handleUpdateAct(act.id, ch.id, { cantidad: parseFloat(e.target.value) || 0 })}
+                                  className="w-full bg-transparent border-none focus:ring-0 p-0 text-right text-[#4B5563] text-sm"
+                                />
+                              </div>
+                            </td>
+
+                            {/* Precio unitario */}
+                            <td className="px-3 py-2.5">
+                              <div className="rounded hover:bg-[#E4E7EC] focus-within:ring-1 focus-within:ring-[#6B7A8D]/30 transition-colors px-1 -mx-1 cursor-text">
+                                <InputPrecio
+                                  value={act.precio_unitario}
+                                  onChange={(val) => handleUpdateAct(act.id, ch.id, { precio_unitario: val })}
+                                  className="text-right text-[#4B5563] font-medium text-sm"
+                                />
+                              </div>
+                            </td>
+
+                            {/* Total */}
+                            <td className="px-3 py-2.5 text-right font-semibold text-[#4B5563] tabular-nums text-sm">
+                              {formatearCOP(Number(act.cantidad) * Number(act.precio_unitario))}
+                            </td>
+
+                            {/* Acciones */}
+                            <td className="px-3 py-2.5">
+                              <div className="flex items-center justify-end gap-1.5">
+                                {/* Botón APU — acción principal */}
+                                <button
+                                  onClick={() => setActiveApuActivity(act)}
+                                  title="Análisis de Precios Unitarios"
+                                  className="flex items-center gap-1 px-2 py-1 text-[11px] font-bold text-[#6B7A8D] bg-[#E4E7EC] hover:bg-[#1A2535] hover:text-white rounded-md transition-all duration-150 border border-[#E4E7EC] hover:border-[#1A2535]"
+                                >
+                                  <Settings className="h-3 w-3" />
+                                  APU
+                                </button>
+
+                                {/* Menú secundario */}
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <button
+                                      className="p-1 rounded text-[#6B7A8D] hover:text-[#1F2937] hover:bg-[#E4E7EC] transition-colors duration-150"
+                                      title="Más acciones"
+                                    >
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="min-w-[180px]">
+                                    <DropdownMenuItem
+                                      onClick={() => handleDuplicateActivity(act, ch.id)}
+                                      className="gap-2 cursor-pointer"
+                                    >
+                                      <Copy className="h-4 w-4 text-[#6B7A8D]" />
+                                      Duplicar actividad
+                                    </DropdownMenuItem>
+
+                                    {otrosCapitulos.length > 0 && (
+                                      <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuLabel className="text-[10px] text-[#6B7A8D] uppercase tracking-widest font-bold px-2 py-1">
+                                          Mover a capítulo
+                                        </DropdownMenuLabel>
+                                        {otrosCapitulos.map((oc: any) => (
+                                          <DropdownMenuItem
+                                            key={oc.id}
+                                            onClick={() => handleMoveActivity(act.id, ch.id, oc.id)}
+                                            className="gap-2 cursor-pointer text-xs"
+                                          >
+                                            <span className="h-4 w-4 rounded bg-[#E4E7EC] text-[#6B7A8D] flex items-center justify-center text-[9px] font-bold shrink-0">
+                                              {String((budget.chapters || []).findIndex((c: any) => c.id === oc.id) + 1).padStart(2, '0')}
+                                            </span>
+                                            <span className="truncate">{oc.nombre.replace(/^\d{2,3}\.\s*/, '')}</span>
+                                          </DropdownMenuItem>
+                                        ))}
+                                      </>
+                                    )}
+
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      onClick={() => handleDeleteActivity(act.id, ch.id)}
+                                      className="gap-2 cursor-pointer text-[#991B1B] focus:text-[#991B1B] focus:bg-[#FEF0F0]"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                      Eliminar
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+
+                    {/* Agregar actividad */}
+                    <div className="px-5 py-3 bg-white border-t border-[#E4E7EC]">
+                      <button
+                        onClick={() => handleAddActivity(ch.id)}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-[#FAF0EB] text-[#D95510] hover:bg-[#D95510] hover:text-white rounded-lg text-xs font-semibold border border-[#D95510]/20 hover:border-[#D95510] transition-all duration-150"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        Agregar actividad
+                      </button>
+                    </div>
                   </div>
-                  <p className="text-[10px] text-stone italic">Se aplica sobre el costo directo total.</p>
-                </div>
+                )}
+              </div>
+            );
+          })}
 
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-stone uppercase">IVA sobre Utilidad</label>
-                  <div className="flex items-center gap-4 h-12">
+          {/* Botones agregar capítulo / catálogo */}
+          <div className="flex gap-3">
+            <Button
+              onClick={handleAddChapter}
+              variant="secondary"
+              className="flex-1 border-dashed border-2 py-7 bg-[#ECEEF2] hover:bg-[#DDE0E6]/60 transition-colors duration-150"
+            >
+              <Plus className="mr-2 h-5 w-5" /> Agregar nuevo capítulo
+            </Button>
+            <Button
+              onClick={() => setCatalogoOpen(true)}
+              variant="outline"
+              className="border-dashed border-2 py-7 px-6"
+            >
+              <BookOpen className="mr-2 h-5 w-5" /> Importar del catálogo
+            </Button>
+          </div>
+
+          {/* Configuración y resumen financiero */}
+          <div className="grid gap-8 xl:grid-cols-[1.8fr_1fr] pt-4">
+            <div className="space-y-6">
+              {/* Configuración AIU / IVA */}
+              <div className="bg-white p-6 rounded-xl border border-[#D0D4DB] space-y-5">
+                <h3 className="text-sm font-semibold text-[#1F2937] flex items-center gap-2">
+                  <Settings className="text-[#6B7A8D] h-4 w-4" /> Configuración de Cascada
+                </h3>
+
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-[#6B7A8D] uppercase tracking-widest">
+                      AIU Total (%)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        value={budget.aiu_porcentaje}
+                        onChange={(e) => handleUpdateBudget({ aiu_porcentaje: parseFloat(e.target.value) || 0 })}
+                        className="w-full h-11 bg-[#ECEEF2] border border-[#D0D4DB] rounded-lg px-3 focus:ring-1 focus:ring-[#D95510]/40 font-semibold text-lg text-[#1F2937]"
+                      />
+                      <span className="text-lg font-semibold text-[#6B7A8D]">%</span>
+                    </div>
+                    <p className="text-[10px] text-[#6B7A8D] italic">Se aplica sobre el costo directo total.</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-[#6B7A8D] uppercase tracking-widest">
+                      IVA sobre Utilidad
+                    </label>
                     <button
                       onClick={() => handleUpdateBudget({ iva_porcentaje: budget.iva_porcentaje > 0 ? 0 : 19 })}
                       className={cn(
-                        "flex-1 h-full rounded-lg font-semibold text-sm transition-all duration-150 border-2",
-                        budget.iva_porcentaje > 0 ? "bg-[var(--accent-primary)] border-[var(--accent-primary)] text-white" : "bg-white border-concrete text-stone"
+                        'w-full h-11 rounded-lg font-semibold text-sm transition-all duration-150 border-2',
+                        budget.iva_porcentaje > 0
+                          ? 'bg-[#D95510] border-[#D95510] text-white'
+                          : 'bg-white border-[#D0D4DB] text-[#6B7A8D] hover:border-[#D95510] hover:text-[#1F2937]'
                       )}
                     >
-                      {budget.iva_porcentaje > 0 ? "19% ACTIVADO" : "SIN IVA (0%)"}
+                      {budget.iva_porcentaje > 0 ? '19% Activado' : 'Sin IVA (0%)'}
                     </button>
+                    <p className="text-[10px] text-[#6B7A8D] italic">Aplica 19% sobre la utilidad calculada.</p>
                   </div>
-                  <p className="text-[10px] text-stone italic">Aplica 19% sobre la utilidad calculada.</p>
+                </div>
+              </div>
+
+              {/* Resumen rápido */}
+              <div className="bg-white p-5 rounded-xl border border-[#D0D4DB]">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-[#6B7A8D] font-semibold">Resumen rápido</p>
+                    <p className="text-2xl font-bold text-[#1F2937]">{formatearCOP(totalGeneral)}</p>
+                  </div>
+                  <div className="text-right text-[#6B7A8D] text-xs">
+                    <p>Costo Directo</p>
+                    <p className="font-semibold text-[#1F2937]">{formatearCOP(subtotalDirecto)}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-sm text-[#6B7A8D]">
+                  <div className="rounded-lg bg-[#ECEEF2] p-3 border border-[#D0D4DB]">
+                    <p className="font-semibold text-[#1F2937] text-xs uppercase tracking-wide">AIU</p>
+                    <p className="mt-1 font-semibold tabular-nums">{formatearCOP(valorAIU)}</p>
+                  </div>
+                  <div className="rounded-lg bg-[#ECEEF2] p-3 border border-[#D0D4DB]">
+                    <p className="font-semibold text-[#1F2937] text-xs uppercase tracking-wide">IVA</p>
+                    <p className="mt-1 font-semibold tabular-nums">{formatearCOP(valorIVA)}</p>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-xl border border-concrete">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-stone font-semibold">Resumen rápido</p>
-                  <p className="text-2xl font-bold text-ink">{formatearCOP(totalGeneral)}</p>
-                </div>
-                <div className="text-right text-stone text-xs">
-                  <p>Costo Directo</p>
-                  <p>{formatearCOP(subtotalDirecto)}</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4 text-sm text-stone">
-                <div className="rounded-lg bg-sand p-4 border border-concrete">
-                  <p className="font-semibold text-ink">AIU</p>
-                  <p className="mt-2">{formatearCOP(valorAIU)}</p>
-                </div>
-                <div className="rounded-lg bg-sand p-4 border border-concrete">
-                  <p className="font-semibold text-ink">IVA</p>
-                  <p className="mt-2">{formatearCOP(valorIVA)}</p>
+            <div className="space-y-5">
+              <ResumenFinanciero budget={budget} />
+              <div className="bg-white p-5 rounded-xl border border-[#D0D4DB]">
+                <h3 className="text-xs font-bold text-[#1F2937] uppercase tracking-[0.15em] mb-3">Exportar Presupuesto</h3>
+                <div className="flex flex-col gap-2">
+                  <BotonExportarPDF budget={budget} profile={profile} />
+                  <BotonExportarExcel budget={budget} profile={profile} />
                 </div>
               </div>
             </div>
           </div>
-
-          <div className="space-y-6">
-            <ResumenFinanciero budget={budget} />
-            <div className="bg-white p-6 rounded-xl border border-concrete">
-              <h3 className="text-sm font-semibold text-ink uppercase tracking-[0.15em] mb-4">Exportar</h3>
-              <BotonExportarPDF budget={budget} profile={profile} />
-            </div>
-          </div>
+        </fieldset>
         </div>
-      </div>
       )}
 
+      {/* ── MODALES / PANELES ─────────────────────────────────────────────── */}
       <ConfirmDialog
         open={!!confirmState}
         title={confirmState?.title ?? ''}
         description={confirmState?.description}
-        confirmLabel="Eliminar"
-        variant="danger"
+        confirmLabel={confirmState?.confirmLabel ?? 'Eliminar'}
+        variant={confirmState?.variant ?? 'danger'}
         onConfirm={confirmState?.onConfirm ?? (() => {})}
         onCancel={() => setConfirmState(null)}
       />
@@ -486,24 +843,15 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
         onImported={() => router.refresh()}
       />
 
-      {/* Panel APU */}
       <PanelAPU
-        isOpen={!!activeApuActivity} 
+        isOpen={!!activeApuActivity}
         onClose={() => {
           setActiveApuActivity(null);
-          router.refresh(); // Refrescar para ver el nuevo precio unitario
+          router.refresh();
         }}
         activity={activeApuActivity}
         budgetId={budget.id}
       />
-
-      <ResumenFinancieroModal
-        isOpen={resumenOpen}
-        onClose={() => setResumenOpen(false)}
-        budget={budget}
-        subtotalDirecto={subtotalDirecto}
-      />
-
     </div>
   );
 }

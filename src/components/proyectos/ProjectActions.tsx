@@ -79,8 +79,8 @@ export function ProjectActions({
           <Button
             variant="ghost"
             size="sm"
-            icon={<Play className="h-4 w-4 text-primary-600" />}
-            className="text-primary-700 hover:bg-primary-50"
+            icon={<Play className="h-4 w-4 text-[--color-sipo-ember]" />}
+            className="text-[--color-sipo-ember] hover:bg-[--color-sipo-ember-dim]"
             onClick={() => setConfirmIniciar(true)}
             disabled={loadingEstado}
           >
@@ -92,8 +92,8 @@ export function ProjectActions({
           <Button
             variant="ghost"
             size="sm"
-            icon={<CheckCircle2 className="h-4 w-4 text-success-600" />}
-            className="text-success-700 hover:bg-success-50"
+            icon={<CheckCircle2 className="h-4 w-4 text-[--color-sipo-success]" />}
+            className="text-[--color-sipo-success] hover:bg-[--color-sipo-success-bg]"
             onClick={() => setConfirmFinalizar(true)}
             disabled={loadingEstado}
           >
@@ -105,8 +105,8 @@ export function ProjectActions({
           <Button
             variant="ghost"
             size="sm"
-            icon={<Archive className="h-4 w-4 text-neutral-500" />}
-            className="text-neutral-600 hover:bg-neutral-50"
+            icon={<Archive className="h-4 w-4 text-[--color-sipo-steel-muted]" />}
+            className="text-[--color-sipo-steel-muted] hover:bg-[--color-sipo-surface]"
             onClick={() => setConfirmArchivar(true)}
             disabled={loadingEstado}
           >
@@ -126,8 +126,8 @@ export function ProjectActions({
         <Button
           variant="ghost"
           size="sm"
-          icon={<Trash2 className="h-4 w-4 text-red-500" />}
-          className="text-red-500 hover:bg-red-50"
+          icon={<Trash2 className="h-4 w-4 text-[--color-sipo-danger]" />}
+          className="text-[--color-sipo-danger] hover:bg-[--color-sipo-danger-bg]"
           onClick={() => setConfirmDelete(true)}
         >
           Eliminar proyecto

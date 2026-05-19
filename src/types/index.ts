@@ -23,6 +23,43 @@ export interface Project {
   cliente?: Cliente;
 }
 
+// ── Proveedor ──
+export type CategoriaProveedor =
+  | 'ferreteria'
+  | 'contratista'
+  | 'equipos'
+  | 'laboratorio'
+  | 'transporte'
+  | 'servicios'
+  | 'otro';
+
+export const CATEGORIA_PROVEEDOR_LABELS: Record<CategoriaProveedor, string> = {
+  ferreteria:  'Ferretería / Materiales',
+  contratista: 'Contratista especializado',
+  equipos:     'Arriendo de equipos y maquinaria',
+  laboratorio: 'Laboratorio de suelos y concretos',
+  transporte:  'Transporte y volquetas',
+  servicios:   'Servicios técnicos varios',
+  otro:        'Otro',
+};
+
+export interface Proveedor {
+  id: string
+  user_id: string
+  tipo: 'persona' | 'empresa'
+  nombre_razon_social: string
+  nit_cedula?: string
+  categoria: CategoriaProveedor
+  ciudad?: string
+  email?: string
+  telefono?: string
+  sitio_web?: string
+  notas?: string
+  deleted_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface Cliente {
   id: string
   user_id: string
@@ -356,8 +393,9 @@ export interface Profile {
   ciudad: string | null;
   nit: string | null;
   logo_url: string | null;
+  cargo_firma: string | null;
+  firma_url: string | null;
   suscripcion: 'gratis' | 'pro';
-  consultas_ia_este_mes: number;
   preferences?: UserPreferences | null;
   created_at: string;
   updated_at: string;

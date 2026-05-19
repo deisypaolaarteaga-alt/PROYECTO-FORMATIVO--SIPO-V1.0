@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { X, Plus, Trash2, Search, Users, Package, Drill, ShieldCheck, Calculator, RefreshCw } from 'lucide-react';
+import { X, Plus, Trash2, Search, Users, Package, Drill, ShieldCheck, Calculator, RefreshCw, Check, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/shared/Button';
 import { InputPrecio } from '@/components/shared/InputPrecio';
@@ -23,13 +23,14 @@ interface PanelAPUProps {
 
 export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps) {
   const [saving, setSaving] = useState(false);
+  const [applied, setApplied] = useState(false);
   const [apu, setApu] = useState<any>(null);
   const [items, setItems] = useState<any[]>([]);
   const [rendimiento, setRendimiento] = useState(1);
   const [cuadrillas, setCuadrillas] = useState<any[]>([]);
   const [showCuadrillaModal, setShowCuadrillaModal] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
-  const [searchType, setSearchType] = useState<'material' | 'equipo'>('material');
+  const [searchType, setSearchType] = useState<'material' | 'equipo' | 'mano_obra'>('material');
 
   // Cargar datos
   useEffect(() => {
@@ -138,7 +139,11 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
       if (res.success) {
         await actualizarActividad(activity.id, budgetId, { precio_unitario: totals.costoDirecto });
         toast.success('APU aplicado correctamente');
-        onClose();
+        setApplied(true);
+        setTimeout(() => {
+          setApplied(false);
+          onClose();
+        }, 1500);
       } else {
         toast.error(res.error || 'No se pudo guardar el APU');
       }
@@ -238,6 +243,13 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
                       </button>
                     )}
                     <button
+                      onClick={() => { setSearchType('mano_obra'); setShowSearch(true); }}
+                      className="p-1 hover:bg-steel-fog rounded text-steel-mid transition-colors duration-150"
+                      title="Buscar en catálogo de trabajadores"
+                    >
+                      <Search className="h-4 w-4" />
+                    </button>
+                    <button
                       onClick={() => addItem('mano_obra')}
                       className="p-1 hover:bg-steel-fog rounded text-steel-mid transition-colors duration-150"
                       title="Agregar ítem manual"
@@ -308,14 +320,14 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
                   ))}
                   {items.filter(i => i.tipo === 'mano_obra').length === 0 && (
                     <p className="text-[11px] text-stone italic text-center py-2">
-                      Sin ítems — agrega <strong>Manual</strong> o usa el botón <strong>Cuadrilla</strong>
+                      Sin ítems — agrega <strong>Manual</strong>, usa 🔍 para buscar trabajadores o el botón <strong>Cuadrilla</strong>
                     </p>
                   )}
                 </div>
               </section>
 
               {/* 2. MATERIALES */}
-              <section className="space-y-4">
+              <section className="space-y-4 border-t border-concrete pt-6">
                 <div className="flex items-center justify-between border-b border-concrete pb-2">
                   <div className="flex items-center gap-2">
                     <Package className="h-4 w-4 text-success-text" />
@@ -372,7 +384,7 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
               </section>
 
               {/* 3. EQUIPOS */}
-              <section className="space-y-4">
+              <section className="space-y-4 border-t border-concrete pt-6">
                 <div className="flex items-center justify-between border-b border-concrete pb-2">
                   <div className="flex items-center gap-2">
                     <Drill className="h-4 w-4 text-steel-mid" />
@@ -428,18 +440,30 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
               </section>
 
               {/* 4. SEGURIDAD */}
-              <section className="space-y-3 bg-steel-fog/30 p-4 rounded-lg border border-steel-fog">
+              <section className="space-y-3 bg-steel-fog/30 p-4 rounded-xl border border-steel-fog/80">
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="h-4 w-4 text-steel-dark" />
                   <h4 className="text-xs font-semibold text-steel-dark uppercase tracking-tight">Seguridad y Herramienta</h4>
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center text-[11px]">
-                    <span className="text-stone">Herramienta Menor (3% sobre MO)</span>
+                    <span
+                      className="text-stone flex items-center gap-1 cursor-help"
+                      title="Herramienta Menor: se calcula automáticamente como el 3% del costo total de Mano de Obra (INVIAS/IDU 2025). Incluye herramientas de mano como palas, picas, llanas y consumibles menores."
+                    >
+                      Herramienta Menor (3% MO)
+                      <Info className="h-3 w-3 text-mortar shrink-0" />
+                    </span>
                     <span className="font-semibold text-ink">{formatearCOP(totals.hm)}</span>
                   </div>
                   <div className="flex justify-between items-center text-[11px]">
-                    <span className="text-stone">EPP (1% sobre MO)</span>
+                    <span
+                      className="text-stone flex items-center gap-1 cursor-help"
+                      title="EPP (Elementos de Protección Personal): se calcula automáticamente como el 1% del costo total de Mano de Obra. Incluye cascos, guantes, gafas, botas y demás dotación de seguridad industrial obligatoria."
+                    >
+                      EPP (1% MO)
+                      <Info className="h-3 w-3 text-mortar shrink-0" />
+                    </span>
                     <span className="font-semibold text-ink">{formatearCOP(totals.epp)}</span>
                   </div>
                 </div>
@@ -467,10 +491,16 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
                 <Button
                   onClick={handleApply}
                   loading={saving}
-                  className="bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white rounded-lg px-6 transition-colors duration-150"
-                  icon={<Calculator className="h-4 w-4" />}
+                  disabled={applied}
+                  className={cn(
+                    'rounded-lg px-6 transition-all duration-300',
+                    applied
+                      ? 'bg-success-bg border border-success-border text-success-text'
+                      : 'bg-burn-orange hover:bg-burn-deep text-white'
+                  )}
+                  icon={applied ? <Check className="h-4 w-4" /> : <Calculator className="h-4 w-4" />}
                 >
-                  Aplicar
+                  {applied ? 'Aplicado' : 'Aplicar'}
                 </Button>
               </div>
             </div>

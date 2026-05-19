@@ -31,24 +31,24 @@ export function ModalValidacionExport({
         <ModalHeader className="mb-4">
           <div className="flex items-center gap-3">
             {hasErrors ? (
-              <XCircle className="h-5 w-5 text-rose-600" />
+              <XCircle className="h-5 w-5 text-[#991B1B]" />
             ) : (
-              <ShieldCheck className="h-5 w-5 text-amber-500" />
+              <ShieldCheck className="h-5 w-5 text-[#7A4B00]" />
             )}
-            <ModalTitle className="text-slate-900">Validación antes de exportar</ModalTitle>
+            <ModalTitle className="text-[#1F2937]">Validación antes de exportar</ModalTitle>
           </div>
-          <ModalDescription className="mt-1 text-slate-500">
+          <ModalDescription className="mt-1 text-[#6B7A8D]">
             {hasErrors
               ? 'El PDF no puede generarse hasta que se corrijan los errores bloqueantes.'
               : 'Se detectaron advertencias. Puedes exportar si deseas, pero revisa primero.'}
           </ModalDescription>
         </ModalHeader>
 
-        <div className="space-y-5 text-sm text-slate-700">
+        <div className="space-y-5 text-sm text-[#4B5563]">
           {hasErrors && (
-            <div className="rounded-3xl border border-rose-200 bg-rose-50 p-4">
-              <div className="font-bold text-rose-700 mb-2">Errores bloqueantes</div>
-              <ul className="space-y-2 list-disc list-inside text-rose-700">
+            <div className="rounded-xl border border-[#F5C2C2] bg-[#FEF0F0] p-4">
+              <div className="font-bold text-[#991B1B] mb-2">Errores bloqueantes</div>
+              <ul className="space-y-2 list-disc list-inside text-[#991B1B]">
                 {errors.map((error, index) => (
                   <li key={index}>{error}</li>
                 ))}
@@ -57,9 +57,9 @@ export function ModalValidacionExport({
           )}
 
           {hasWarnings && (
-            <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4">
-              <div className="font-bold text-amber-900 mb-2">Advertencias</div>
-              <ul className="space-y-2 list-disc list-inside text-amber-900">
+            <div className="rounded-xl border border-[#F0D080] bg-[#FEF3E2] p-4">
+              <div className="font-bold text-[#7A4B00] mb-2">Advertencias</div>
+              <ul className="space-y-2 list-disc list-inside text-[#7A4B00]">
                 {warnings.map((warning, index) => (
                   <li key={index}>{warning}</li>
                 ))}

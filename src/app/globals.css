@@ -89,6 +89,32 @@
   --color-info-500:    #1C4A72;
   --color-info-600:    #1C4A72;
 
+  /* ── Grafito SIPO — tokens nuevos ── */
+  --color-sipo-ember:        #D95510;
+  --color-sipo-ember-dim:    #FAF0EB;
+  --color-sipo-ember-mid:    #F0A882;
+  --color-sipo-steel:        #1A2535;
+  --color-sipo-steel-mid:    #2E4257;
+  --color-sipo-steel-muted:  #6B7A8D;
+  --color-sipo-base:         #ECEEF2;
+  --color-sipo-surface:      #E4E7EC;
+  --color-sipo-surface-2:    #DDE0E6;
+  --color-sipo-border:       #D0D4DB;
+  --color-sipo-border-md:    #C8CDD6;
+  --color-sipo-ink:          #1F2937;
+  --color-sipo-ink-muted:    #4B5563;
+  --color-sipo-ink-ghost:    #6B7A8D;
+
+  /* Semánticos Grafito */
+  --color-sipo-success:      #166534;
+  --color-sipo-success-bg:   #EBFAF0;
+  --color-sipo-warning:      #7A4B00;
+  --color-sipo-warning-bg:   #FEF3E2;
+  --color-sipo-danger:       #991B1B;
+  --color-sipo-danger-bg:    #FEF0F0;
+  --color-sipo-info:         #1E4D8C;
+  --color-sipo-info-bg:      #EBF2FA;
+
   /* ── Fuente ── */
   --font-sans: var(--font-inter), 'Inter', system-ui, sans-serif;
 
@@ -125,15 +151,15 @@
 
 /* ----------- Base ----------- */
 :root {
-  --background: #F4F2EE;
-  --foreground: #1C1814;
+  --background: #ECEEF2;
+  --foreground: #1F2937;
   --sidebar-width: 240px;
   --sidebar-collapsed-width: 64px;
   --header-height: 60px;
   /* Accent theming — overridden by ThemeProvider */
-  --accent-primary: #E8571A;
-  --accent-hover: #F07848;
-  --accent-pale: #FFF0E8;
+  --accent-primary: #D95510;
+  --accent-hover: #C04A0D;
+  --accent-pale: #FAF0EB;
 }
 
 * { box-sizing: border-box }

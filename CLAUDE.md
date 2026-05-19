@@ -20,11 +20,11 @@ SIPO (Sistema Inteligente de Presupuestos de Obra) is a Colombian construction b
 - **Next.js 16** (App Router) + **React 19** + **TypeScript** (strict)
 - **Tailwind CSS v4** — inline `@theme` in `src/app/globals.css` (no separate config file)
 - **Supabase** — PostgreSQL 17 + Auth (cookie-based via `@supabase/ssr`) + Storage
-- **Anthropic Claude 3.5 Sonnet** — streaming via `/api/ia/stream`
 - **Zod v4** — centralized schemas in `src/lib/validations/schemas.ts`
 - **Zustand** — local UI state only
 - **decimal.js** — all financial/tax calculations (never use native floats)
 - **@react-pdf/renderer** — PDF export
+- **xlsx 0.18.5** — Excel export (SheetJS, browser-side via `XLSX.write` + Blob download)
 
 ## Commands
 
@@ -37,6 +37,9 @@ pnpm run seed:catalogo       # Insert/update reference catalog (Colombia 2025 pr
 pnpm run seed:catalogo:reset # Wipe and re-seed catalog
 pnpm run seed:apu            # Insert APU reference items into catalogo_apu_items (31 activities)
 pnpm run seed:apu:reset      # Wipe and re-seed APU reference items
+pnpm run seed:catalogo-items      # Seed masivo de ítems APU de referencia (Colombia 2026) en catalogo_apu_items
+pnpm run seed:catalogo-items:reset # Wipe and re-seed catalogo items 2026
+pnpm run seed:catalogo-items:dry  # Dry-run: muestra qué insertaría sin escribir en BD
 pnpm exec vitest             # Run calculation engine tests
 ```
 
@@ -53,11 +56,8 @@ SUPABASE_SERVICE_ROLE_KEY
 SUPABASE_DB_PASSWORD          # PostgreSQL password (≠ service role key)
 SUPABASE_DB_HOST              # e.g. aws-0-us-west-2.pooler.supabase.com
 SUPABASE_DB_PORT              # 6543 for Transaction pooler
-ANTHROPIC_API_KEY             # Required for IA features (currently empty in dev)
 NEXT_PUBLIC_APP_URL
 ```
-
-`ANTHROPIC_API_KEY` is **empty in dev** — all `/api/ia/*` endpoints will fail until it is set.
 
 ## Migration System
 
@@ -69,16 +69,16 @@ NEXT_PUBLIC_APP_URL
 - Triggers: `DROP TRIGGER IF EXISTS name ON table; CREATE TRIGGER ...`
 - Functions: `CREATE OR REPLACE FUNCTION`
 
-### Applied migrations (29 total, in order)
+### Applied migrations (35 total, in order)
 
 | File | Content | Status |
 |------|---------|--------|
-| `schema.sql` | Core tables: profiles, projects, budgets, chapters, activities, apus, apu_items, materials, labor, equipment, ai_conversations, user_materials | ✅ applied |
+| `schema.sql` | Core tables: profiles, projects, budgets, chapters, activities, apus, apu_items, materials, labor, equipment, user_materials | ✅ applied |
 | `20260504103000_parametros_fiscales.sql` | Colombian fiscal parameters (SMMLV, ARL factors) + seed 2025 | ✅ applied |
 | `20260504103500_profiles_fiscal.sql` | AIU defaults on profiles, `municipios` table with ReteICA | ✅ applied |
 | `20260504104000_rls_audit.sql` | Soft-delete (`deleted_at`), active views, audit_log, RLS reinforcement | ✅ applied |
 | `20260504104500_budget_estados.sql` | Budget state machine, `budget_snapshots`, version trigger | ✅ applied |
-| `20260504105000_ia_security.sql` | `ai_usage` rate-limit table, IA config on profiles | ✅ applied |
+| `20260504105000_ia_security.sql` | Tablas legacy `ai_usage` + config IA en profiles (ya no usadas en la app pero presentes en BD) | ✅ applied |
 | `20260505100000_catalogo_actividades.sql` | `catalogo_capitulos` + `catalogo_actividades` tables (public read) | ✅ applied |
 | `20260505200000_budget_columns_completo.sql` | **Critical fix**: adds 14 missing columns to `budgets` (metodo_aiu, administracion_pct, imprevistos_pct, utilidad_pct, metodo_iva, retenciones, etc.), `precio_desde_apu` on activities, extended `apu_items.tipo` constraint | ✅ applied |
 | `20260505210000_pendientes_motor.sql` | `pct_herramienta_menor`/`pct_epp` on apus, `preferences` JSONB on profiles, `v_resumen_presupuesto` view | ✅ applied |
@@ -89,8 +89,8 @@ NEXT_PUBLIC_APP_URL
 | `20260511100000_drop_legacy_users.sql` | **Limpieza**: `DROP TABLE IF EXISTS public.users/usuarios CASCADE` — tablas legacy nunca usadas en SIPO | ✅ applied |
 | `20260511110000_fix_apu_costo_precision.sql` | **Bug fix**: Columnas `costo_*` de `apus` a `NUMERIC(15,2)`, `costo_total` GENERATED con `ROUND(...,2)`, `v_resumen_presupuesto` con `ROUND` en toda aritmética | ✅ applied |
 | `20260511120000_seed_trabajadores.sql` | **Seed**: Índice único en `trabajadores.especialidad` + 25 trabajadores de referencia Colombia 2025 (`ON CONFLICT DO NOTHING`) | ✅ applied |
-| `20260511130000_estados_proyecto_presupuesto.sql` | **Actualización**: `projects.estado` cambia constraint a `borrador\|en_progreso\|finalizado\|archivado`; migra `activo/pausado→en_progreso`, `completado→finalizado`; default ahora `borrador` | ⏳ pendiente (`pnpm run migrate`) |
-| `20260511140000_fix_estados_proyecto.sql` | **Idempotente**: repite el fix de estados con UPDATE antes de ADD CONSTRAINT; segundo guard por si `130000` falló parcialmente | ⏳ pendiente (`pnpm run migrate`) |
+| `20260511130000_estados_proyecto_presupuesto.sql` | **Actualización**: `projects.estado` cambia constraint a `borrador\|en_progreso\|finalizado\|archivado`; migra `activo/pausado→en_progreso`, `completado→finalizado`; default ahora `borrador` | ✅ applied |
+| `20260511140000_fix_estados_proyecto.sql` | **Idempotente**: repite el fix de estados con UPDATE antes de ADD CONSTRAINT; segundo guard por si `130000` falló parcialmente | ✅ applied |
 | `20260512100000_seed_institucional.sql` | **Seed**: 40+ actividades institucionales (hospitales, escuelas) con APUs base | ✅ applied |
 | `20260512110000_seed_industrial.sql` | **Seed**: 30+ actividades industriales (bodegas, plantas) con APUs base | ✅ applied |
 | `20260512120000_seed_hotelero.sql` | **Seed**: 35+ actividades hoteleras/turismo con APUs base | ✅ applied |
@@ -102,26 +102,33 @@ NEXT_PUBLIC_APP_URL
 | `20260512210001_fix_catalogo_apu_precios_v2.sql` | **Bug fix**: Segunda pasada de corrección de precios en catálogo | ✅ applied |
 | `20260512210002_fix_catalogo_apu_precios_v3.sql` | **Bug fix**: Corrige precios desactualizados en el catálogo tras la importación masiva | ✅ applied |
 | `20260512300000_clientes.sql` | **Módulo Clientes**: Tabla `clientes` + `cliente_id` en `projects` + RLS | ✅ applied |
+| `20260514100000_fix_audit_log_rls.sql` | **Security fix**: Agrega política INSERT a `audit_log` — sin ella, los INSERTs desde Server Actions con JWT de usuario eran bloqueados por RLS (solo existía política SELECT) | ✅ applied |
+| `20260516100000_update_trabajadores_2026.sql` | **Seed update**: Actualiza los 25 jornales en `trabajadores` a valores coherentes con SMMLV 2026 ($1.423.500/mes). `jornal_con_prestaciones` se recalcula automáticamente (GENERATED ALWAYS AS). | ✅ applied |
+| `20260516200000_proveedores.sql` | **Módulo Proveedores**: Tabla `proveedores` (7 categorías de construcción colombiana: ferreteria/contratista/equipos/laboratorio/transporte/servicios/otro) + soft-delete con `deleted_at` + RLS + `proveedor_id` nullable en `apu_items` (FK futura para asociar insumos a proveedor) | ✅ applied |
+| `20260516300000_fix_materials_duplicados.sql` | **Bug fix**: Elimina 7 filas duplicadas en `materials` (conserva el de mayor `id` por `nombre+categoria`); agrega `UNIQUE INDEX materials_nombre_categoria_unique` para prevenir recurrencia | ✅ applied |
+| `20260517100000_budget_aprobacion.sql` | **Flujo aprobación**: Normaliza `check_budget_estado` a `borrador\|en_revision\|aprobado\|rechazado\|archivado`; actualiza `fn_increment_budget_version` para limpiar `aprobado_en = NULL` al reabrir a borrador | ✅ applied |
+| `20260517200000_drop_legacy_estado_check.sql` | **Bug fix**: Elimina constraint legado `budgets_estado_check` que bloqueaba la transición `borrador → en_revision` (no incluía `'en_revision'` como valor válido) | ✅ applied |
 
 ### Loose SQL files at root (already applied manually — do NOT re-run)
 
 `cuadrillas_schema.sql`, `ai-tables.sql`, `migration_motor_calculo.sql`, `migration_motor_2026.sql`, `preferences_column.sql`, `trigger-profiles.sql`, `seed.sql`, `seed_cuadrillas.sql`, `seed_data.sql` — these were executed directly in Supabase Dashboard and are **already reflected in the database**. Their triggers and functions are now superseded by `20260507100000_fix_trigger_chain.sql`. Do not add them to `migrate.js`.
 
-## Current Database State (as of 2026-05-11)
+## Current Database State (as of 2026-05-18)
 
-**27 tables + 5 views** in `public` schema. Key tables and their non-obvious columns:
+**28 tables + 5 views** in `public` schema. Jornales en `trabajadores` actualizados a SMMLV 2026 ($1.423.500/mes). Tabla `materials` deduplicada (46 filas, índice único en `nombre+categoria`). Key tables and their non-obvious columns:
 
 | Table | Key columns beyond the obvious |
 |-------|-------------------------------|
 | `budgets` | `metodo_aiu` ('porcentaje'\|'detallado'), `administracion_pct`, `imprevistos_pct`, `utilidad_pct`, `gastos_fijos_mensuales`, `duracion_meses`, `metodo_iva`, `mostrar_retenciones`, `retefuente_pct`, `ica_pct`, `reteiva_pct`, `ciudad_ica`, `costo_directo`, `vigencia_dias` |
 | `apus` | `costo_herramienta_menor`, `costo_epp`, `pct_herramienta_menor` (default 3%), `pct_epp` (default 1%), `rendimiento` |
-| `apu_items` | `tipo` IN ('material','mano_obra','equipo','herramienta_menor','epp') |
+| `apu_items` | `tipo` IN ('material','mano_obra','equipo','herramienta_menor','epp'); `cuadrilla_id` UUID nullable; `proveedor_id` UUID nullable (FK futura a `proveedores`) |
 | `activities` | `precio_desde_apu` BOOLEAN — when true, `precio_unitario` is read from the linked APU |
 | `profiles` | `preferences` JSONB (accentColor, density, showCompanyName, defaultCity), `nivel_riesgo_arl` (1-5), `municipio`, `telefono`, `direccion`, `email_empresa`, AIU defaults |
 | `catalogo_capitulos` | Reference catalog — 28 chapters across residencial/comercial/infraestructura |
 | `catalogo_actividades` | 164 reference activities with `precio_referencia_nacional`, `rango_min`, `rango_max` (COP 2025) |
 | `catalogo_apu_items` | APU reference items per activity — tipo, nombre, unidad, cantidad, precio_unitario, orden (public read) |
-| `clientes` | `tipo` (persona/empresa), `nombre_razon_social`, `nit_cedula`, `nombre_contacto`, `cargo_contacto`, `ciudad`, `email`, `telefono` |
+| `clientes` | `tipo` ('persona_natural'\|'empresa'), `nombre_razon_social`, `nit_cedula`, `nombre_contacto`, `cargo_contacto`, `ciudad`, `email`, `telefono`; soft-delete via `activo BOOLEAN` |
+| `proveedores` | `tipo` ('persona'\|'empresa'), `nombre_razon_social`, `nit_cedula`, `categoria` IN (ferreteria/contratista/equipos/laboratorio/transporte/servicios/otro), `ciudad`, `email`, `telefono`, `sitio_web`; soft-delete via `deleted_at TIMESTAMPTZ` |
 
 ## Architecture
 
@@ -170,13 +177,17 @@ Always use `decimal.js` for these computations. Fiscal rates by city live in `sr
 
 | Path | Purpose |
 |------|---------|
-| `src/actions/` | All data mutations as `'use server'` Server Actions; validate with Zod, then Supabase |
+| `src/actions/` | All data mutations as `'use server'` Server Actions; validate with Zod, then Supabase. Archivos: `analytics.ts`, `apariencia.ts` (persiste `preferences` JSONB en profiles), `auth.ts`, `catalogo.ts`, `clientes.ts`, `configuracion-fiscal.ts` (params IVA/AIU/retenciones del presupuesto), `cuadrillas.ts`, `insumos.ts`, `mano-obra.ts`, `onboarding.ts`, `pdf.ts`, `perfil.ts`, `presupuesto-estados.ts` (máquina de estados: enviar/aprobar/rechazar/reabrir), `presupuestos.ts`, `proveedores.ts`, `proyectos.ts` |
 | `src/app/(auth)/` | Public routes: login, registro, recuperar-contrasena, nueva-contrasena |
 | `src/app/(dashboard)/` | Protected routes behind sidebar layout |
-| `src/app/api/ia/` | `stream` (Claude streaming) and `presupuesto` (budget analysis) endpoints |
-| `src/components/shared/` | UI primitives — always reuse before creating new components |
-| `src/lib/anthropic/` | Claude client singleton, SYSTEM_PROMPT, response parser, rate limiter |
+| `src/components/shared/` | UI primitives (Sidebar, Logo, EstadoBadge, InputEditable, etc.) — always reuse before creating new components |
+| `src/components/clientes/` | `ClientesList.tsx`, `ClientesNewButton.tsx`, `ModalCliente.tsx`, `MunicipioCombobox.tsx`, `ClienteSelector.tsx`, `ClienteDetailActions.tsx` |
+| `src/components/proveedores/` | `ProveedoresList.tsx` (grid con filtros tipo/categoría), `ProveedoresNewButton.tsx`, `ModalProveedor.tsx` (form con 7 categorías + ciudad select) |
+| `src/app/(dashboard)/parametros-fiscales/` | Página de configuración de parámetros AIU/IVA globales (cliente); usa `src/components/configuracion/FiscalForm.tsx` |
+| `src/components/presupuestos/` | Editor principal (`EditorPresupuesto.tsx`), `PanelAPU.tsx`, `ExplosionInsumosView.tsx`, `ResumenFinancieroTab.tsx` (pestaña activa), `ResumenFinanciero.tsx` (colapsible), `ResumenFinancieroVisual.tsx` (tarjetas KPI), `BotonEnviarRevision.tsx` (enviar a revisión), `ModalValidacionExport.tsx` (validación pre-PDF), `EstadoBadge.tsx`, `ResumenFinancieroModal.tsx` (**deprecated** — en disco pero sin importar) |
 | `src/lib/calculos/` | Budget calculation engine + tests |
+| `src/lib/excel/exportarPresupuestoExcel.ts` | Genera `.xlsx` en browser: 4 hojas (Resumen, Presupuesto, APUs, Insumos). Usa SheetJS `XLSX.write` + Blob. Mismos cálculos con `decimal.js` que el PDF — nunca floats nativos. |
+| `src/components/pdf/` | `PresupuestoPDF.tsx`, `APUDetallePDF.tsx`, `PresupuestoCompletoConAPU.tsx`, `BotonExportarPDF.tsx`, `BotonExportarExcel.tsx` (import dinámico del helper Excel) |
 | `src/lib/supabase/` | `client.ts` (browser), `server.ts` (server + `createAdminClient()`), `middleware.ts` (session + route guard) |
 | `src/lib/validations/schemas.ts` | Single source of truth for all Zod schemas — edit here first |
 | `src/types/index.ts` | All TypeScript interfaces |
@@ -185,6 +196,12 @@ Always use `decimal.js` for these computations. Fiscal rates by city live in `sr
 | `scripts/seed-catalogo.ts` | Reference catalog seed (run with `pnpm run seed:catalogo`) |
 | `scripts/verificar-fix.ts` | End-to-end test: simula `crearPresupuestoConPlantilla` completo y verifica chapters+activities+APUs en BD |
 | `scripts/check-catalogo.ts` | Verifica conteos de catálogo y presupuestos recientes via REST API |
+| `scripts/check-catalog-integrity.ts` | Verifica integridad del catálogo (capítulos sin actividades, actividades sin apu_items) vía Supabase REST |
+| `scripts/debug-plantilla.ts` | Diagnóstico de `crearPresupuestoConPlantilla` — replica la lógica de la acción para encontrar dónde falla |
+| `scripts/master-fill-all-prices.ts` | Pobla precios 2026 en actividades del catálogo con `precio_unitario = 0` |
+| `scripts/master-fill-catalogo-prices.ts` | Variante focada de llenado de precios del catálogo |
+| `scripts/seed_catalogo_items_2026.ts` | Seed masivo de ítems APU de referencia (`catalogo_apu_items`) con proporciones por categoría Colombia 2026 — soporta `--reset` y `--dry-run` |
+| `scripts/verificar-rls.ts` | Verifica aislamiento RLS entre usuarios (crea user_A y user_B, valida que cada uno solo ve sus propios datos) |
 
 ### Supabase Clients — dos tipos
 
@@ -198,12 +215,6 @@ Always use `decimal.js` for these computations. Fiscal rates by city live in `sr
 ### Authentication & Routing
 
 Cookie-based Supabase Auth. `src/lib/supabase/middleware.ts` refreshes tokens and redirects unauthenticated users away from `(dashboard)` routes. `src/proxy.ts` adapts Next.js 16 middleware conventions.
-
-### AI Integration
-
-- `POST /api/ia/stream` — streams Claude responses; lines prefixed `__METADATA__:` carry conversation ID
-- Rate limiting: `consultas_ia_este_mes` on `profiles` + `ai_usage` table
-- `ANTHROPIC_API_KEY` must be non-empty; the route validates before any call
 
 ## Feature Implementation Workflow
 
@@ -222,32 +233,54 @@ Token reference: `src/lib/design-tokens.ts`. User accent color stored in `profil
 
 ## Known Remaining Tasks
 
+> **Snapshot:** 2026-05-19 — `tsc --noEmit --skipLibCheck` limpio, 35 migraciones aplicadas, 6 commits en rama `main` de `sipo/`. Nueva ruta `/parametros-fiscales`. 3 scripts nuevos `seed:catalogo-items`.
+
 ### Pendiente — acción manual requerida
 - Presupuestos creados antes del fix de admin client (2026-05-07) tienen 0 actividades — deben eliminarse y recrearse con "Plantilla Sugerida"
 - Reimportar capítulos del catálogo que existan en BD sin `apu_items` (fueron importados antes del fix del `subtotal` GENERATED)
 
-### Pendiente — configuración de entorno
-- `ANTHROPIC_API_KEY` debe estar configurada para funciones IA (`/api/ia/stream`, asistente)
+### Pendiente — próximas features (prioridad alta)
+~~- **Panel APU — fix duplicados en apu_items**~~ ✅ 2026-05-18 — `guardarAPU` en `presupuestos.ts`: cuando `payload.id` no viene del cliente, ahora busca primero un APU existente para la actividad (`maybeSingle()` con filtro `activity_id + user_id + deleted_at IS NULL`) antes de insertar uno nuevo. Elimina la condición de carrera que creaba APUs duplicados al guardar dos veces sin recargar.
+- **n8n reportes**: Integración con n8n para envío automático de reportes PDF por email al aprobar presupuesto.
 
-### Pendiente — features incompletas
-- **Migración pendiente de ejecutar**: `pnpm run migrate` debe correr `20260511130000` + `20260511140000` para actualizar el constraint de `projects.estado` en BD.
+### Pendiente — autenticación
+~~- **`middleware.ts` NO EXISTE**~~ ✅ 2026-05-18 — `src/middleware.ts` creado; llama a `updateSession` de `@/lib/supabase/middleware`. Matcher excluye `_next/static`, `_next/image`, `favicon.ico` y archivos estáticos. Archivos obsoletos `src/proxy.ts` y `src/middleware.ts.bak` eliminados.
 - **Supabase Auth Dashboard**: Verificar en Authentication → URL Configuration que `Site URL = http://localhost:3000` y Redirect URLs incluye `http://localhost:3000/**`. Sin esto el callback de confirmación de email falla.
 
-~~- `ResumenFinancieroModal` existe en `src/components/presupuestos/ResumenFinancieroModal.tsx` pero **no tiene botón disparador** en `EditorPresupuesto.tsx`~~ ✅ 2026-05-14 — botón "Dashboard" (BarChart3) implementado en el header del editor con `resumenOpen` state
-
-~~### Pendiente — errores TypeScript (5 archivos, descubiertos 2026-05-13)~~ ✅ 2026-05-13 — todos resueltos, `tsc --noEmit --skipLibCheck` sin errores en source (sólo 2 errores en `scratch/` que no afectan build)
-
-### Pendiente — autenticación (descubierto 2026-05-14)
-- `src/middleware.ts` **creado** ✅ 2026-05-14 — `src/proxy.ts` nunca era ejecutado por Next.js (nombre incorrecto); `middleware.ts` correcto ahora existe en `src/`
-- Pendiente verificar configuración Supabase Dashboard (ver punto arriba)
-
 ### Pendiente — deuda técnica
+~~- **`ResumenFinancieroModal.tsx` en disco sin importar**~~ ✅ 2026-05-18 — archivo ya no existe en el proyecto.
+~~- **`old_sidebar.tsx` en raíz del proyecto**~~ ✅ 2026-05-18 — archivo ya no existe en el proyecto.
+~~- **`src/proxy.ts` reemplazado pero no eliminado**~~ ✅ 2026-05-18 — eliminado junto con `middleware.ts.bak`.
+
+~~### Pendiente — errores TypeScript (5 archivos, descubiertos 2026-05-13)~~ ✅ 2026-05-13 — todos resueltos. **Estado actual (2026-05-18): `tsc --noEmit --skipLibCheck` sin errores.**
+
+### Pendiente — deuda técnica (histórico)
 ~~- Turbopack FATAL panic en Windows con `@react-pdf/renderer` — OS error 5 "Acceso denegado" al crear junction points~~ ✅ 2026-05-14 — `package.json` restaurado a `next dev --no-turbo` (flag se perdió al migrar a pnpm)
 ~~- Legacy tables `users`, `usuarios` — verificar que no se usan antes de eliminar~~ ✅ 2026-05-11
 ~~- Imprecisión de punto flotante en `apus.costo_total` GENERATED (ej: `26757.96000000000...`) — columna NUMERIC debería usar escala fija `NUMERIC(15,2)`~~ ✅ 2026-05-11
 ~~- `ResumenFinancieroModal.tsx` líneas 416-425 — fragmento huérfano de versión anterior causaba 14 errores TS1005/TS1109 parse errors~~ ✅ 2026-05-13
 
 ### Completado ✅
+- ~~**Rediseño página Perfil (`/perfil`)**~~ — `src/components/perfil/PerfilEmpresaClient.tsx` reescrito completo con patrón Stripe/Vercel Settings: nav lateral sticky (`w-44`, scroll-spy via `IntersectionObserver`) + 4 secciones ancladas (`sec-empresa`, `sec-apariencia`, `sec-pdf`, `sec-seguridad`). **Empresa**: logo compacto (64px thumbnail + botones Cambiar/Eliminar en fila). **Apariencia**: 4 swatches tomados de `ACCENT_THEMES` vía `useTheme().updatePref()` — actualiza `--accent-primary` en DOM sin recarga, persiste en `profiles.preferences` con debounce 1s. **PDF y reportes**: firma en layout horizontal (140px preview + fields). **Seguridad**: email read-only + campos contraseña con Eye/EyeOff toggle. Inputs: `bg-[#F8F7F5] border border-[#E5E1D8]`. `tsc` + `pnpm build` limpios ✅ 2026-05-17
+- ~~**Avatar burn-orange en toda la app**~~ — `src/components/shared/Avatar.tsx`: `bg-steel-fog text-steel-mid` → `bg-[#D95510] text-white`. Afecta `DashboardHeader` y cualquier otro uso del componente `Avatar` ✅ 2026-05-17
+- ~~**Fix personalización de color vía ThemeProvider**~~ — Sección Apariencia en `PerfilEmpresaClient` ahora usa `useTheme().updatePref('accentColor', theme.primary)` con swatches tomados directamente de `ACCENT_THEMES` (`orange:#E8571A`, `blue:#1E6FB8`, `green:#2D7A45`, `gray:#4A5568`). Eliminados: `COLORES_ACENTO` (6 hexes que no coincidían con ningún key de `ACCENT_THEMES`), `guardandoApariencia` state, `handleGuardarApariencia` (llamaba server action sin tocar DOM). El CSS variable `--accent-primary` se aplica en tiempo real ✅ 2026-05-17
+- ~~**`guardarApariencia` server action**~~ — `src/actions/apariencia.ts`: fusiona (`{ ...current.preferences, ...prefs }`) y persiste en `profiles.preferences` JSONB; disponible para uso desde otros componentes ✅ 2026-05-17
+- ~~**`cambiarContrasena` en `auth.ts`**~~ — `src/actions/auth.ts`: acción para usuario autenticado que valida longitud ≥8 + coincidencia, luego llama `supabase.auth.updateUser({ password })` ✅ 2026-05-17
+- ~~**Excel export**~~ — `src/lib/excel/exportarPresupuestoExcel.ts` genera `.xlsx` en browser con 4 hojas: **Resumen** (CD, AIU, IVA, Total Oferta, retenciones informativas + datos del proyecto/elaborador), **Presupuesto** (capítulos + actividades con cantidad, precio unit., total y % C.D.), **APUs** (todos los `apu_items` agrupados por actividad con tipo, cantidad, precio y subtotal), **Insumos** (explosión consolidada: agrupa por tipo+nombre+precio, multiplica `item.cantidad × act.cantidad` para obtener cantidad total en obra). `BotonExportarExcel.tsx` con import dinámico del helper. Botón aparece en header del editor y en panel lateral de exportación. Dependencia `xlsx 0.18.5` agregada. `tsc` + `pnpm build` limpios ✅ 2026-05-17
+- ~~**PDF — 4 bugs corregidos**~~ — (1) **% C.D. por actividad** (`PresupuestoPDF.tsx`): cada fila de actividad ahora calcula y muestra `vrTotal / costoDirecto × 100` con 1 decimal, usando `Decimal.js`; antes estaba vacío con `<Text></Text>`. (2) **Página de firmas** (`PresupuestoPDF.tsx`): bloque rediseñado con texto introductorio legal, dos `signatureBox` al 44% de ancho con `signatureName` (bold), `signatureRole` (cargo/matrícula/empresa), y pie "Elaboró y Presentó" / "Aceptó y Firmó" — ya no se ve como nombres flotando. (3) **Numeración dinámica APU** (`APUDetallePDF.tsx`): `sectionNum` se incrementa solo cuando la sección existe — si no hay equipos, materiales arranca como "1. MATERIALES" en lugar de "2. MATERIALES". (4) **Nota aclaratoria genéricos** (`APUDetallePDF.tsx`): si algún `apu_item.nombre` coincide con `/actividad general|sin definir|por definir/i`, aparece nota al pie: "Precios de referencia INVIAS/IDU 2025. Verificar con cotización real del mercado local." ✅ 2026-05-17
+- ~~**BotonEnviarRevision + ModalValidacionExport**~~ — `BotonEnviarRevision.tsx` permite al usuario enviar el presupuesto a revisión desde el editor; `ModalValidacionExport.tsx` muestra validación pre-PDF (alertas de campos faltantes, estado, etc.); `presupuesto-estados.ts` centraliza las transiciones del estado machine; `ResumenFinanciero.tsx` y `ResumenFinancieroVisual.tsx` como variantes de presentación del resumen ✅ 2026-05-17
+- ~~**configuracion-fiscal Server Action**~~ — `src/actions/configuracion-fiscal.ts` gestiona parámetros IVA/AIU/retenciones del presupuesto ✅ 2026-05-17
+- ~~**Flujo de aprobación de presupuestos**~~ — Máquina de estados `borrador → en_revision → aprobado` con posibilidad de reabrir (`aprobado → borrador`). Migración `20260517100000_budget_aprobacion.sql`: constraint normalizado, trigger `fn_increment_budget_version` llena/limpia `aprobado_en` automáticamente. Server Actions `aprobarPresupuesto` + `reabrirPresupuesto` en `src/actions/presupuestos.ts` (admin client, RLS-safe). `EditorPresupuesto`: botón verde "Marcar como aprobado" en `en_revision`; banner verde + editor bloqueado vía `<fieldset disabled>` + botón "Reabrir para edición" con `ConfirmDialog` en `aprobado`. `tsc` + `pnpm build` limpios ✅ 2026-05-17
+- ~~Dashboard analytics global~~ — `/dashboard` rediseñado con KPIs corregidos + 3 secciones nuevas: (1) **Análisis financiero** — `DistribucionCDChart` (barras apiladas CSS material/MO/equipo desde `apus`) + `ComparativaPresupuestos` (tabla con barra proporcional por `total_oferta`); (2) **Vigencia** — `VencimientoAlert` con semáforo rojo/ámbar/azul, oculto si no hay vencimientos ≤30 días; (3) **Estado de presupuestos** — barra apilada proporcional + contadores. Alimentado desde `v_resumen_presupuesto` + `apus` + `budgets` + `projects`. Sin dependencias nuevas — barras CSS puras. **Bugs corregidos:** (a) `proyectosActivos` filtraba por `['activo','cotizacion','ejecucion']` (estados eliminados en 2026-05-11); ahora usa `proyectos_en_progreso` del KPI con estados correctos `borrador|en_progreso|finalizado|archivado`. (b) "Total presupuestado" usaba `budgets.costo_directo` (CD bruto); ahora muestra `total_oferta` (CD + AIU + IVA) desde `v_resumen_presupuesto`. Archivos: `src/actions/analytics.ts`, `src/components/dashboard/{DistribucionCDChart,ComparativaPresupuestos,VencimientoAlert}.tsx`, `src/app/(dashboard)/dashboard/page.tsx` ✅ 2026-05-17
+- ~~Panel APU — buscador de Mano de Obra~~ — `PanelAPU.tsx` tiene botón 🔍 en la sección Mano de Obra (igual que Materiales y Equipos); `searchInsumos` en `src/actions/insumos.ts` ahora consulta `trabajadores` (no `labor`) para `type === 'mano_obra'`, mapeando `especialidad→nombre`, `jornal_con_prestaciones→precio_unitario`, `'jornal'→unidad`; filtra `activo=true`. `searchType` extendido a `'material'|'equipo'|'mano_obra'` ✅ 2026-05-16
+- ~~Duplicados en buscador de insumos (tabla `materials`)~~ — migración `20260516300000_fix_materials_duplicados.sql` eliminó 7 filas duplicadas (Cemento Portland ×3, Acero figurado ×3, Bloque/Concreto/Vinilo ×2) y creó `UNIQUE INDEX materials_nombre_categoria_unique`; tabla queda con 46 filas limpias ✅ 2026-05-16
+- ~~Módulo Proveedores (`/proveedores`)~~ — CRUD completo con 7 categorías de construcción colombiana (ferretería/contratista/equipos/laboratorio/transporte/servicios/otro); grid de cards con filtros tipo + categoría + búsqueda; badges con color por categoría; íconos de teléfono/email/sitio web; soft-delete con `deleted_at`; sidebar con `Truck` entre Clientes e Insumos; `proveedor_id` nullable en `apu_items` para futura asociación. Archivos: `src/actions/proveedores.ts`, `src/app/(dashboard)/proveedores/page.tsx`, `src/components/proveedores/{ProveedoresList,ProveedoresNewButton,ModalProveedor}.tsx` ✅ 2026-05-16
+- ~~Módulo Mano de Obra (`/mano-obra`)~~ — Tabla visual de referencia salarial Colombia 2026: `src/actions/mano-obra.ts` (`getTrabajadoresReferencia`), `src/app/(dashboard)/mano-obra/page.tsx` (solo lectura, buscador client-side, ordenamiento por columna, `formatearCOP`); sidebar con enlace `HardHat` entre Insumos y Perfil; jornales actualizados vía migración `20260516100000_update_trabajadores_2026.sql` ✅ 2026-05-16
+- ~~Discrepancia de totales: header vs ResumenFinancieroTab~~ — Header (`EditorPresupuesto.tsx` líneas 98-112) ignoraba `budget.metodo_iva` y hardcodeaba "IVA sobre utilidad"; reemplazado con el mismo switch de 4 casos (`sobre_utilidad | sobre_aiu | sobre_total | default→0`) que usa la pestaña. Ahora header y pestaña muestran exactamente el mismo número ✅ 2026-05-16
+- ~~Fallback `ivaPct` incorrecto en ResumenFinancieroTab~~ — `Number(budget.iva_porcentaje) || 19` devolvía 19 cuando `iva_porcentaje = 0`; corregido a `budget.iva_porcentaje != null ? Number(...) : 0` ✅ 2026-05-16
+- ~~`barColor` derivado con `replace()` en ExplosionInsumosView~~ — `cfg.color.replace('text-', 'bg-')` reemplazado por propiedad explícita `barColor` en `TIPO_CONFIG` (`bg-burn-orange`, `bg-steel-mid`, `bg-green-500`, `bg-amber-400`, `bg-gray-400`) — evita purge de Tailwind v4 en producción ✅ 2026-05-16
+- ~~Rediseño UI/UX del editor de presupuesto~~ — `EditorPresupuesto.tsx` reescrito (header con pill estado + auto-save indicator + total prominente; tabla con editable-cell hints + APU button mejorado + DropdownMenu Duplicar/Mover/Eliminar + HTML5 drag & drop local); `PanelAPU.tsx` con contraste mejorado + tooltips Info en HM/EPP + feedback "Aplicado"; `ExplosionInsumosView.tsx` con columna `% CD` por fila y por grupo; `ResumenFinancieroTab.tsx` nuevo como 3ª pestaña; `Sidebar.tsx` con link Clientes ✅ 2026-05-16
+- ~~Limpieza módulo IA~~ — `src/actions/ia.ts` eliminado, `src/lib/security/encryption.ts` eliminado, `src/app/(dashboard)/configuracion/ia/` eliminado, `Profile.consultas_ia_este_mes` removido de tipos, `ANTHROPIC_API_KEY` removido de env vars y docs ✅ 2026-05-16
 - ~~Módulo de Gestión de Clientes~~ — Dashboard completo (`/clientes`) con CRUD de clientes (Persona Natural / Empresa); integración en `ModalNuevoProyecto` y `ProjectSettings` para asignar cliente; actualización de `PresupuestoPDF` para mostrar datos del cliente (NIT, contacto, cargo) y firmas dinámicas ✅ 2026-05-12
 - ~~Ampliación de Catálogo (800+ ítems)~~ — Nuevas categorías: Institucional, Industrial y Hotelero; selector de tipo de obra en `ModalNuevoPresupuesto` ahora incluye estas opciones; limpieza de prefijos numéricos en nombres de capítulos ✅ 2026-05-12
 - ~~Estados de proyectos rediseñados~~ — máquina de estados `borrador→en_progreso→finalizado→archivado`; `ProjectActions` muestra "Finalizar obra" (ghost, success) en `en_progreso` y "Archivar proyecto" (ghost, neutral) en `finalizado` con ConfirmDialog; `ProyectosGrid` cliente con 4 pills de filtro (por defecto muestra borrador+en_progreso); `createProject` inserta `estado:'borrador'` explícito; proyecto avanza a `en_progreso` solo al aprobar un presupuesto ✅ 2026-05-12
@@ -285,3 +318,4 @@ Token reference: `src/lib/design-tokens.ts`. User accent color stored in `profil
 - ~~Template de capítulos ignorada~~ — `crearPresupuesto` recibe `capitulos?: string[]` y los inserta
 - ~~`@types/pg` faltante~~ — ya en `devDependencies`
 - ~~`pnpm run seed:apu`~~ — 175 filas en `catalogo_apu_items` (31 actividades con ítems de referencia)
+

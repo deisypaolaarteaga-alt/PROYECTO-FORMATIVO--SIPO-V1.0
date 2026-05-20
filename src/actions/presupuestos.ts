@@ -13,6 +13,7 @@ import Decimal from 'decimal.js';
 export async function crearPresupuesto(
   projectId: string,
   titulo: string,
+  ciudadObra?: string,
   capitulos?: string[]
 ): Promise<ActionResult> {
   try {
@@ -22,6 +23,12 @@ export async function crearPresupuesto(
 
     const rateLimit = checkRateLimit(user.id);
     if (!rateLimit.success) return { success: false, error: 'Límite de solicitudes excedido.' };
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('municipio, ciudad')
+      .eq('id', user.id)
+      .single();
 
     const validated = presupuestoSchema.parse({
       titulo,
@@ -40,6 +47,7 @@ export async function crearPresupuesto(
         ...validated,
         project_id: projectId,
         user_id: user.id,
+        ciudad_ica: ciudadObra || profile?.municipio || profile?.ciudad || 'Bogotá D.C.',
       })
       .select()
       .single();

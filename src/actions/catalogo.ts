@@ -242,7 +242,8 @@ export async function crearPresupuestoConPlantilla(
   projectId: string,
   titulo: string,
   capitulosPersonalizados: string[],
-  tipo_obra: string
+  tipo_obra: string,
+  ciudadObra?: string
 ): Promise<ActionResult<{ id: string }>> {
   try {
     const supabase = await createClient();
@@ -255,6 +256,12 @@ export async function crearPresupuestoConPlantilla(
     if (!titulo?.trim()) return { success: false, error: 'El nombre del presupuesto es obligatorio.' };
 
     const admin = createAdminClient();
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('municipio, ciudad')
+      .eq('id', user.id)
+      .single();
 
     // ── 1. Crear el presupuesto ───────────────────────────────────────────────
     const { data: budget, error: budgetErr } = await admin
@@ -270,6 +277,7 @@ export async function crearPresupuestoConPlantilla(
         iva_porcentaje: 19,
         retefuente_pct: 2,
         ica_pct: 0,
+        ciudad_ica: ciudadObra || profile?.municipio || profile?.ciudad || 'Bogotá D.C.',
       })
       .select()
       .single();

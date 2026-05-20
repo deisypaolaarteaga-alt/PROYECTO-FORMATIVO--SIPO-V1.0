@@ -84,6 +84,7 @@ export function ModalNuevoPresupuesto({
     normalizarTipo(proyectoTipoObra)
   );
   const [customChapters, setCustomChapters] = useState<string[]>([]);
+  const [ciudadObra, setCiudadObra] = useState('');
 
   const router = useRouter();
 
@@ -100,6 +101,7 @@ export function ModalNuevoPresupuesto({
       setStartingPoint('blank');
       setSelectedTipoObra(normalizarTipo(proyectoTipoObra));
       setCustomChapters([]);
+      setCiudadObra('');
       if (!proyectoFijo) loadProjects();
     }
   }, [isOpen]);
@@ -149,10 +151,11 @@ export function ModalNuevoPresupuesto({
           selectedProjectId,
           budgetName,
           customChapters,
-          selectedTipoObra
+          selectedTipoObra,
+          ciudadObra || undefined
         );
       } else {
-        res = await crearPresupuesto(selectedProjectId, budgetName);
+        res = await crearPresupuesto(selectedProjectId, budgetName, ciudadObra || undefined);
       }
 
       if (res.data) {
@@ -310,6 +313,17 @@ export function ModalNuevoPresupuesto({
                     onChange={e => setBudgetName(e.target.value)}
                     className="w-full h-12 px-4 text-[14px] border border-concrete rounded-xl focus:border-burn-orange outline-none shadow-sm transition-all"
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[14px] font-bold text-ink">Ciudad de la obra</label>
+                  <input
+                    placeholder="Ej: Medellín, Cali, Bogotá D.C."
+                    value={ciudadObra}
+                    onChange={e => setCiudadObra(e.target.value)}
+                    className="w-full h-12 px-4 text-[14px] border border-concrete rounded-xl focus:border-burn-orange outline-none shadow-sm transition-all"
+                  />
+                  <p className="text-[11px] text-stone">Define la ciudad donde se ejecuta la obra — determina la tarifa ICA aplicable.</p>
                 </div>
 
                 <div className="space-y-3">

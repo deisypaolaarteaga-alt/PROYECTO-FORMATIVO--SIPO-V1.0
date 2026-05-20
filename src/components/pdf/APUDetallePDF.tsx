@@ -26,6 +26,7 @@ const styles = StyleSheet.create({
   },
   projectRow: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
     marginBottom: 4,
   },
   label: {
@@ -36,6 +37,8 @@ const styles = StyleSheet.create({
   },
   value: {
     flex: 1,
+    flexShrink: 1,
+    flexWrap: 'wrap',
     fontSize: 9,
   },
   

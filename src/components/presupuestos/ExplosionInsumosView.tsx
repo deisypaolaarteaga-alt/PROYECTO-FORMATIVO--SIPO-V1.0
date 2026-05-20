@@ -216,9 +216,9 @@ function CategoriaTable({
           </thead>
 
           <tbody className="divide-y divide-sand">
-            {items.map((item) => (
+            {items.map((item, itemIdx) => (
               <FilaInsumo
-                key={`${item.tipo}-${item.nombre}`}
+                key={`${item.tipo}|||${item.nombre ?? itemIdx}|||${item.unidad}`}
                 item={item}
                 mostrarAccion={esMaterial}
                 granTotal={granTotal}

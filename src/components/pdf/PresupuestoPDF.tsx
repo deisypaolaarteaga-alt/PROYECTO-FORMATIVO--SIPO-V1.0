@@ -24,8 +24,6 @@ const formatNIT = (nit: string) => {
 const styles = StyleSheet.create({
   page: {
     padding: 40,
-    paddingTop: 50,
-    paddingBottom: 60,
     fontFamily: 'Helvetica',
     fontSize: 10,
     color: '#000000',
@@ -39,7 +37,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 30,
     borderBottomWidth: 2,
-    borderBottomColor: '#1C2B3A',
+    borderBottomColor: '#1F2937',
     paddingBottom: 15,
   },
   logoContainer: {
@@ -53,7 +51,7 @@ const styles = StyleSheet.create({
   logoText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#1C2B3A',
+    color: '#1F2937',
   },
   companyInfo: {
     alignItems: 'flex-end',
@@ -62,7 +60,7 @@ const styles = StyleSheet.create({
   companyName: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#1C2B3A',
+    color: '#1F2937',
     marginBottom: 4,
   },
   companyDetails: {
@@ -81,16 +79,19 @@ const styles = StyleSheet.create({
   },
   projectRow: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
     marginBottom: 6,
   },
   projectLabel: {
     width: 100,
     fontWeight: 'bold',
-    color: '#1C2B3A',
+    color: '#1F2937',
     fontSize: 9,
   },
   projectValue: {
     flex: 1,
+    flexShrink: 1,
+    flexWrap: 'wrap',
     fontSize: 9,
   },
 
@@ -98,7 +99,7 @@ const styles = StyleSheet.create({
   tableTitle: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: '#1C2B3A',
+    color: '#1F2937',
     marginBottom: 10,
     textTransform: 'uppercase',
   },
@@ -111,7 +112,7 @@ const styles = StyleSheet.create({
   },
   tableHeader: {
     flexDirection: 'row',
-    backgroundColor: '#1C2B3A',
+    backgroundColor: '#1F2937',
     color: '#ffffff',
     paddingVertical: 6,
     paddingHorizontal: 4,
@@ -131,11 +132,11 @@ const styles = StyleSheet.create({
     minHeight: 20,
   },
   tableRowAlternate: {
-    backgroundColor: '#fafafa',
+    backgroundColor: '#FAF0EB',
   },
   chapterSubtotalRow: {
     flexDirection: 'row',
-    backgroundColor: '#E2DDD6',
+    backgroundColor: '#D95510',
     paddingVertical: 6,
     paddingHorizontal: 4,
     alignItems: 'center',
@@ -144,7 +145,7 @@ const styles = StyleSheet.create({
   },
   chapterSubtotalText: {
     fontWeight: 'bold',
-    color: '#1C2B3A',
+    color: '#ffffff',
     fontSize: 9,
   },
 
@@ -166,6 +167,7 @@ const styles = StyleSheet.create({
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: 4,
     borderBottomWidth: 1,
     borderBottomColor: '#E2DDD6',
@@ -181,21 +183,24 @@ const styles = StyleSheet.create({
   summaryTotalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: 8,
     marginTop: 4,
     borderTopWidth: 2,
-    borderTopColor: '#1C2B3A',
+    borderTopColor: '#1F2937',
+    backgroundColor: '#D95510',
+    paddingHorizontal: 8,
   },
   summaryTotalLabel: {
     fontSize: 11,
     fontWeight: 'bold',
-    color: '#1C2B3A',
+    color: '#ffffff',
   },
   summaryTotalValue: {
     fontSize: 11,
     fontWeight: 'bold',
     textAlign: 'right',
-    color: '#1C2B3A',
+    color: '#ffffff',
   },
   ivaNota: {
     fontSize: 7,
@@ -216,7 +221,7 @@ const styles = StyleSheet.create({
   retencionesTitle: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: '#1C2B3A',
+    color: '#1F2937',
     marginBottom: 6,
   },
   retencionesDisclaimer: {
@@ -228,10 +233,11 @@ const styles = StyleSheet.create({
   netoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: 6,
     marginTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#1C2B3A',
+    borderTopColor: '#1F2937',
     backgroundColor: '#E2DDD6',
     paddingHorizontal: 8,
   },
@@ -251,12 +257,14 @@ const styles = StyleSheet.create({
   signatureRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginTop: 40,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#D0D4DB',
   },
   signatureBox: {
     width: '44%',
-    borderTopWidth: 1.5,
-    borderTopColor: '#1C2B3A',
-    paddingTop: 10,
     alignItems: 'center',
   },
   signatureText: {
@@ -268,7 +276,7 @@ const styles = StyleSheet.create({
   signatureName: {
     fontSize: 10,
     fontWeight: 'bold',
-    color: '#1C2B3A',
+    color: '#1F2937',
     marginBottom: 3,
     textAlign: 'center',
   },
@@ -287,6 +295,7 @@ const styles = StyleSheet.create({
     right: 40,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     borderTopWidth: 1,
     borderTopColor: '#E2DDD6',
     paddingTop: 8,
@@ -510,8 +519,8 @@ export const PresupuestoPDF = ({ budget, profile, options, children }: Props) =>
           </View>
 
           <View style={styles.summaryRow}>
-            <Text style={[styles.summaryLabel, { fontWeight: 'bold', color: '#1C2B3A' }]}>SUBTOTAL (CD + AIU):</Text>
-            <Text style={[styles.summaryValue, { fontWeight: 'bold', color: '#1C2B3A' }]}>{fmtD(subtotal)}</Text>
+            <Text style={[styles.summaryLabel, { fontWeight: 'bold', color: '#1F2937' }]}>SUBTOTAL (CD + AIU):</Text>
+            <Text style={[styles.summaryValue, { fontWeight: 'bold', color: '#1F2937' }]}>{fmtD(subtotal)}</Text>
           </View>
 
           {/* IVA — siempre visible */}
@@ -567,8 +576,8 @@ export const PresupuestoPDF = ({ budget, profile, options, children }: Props) =>
             )}
 
             <View style={styles.netoRow}>
-              <Text style={[styles.summaryLabel, { fontWeight: 'bold', color: '#1C2B3A' }]}>VALOR NETO A GIRAR (Informativo):</Text>
-              <Text style={[styles.summaryValue, { fontWeight: 'bold', color: '#1C2B3A' }]}>{fmtD(valorNeto)}</Text>
+              <Text style={[styles.summaryLabel, { fontWeight: 'bold', color: '#1F2937' }]}>VALOR NETO A GIRAR (Informativo):</Text>
+              <Text style={[styles.summaryValue, { fontWeight: 'bold', color: '#1F2937' }]}>{fmtD(valorNeto)}</Text>
             </View>
           </View>
         )}
@@ -580,13 +589,13 @@ export const PresupuestoPDF = ({ budget, profile, options, children }: Props) =>
             La aceptación de este documento implica conformidad con el alcance, cantidades y condiciones técnicas descritas.
           </Text>
           <View style={styles.signatureRow}>
-            <View style={{ width: '44%', alignItems: 'center' }}>
-              <View style={{ height: 48, marginBottom: 4, width: '100%', alignItems: 'center', justifyContent: 'flex-end' }}>
+            <View style={{ width: '44%', alignItems: 'center', paddingTop: 8 }}>
+              <View style={{ height: 68, marginBottom: 4, width: '100%', alignItems: 'center', justifyContent: 'flex-end' }}>
                 {profile.firma_url ? (
-                  <Image src={profile.firma_url} style={{ height: 44, objectFit: 'contain' }} />
+                  <Image src={profile.firma_url} style={{ width: 160, height: 64, objectFit: 'contain', marginBottom: 4 }} />
                 ) : null}
               </View>
-              <View style={{ borderTopWidth: 1.5, borderTopColor: '#1C2B3A', width: '100%', paddingTop: 10, alignItems: 'center' }}>
+              <View style={{ borderTopWidth: 1.5, borderTopColor: '#1F2937', width: '100%', paddingTop: 10, alignItems: 'center' }}>
                 <Text style={styles.signatureName}>
                   {profile.nombre_completo || '[Nombre no configurado]'}
                 </Text>

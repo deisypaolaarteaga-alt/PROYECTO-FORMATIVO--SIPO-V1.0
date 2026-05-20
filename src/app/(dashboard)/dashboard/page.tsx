@@ -24,19 +24,12 @@ export default async function DashboardPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  const [profile, , kpis, distribucion, vencimientos] = await Promise.all([
+  const [profile, kpis, distribucion, vencimientos] = await Promise.all([
     supabase
       .from('profiles')
       .select('nombre_completo, empresa')
       .eq('id', user?.id ?? '')
       .maybeSingle()
-      .then((r) => r.data),
-    supabase
-      .from('projects')
-      .select('*')
-      .eq('user_id', user?.id ?? '')
-      .order('updated_at', { ascending: false })
-      .limit(5)
       .then((r) => r.data),
     getKPIsGlobales(),
     getDistribucionCD(),

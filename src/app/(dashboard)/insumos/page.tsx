@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import {
-  Package, Users, Drill, Star,
+  Package, Drill, Star,
   Plus, Search, Trash2, Edit2,
   ShieldCheck, Loader2, Info, X, Save, UserPlus, Minus
 } from 'lucide-react';
@@ -19,7 +19,7 @@ import {
 } from '@/actions/cuadrillas';
 import { cn } from '@/lib/utils';
 
-type TabId = 'material' | 'labor' | 'equipment' | 'user' | 'crews';
+type TabId = 'material' | 'equipment' | 'user' | 'crews';
 
 interface UserMaterial {
   id: string;
@@ -66,6 +66,11 @@ export default function InsumosPage() {
   const [showLaborImport, setShowLaborImport] = useState(false);
   const [importandoLaborId, setImportandoLaborId] = useState<string | null>(null);
 
+  // FIX 5: estado rendimiento base
+  const [rendimientoNormal, setRendimientoNormal] = useState('');
+  const [rendimientoUnidad, setRendimientoUnidad] = useState('m²');
+  const [rendimientoFuente, setRendimientoFuente] = useState('SIPO Colombia 2026');
+
   useEffect(() => { loadData(); }, [tab]);
 
   async function loadData() {
@@ -73,7 +78,6 @@ export default function InsumosPage() {
     try {
       let res;
       if (tab === 'material') res = await getMaterials();
-      else if (tab === 'labor') res = await getLabor();
       else if (tab === 'equipment') res = await getEquipment();
       else if (tab === 'user') res = await getUserMaterials();
       else if (tab === 'crews') res = await getCuadrillas();
@@ -130,13 +134,21 @@ export default function InsumosPage() {
     setCantidadTrabajador(1);
     setShowLaborImport(false);
     setBusquedaLabor('');
+    // FIX 5: resetear rendimiento al abrir modal
+    setRendimientoNormal('');
+    setRendimientoUnidad('m²');
+    setRendimientoFuente('SIPO Colombia 2026');
     setShowCuadrillaModal(true);
     if (tab !== 'crews') setTab('crews');
     const promises: Promise<void>[] = [];
     if (trabajadoresDisponibles.length === 0) {
       setLoadingTrabajadores(true);
+      // FIX 2: deduplicar por id para evitar entradas repetidas
       promises.push(getTrabajadores().then(list => {
-        setTrabajadoresDisponibles(list);
+        const unicos = list.filter((t, i, self) =>
+          i === self.findIndex(x => x.id === t.id)
+        );
+        setTrabajadoresDisponibles(unicos);
         setLoadingTrabajadores(false);
       }));
     }
@@ -201,6 +213,7 @@ export default function InsumosPage() {
     const fd = new FormData(e.currentTarget);
     setSavingCuadrilla(true);
     setCuadrillaError('');
+    // FIX 5: incluir rendimiento si fue diligenciado
     const result = await crearCuadrillaPersonalizada({
       nombre: fd.get('nombre') as string,
       descripcion: fd.get('descripcion') as string || undefined,
@@ -209,6 +222,9 @@ export default function InsumosPage() {
         trabajador_id: t.id,
         cantidad: t.cantidad,
       })),
+      rendimiento_normal: rendimientoNormal ? Number(rendimientoNormal) : undefined,
+      rendimiento_unidad: rendimientoNormal ? rendimientoUnidad : undefined,
+      rendimiento_fuente: rendimientoNormal ? rendimientoFuente || 'SIPO Colombia 2026' : undefined,
     });
     setSavingCuadrilla(false);
     if (!result.success) { setCuadrillaError(result.error || 'Error al crear'); return; }
@@ -237,7 +253,6 @@ export default function InsumosPage() {
   /* Clases de icono por pestaña */
   const tabIconClass: Record<string, string> = {
     material:  'bg-[#FAF0EB] text-[#D95510]',
-    labor:     'bg-[#EBF2FA] text-[#1E4D8C]',
     equipment: 'bg-[#EBFAF0] text-[#166534]',
     user:      'bg-[#FEF3E2] text-[#7A4B00]',
     crews:     'bg-[#E4E7EC] text-[#4B5563]',
@@ -274,7 +289,6 @@ export default function InsumosPage() {
       <div className="flex items-center gap-1 border-b border-[#D0D4DB] pb-px overflow-x-auto">
         {[
           { id: 'material',  label: 'Materiales',   icon: Package    },
-          { id: 'labor',     label: 'Mano de Obra',  icon: Users      },
           { id: 'equipment', label: 'Equipos',       icon: Drill      },
           { id: 'user',      label: 'Mis Insumos',   icon: Star       },
           { id: 'crews',     label: 'Cuadrillas',    icon: ShieldCheck },
@@ -325,7 +339,6 @@ export default function InsumosPage() {
                             tabIconClass[tab] ?? tabIconClass.material
                           )}>
                             {tab === 'material'  ? <Package className="h-4 w-4" /> :
-                             tab === 'labor'     ? <Users   className="h-4 w-4" /> :
                              tab === 'equipment' ? <Drill   className="h-4 w-4" /> : <Star className="h-4 w-4" />}
                           </div>
                           <div>
@@ -370,6 +383,8 @@ export default function InsumosPage() {
                   <tr>
                     <th className="px-6 py-3 text-[9px] font-bold text-[#6B7A8D] uppercase tracking-wide">Cuadrilla</th>
                     <th className="px-6 py-3 text-[9px] font-bold text-[#6B7A8D] uppercase tracking-wide">Trabajadores</th>
+                    {/* FIX 6: columna rendimiento */}
+                    <th className="px-6 py-3 text-[9px] font-bold text-[#6B7A8D] uppercase tracking-wide">Rendimiento</th>
                     <th className="px-6 py-3 text-[9px] font-bold text-[#6B7A8D] uppercase tracking-wide text-right">Costo / Jornada (COP)</th>
                     <th className="px-6 py-3 w-24"></th>
                   </tr>
@@ -406,6 +421,16 @@ export default function InsumosPage() {
                             <span className="text-[10px] text-[#6B7A8D]">Sin trabajadores</span>
                           )}
                         </div>
+                      </td>
+                      {/* FIX 6: celda rendimiento */}
+                      <td className="px-6 py-4">
+                        {item.rendimientos?.length > 0 ? (
+                          <span className="text-xs font-semibold text-[#1F2937]">
+                            {item.rendimientos[0].rendimiento_normal} {item.rendimientos[0].unidad}/día
+                          </span>
+                        ) : (
+                          <span className="text-xs text-[#9CA3AF]">— Sin definir</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-right">
                         <p className="text-sm font-bold text-[#1F2937] tabular-nums">{formatearCOP(costoJornadaCuadrilla(item))}</p>
@@ -577,20 +602,28 @@ export default function InsumosPage() {
                       className="flex-1 px-3 py-2 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none bg-white"
                     >
                       <option value="">Selecciona un trabajador...</option>
+                      {/* FIX 4: deshabilitar y marcar trabajadores ya agregados */}
                       {trabajadoresDisponibles.map(t => (
-                        <option key={t.id} value={t.id} disabled={trabajadoresSeleccionados.some(s => s.id === t.id)}>
+                        <option
+                          key={t.id}
+                          value={t.id}
+                          disabled={trabajadoresSeleccionados.some(s => s.id === t.id)}
+                        >
+                          {trabajadoresSeleccionados.some(s => s.id === t.id) ? '✓ ' : ''}
                           {t.especialidad} · {t.categoria} · {formatearCOP(t.jornal_base)}/día
                         </option>
                       ))}
                     </select>
+                    {/* FIX 1: placeholder y title descriptivo */}
                     <input
                       type="number"
                       value={cantidadTrabajador}
                       onChange={e => setCantidadTrabajador(Math.max(1, parseInt(e.target.value) || 1))}
                       min={1}
                       max={20}
+                      placeholder="Cant."
                       className="w-16 px-2 py-2 border border-[#C8CDD6] rounded-lg text-sm text-center focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none"
-                      title="Cantidad"
+                      title="Cantidad de este trabajador"
                     />
                     <button
                       type="button"
@@ -683,6 +716,39 @@ export default function InsumosPage() {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* FIX 5: sección Rendimiento Base */}
+              <div className="border border-[#D0D4DB] rounded-xl p-4 space-y-3 bg-[#F8F7F5]">
+                <p className="text-[10px] font-bold text-[#4B5563] uppercase tracking-widest">Rendimiento Base <span className="text-[#6B7A8D] font-normal normal-case">(opcional)</span></p>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    value={rendimientoNormal}
+                    onChange={e => setRendimientoNormal(e.target.value)}
+                    min={0}
+                    step="0.01"
+                    placeholder="Rendimiento: ej. 8"
+                    className="flex-1 px-3 py-2 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all bg-white"
+                  />
+                  <select
+                    value={rendimientoUnidad}
+                    onChange={e => setRendimientoUnidad(e.target.value)}
+                    className="w-28 px-3 py-2 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none bg-white"
+                  >
+                    {['m²','m³','ml','kg','gl','un','hr','pto','día','ton'].map(u => (
+                      <option key={u} value={u}>Unidad: {u}</option>
+                    ))}
+                  </select>
+                </div>
+                <input
+                  type="text"
+                  value={rendimientoFuente}
+                  onChange={e => setRendimientoFuente(e.target.value)}
+                  maxLength={150}
+                  placeholder="Fuente: SIPO Colombia 2026"
+                  className="w-full px-3 py-2 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all bg-white"
+                />
               </div>
 
               {cuadrillaError && (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ChevronDown, ChevronRight, Plus, Trash2,
@@ -24,7 +24,8 @@ import {
   aprobarPresupuesto, reabrirPresupuesto,
 } from '@/actions/presupuestos';
 import { formatearCOP } from '@/lib/utils/formato-cop';
-import { PanelAPU } from './PanelAPU';
+import dynamic from 'next/dynamic';
+const PanelAPU = dynamic(() => import('./PanelAPU').then(m => ({ default: m.PanelAPU })), { ssr: false });
 import { ResumenFinanciero } from './ResumenFinanciero';
 import { ResumenFinancieroTab } from './ResumenFinancieroTab';
 import { BotonExportarPDF } from '@/components/pdf/BotonExportarPDF';
@@ -77,12 +78,22 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
 
   const router = useRouter();
 
+  // Ref para debounce de guardado — evita un server round-trip por cada keystroke
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Actualizar "hace Xs" cada 10s mientras hay lastSaved
   useEffect(() => {
     if (!lastSaved) return;
     const id = setInterval(() => forceRefreshTime(n => n + 1), 10_000);
     return () => clearInterval(id);
   }, [lastSaved]);
+
+  // Limpiar timer pendiente al desmontar
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, []);
 
   const ciudadPerfil = (profile?.ciudad || '').trim().toLowerCase();
   const ciudadObra   = (budget.ciudad_ica || '').trim().toLowerCase();
@@ -106,28 +117,32 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
   const askConfirm = (title: string, description: string, onConfirm: () => void) =>
     setConfirmState({ title, description, onConfirm });
 
-  // ── CÁLCULOS ──────────────────────────────────────────────────────────────
-  const subtotalDirecto = (budget.chapters || []).reduce((acc: number, ch: any) => {
-    const chTotal = (ch.activities || []).reduce((s: number, a: any) =>
-      s + (Number(a.cantidad) * Number(a.precio_unitario) || 0), 0);
-    return acc + chTotal;
-  }, 0);
+  // ── CÁLCULOS (memoizados — solo recalculan cuando cambian los capítulos o config AIU/IVA) ──
+  const subtotalDirecto = useMemo(() =>
+    (budget.chapters || []).reduce((acc: number, ch: any) => {
+      const chTotal = (ch.activities || []).reduce((s: number, a: any) =>
+        s + (Number(a.cantidad) * Number(a.precio_unitario) || 0), 0);
+      return acc + chTotal;
+    }, 0),
+    [budget.chapters]
+  );
 
-  const aiuTotalPct = Number(budget.administracion_pct ?? 10)
-    + Number(budget.imprevistos_pct ?? 5)
-    + Number(budget.utilidad_pct ?? 10);
-  const valorAIU        = subtotalDirecto * (aiuTotalPct / 100);
-  const utilidadEstimada = subtotalDirecto * (Number(budget.utilidad_pct ?? 10) / 100);
-  const subtotalConAIU  = subtotalDirecto + valorAIU;
-  const ivaPct          = budget.iva_porcentaje != null ? Number(budget.iva_porcentaje) : 0;
-  let valorIVA = 0;
-  switch (budget.metodo_iva) {
-    case 'sobre_utilidad': valorIVA = utilidadEstimada  * ivaPct / 100; break;
-    case 'sobre_aiu':      valorIVA = valorAIU          * ivaPct / 100; break;
-    case 'sobre_total':    valorIVA = subtotalConAIU    * ivaPct / 100; break;
-    default:               valorIVA = 0;
-  }
-  const totalGeneral = subtotalConAIU + valorIVA;
+  const { valorAIU, valorIVA, totalGeneral } = useMemo(() => {
+    const aiuTotalPct = Number(budget.administracion_pct ?? 10)
+      + Number(budget.imprevistos_pct ?? 5)
+      + Number(budget.utilidad_pct ?? 10);
+    const vAIU            = subtotalDirecto * (aiuTotalPct / 100);
+    const utilidadEstimada = subtotalDirecto * (Number(budget.utilidad_pct ?? 10) / 100);
+    const subConAIU       = subtotalDirecto + vAIU;
+    const ivaPct          = budget.iva_porcentaje != null ? Number(budget.iva_porcentaje) : 0;
+    let vIVA = 0;
+    switch (budget.metodo_iva) {
+      case 'sobre_utilidad': vIVA = utilidadEstimada * ivaPct / 100; break;
+      case 'sobre_aiu':      vIVA = vAIU             * ivaPct / 100; break;
+      case 'sobre_total':    vIVA = subConAIU         * ivaPct / 100; break;
+    }
+    return { valorAIU: vAIU, valorIVA: vIVA, totalGeneral: subConAIU + vIVA };
+  }, [subtotalDirecto, budget.administracion_pct, budget.imprevistos_pct, budget.utilidad_pct, budget.metodo_iva, budget.iva_porcentaje]);
 
   const vigenciaDias = Number(budget.vigencia_dias ?? 0);
   const fechaValidez = budget.created_at && vigenciaDias > 0 ? (() => {
@@ -139,13 +154,13 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
     day: '2-digit', month: 'short', year: 'numeric', timeZone: 'America/Bogota',
   }).format(fechaValidez) : null;
 
-  const toggleChapter = (id: string) => {
+  const toggleChapter = useCallback((id: string) => {
     setExpanded(prev => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
-  };
+  }, []);
 
   // ── ACCIONES ──────────────────────────────────────────────────────────────
   const handleAddChapter = async () => {
@@ -171,7 +186,8 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
     }
   };
 
-  const handleUpdateAct = async (actId: string, chId: string, fields: any) => {
+  const handleUpdateAct = useCallback((actId: string, chId: string, fields: any) => {
+    // Actualización optimista inmediata
     setBudget((prev: any) => ({
       ...prev,
       chapters: prev.chapters.map((c: any) =>
@@ -181,11 +197,15 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
         } : c
       ),
     }));
+    // Debounce: guarda en servidor 600ms después del último cambio
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     setIsSaving(true);
-    await actualizarActividad(actId, budget.id, fields);
-    setIsSaving(false);
-    setLastSaved(new Date());
-  };
+    saveTimerRef.current = setTimeout(async () => {
+      await actualizarActividad(actId, budget.id, fields);
+      setIsSaving(false);
+      setLastSaved(new Date());
+    }, 600);
+  }, [budget.id]);
 
   const handleUpdateBudget = async (fields: any) => {
     setBudget((prev: any) => ({ ...prev, ...fields }));
@@ -265,30 +285,36 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
   };
 
   // ── DRAG & DROP (reorden local, mismo capítulo) ────────────────────────────
-  const handleDragStart = (e: React.DragEvent, actId: string, chId: string) => {
+  // dragSrcActId/dragSrcChId en ref — evita re-render en cada dragOver
+  const dragSrcRef = useRef<{ actId: string; chId: string } | null>(null);
+
+  const handleDragStart = useCallback((e: React.DragEvent, actId: string, chId: string) => {
+    dragSrcRef.current = { actId, chId };
     setDragSrcActId(actId);
     setDragSrcChId(chId);
     e.dataTransfer.effectAllowed = 'move';
-  };
+  }, []);
 
-  const handleDragOver = (e: React.DragEvent, actId: string) => {
+  const handleDragOver = useCallback((e: React.DragEvent, actId: string) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    if (actId !== dragOverActId) setDragOverActId(actId);
-  };
+    setDragOverActId(prev => prev === actId ? prev : actId);
+  }, []);
 
-  const handleDrop = (e: React.DragEvent, targetActId: string, targetChId: string) => {
+  const handleDrop = useCallback((e: React.DragEvent, targetActId: string, targetChId: string) => {
     e.preventDefault();
-    if (!dragSrcActId || !dragSrcChId || dragSrcChId !== targetChId || dragSrcActId === targetActId) {
+    const src = dragSrcRef.current;
+    if (!src || src.chId !== targetChId || src.actId === targetActId) {
       setDragOverActId(null);
       return;
     }
+    const { actId: srcActId } = src;
     setBudget((prev: any) => ({
       ...prev,
       chapters: prev.chapters.map((c: any) => {
         if (c.id !== targetChId) return c;
         const acts = [...c.activities];
-        const srcIdx = acts.findIndex((a: any) => a.id === dragSrcActId);
+        const srcIdx = acts.findIndex((a: any) => a.id === srcActId);
         const tgtIdx = acts.findIndex((a: any) => a.id === targetActId);
         if (srcIdx === -1 || tgtIdx === -1) return c;
         const [moved] = acts.splice(srcIdx, 1);
@@ -296,21 +322,23 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
         return { ...c, activities: acts };
       }),
     }));
+    dragSrcRef.current = null;
     setDragSrcActId(null);
     setDragSrcChId(null);
     setDragOverActId(null);
-  };
+  }, []);
 
-  const handleDragEnd = () => {
+  const handleDragEnd = useCallback(() => {
+    dragSrcRef.current = null;
     setDragSrcActId(null);
     setDragSrcChId(null);
     setDragOverActId(null);
-  };
+  }, []);
 
   const tabs = [
-    { key: 'estructura', label: 'Estructura',             icon: FileText    },
-    { key: 'insumos',    label: 'Explosión de Insumos',   icon: Package     },
-    { key: 'resumen',    label: 'Resumen Financiero',      icon: TrendingUp  },
+    { key: 'estructura', label: '1. Estructura y Costos',     icon: FileText    },
+    { key: 'insumos',    label: '2. Explosión de Insumos',    icon: Package     },
+    { key: 'resumen',    label: '3. Resumen y Exportación',   icon: TrendingUp  },
   ] as const;
 
   return (
@@ -496,8 +524,11 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
         <div className="flex-1 overflow-y-auto p-6 lg:p-8">
         <fieldset
           disabled={bloqueado}
-          className={cn('border-0 p-0 m-0 min-w-0 block w-full space-y-5', bloqueado && 'opacity-70')}
+          className={cn('border-0 p-0 m-0 min-w-0 flex flex-col lg:flex-row items-start gap-8', bloqueado && 'opacity-70')}
         >
+
+          {/* Columna Izquierda: Capítulos (70%) */}
+          <div className="flex-1 w-full space-y-5 min-w-0">
 
           {/* Capítulos */}
           {(budget.chapters || []).map((ch: any, idx: number) => {
@@ -526,7 +557,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                       {String(idx + 1).padStart(2, '0')}
                     </span>
                     <span className="font-semibold text-[#4B5563] text-[11px] uppercase">
-                      {ch.nombre.replace(/^\d{2,3}\.\s*/, '')}
+                      {(ch.nombre ?? '').replace(/^\d{2,3}\.\s*/, '')}
                     </span>
                   </div>
                   <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
@@ -586,7 +617,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                             <td className="px-4 py-2.5">
                               <div className="rounded hover:bg-[#E4E7EC] focus-within:ring-1 focus-within:ring-[#6B7A8D]/30 transition-colors px-1 -mx-1 cursor-text">
                                 <InputEditable
-                                  value={act.nombre || act.descripcion}
+                                  value={act.nombre || act.descripcion || ''}
                                   onChange={(val) => handleUpdateAct(act.id, ch.id, { nombre: val })}
                                   className="text-[#1F2937] w-full"
                                 />
@@ -596,7 +627,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                             {/* Unidad */}
                             <td className="px-3 py-2.5">
                               <select
-                                value={act.unidad}
+                                value={act.unidad ?? 'un'}
                                 onChange={(e) => handleUpdateAct(act.id, ch.id, { unidad: e.target.value })}
                                 className="bg-transparent border-none focus:ring-0 p-0 text-[#6B7A8D] text-xs font-medium cursor-pointer hover:text-[#1F2937] transition-colors"
                               >
@@ -673,9 +704,9 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                                         <DropdownMenuLabel className="text-[10px] text-[#6B7A8D] uppercase tracking-widest font-bold px-2 py-1">
                                           Mover a capítulo
                                         </DropdownMenuLabel>
-                                        {otrosCapitulos.map((oc: any) => (
+                                        {otrosCapitulos.map((oc: any, ocIdx: number) => (
                                           <DropdownMenuItem
-                                            key={oc.id}
+                                            key={oc.id || `oc-${ocIdx}`}
                                             onClick={() => handleMoveActivity(act.id, ch.id, oc.id)}
                                             className="gap-2 cursor-pointer text-xs"
                                           >
@@ -738,10 +769,10 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
               <BookOpen className="mr-2 h-5 w-5" /> Importar del catálogo
             </Button>
           </div>
+          </div> {/* Fin Columna Izquierda */}
 
-          {/* Configuración y resumen financiero */}
-          <div className="grid gap-8 xl:grid-cols-[1.8fr_1fr] pt-4">
-            <div className="space-y-6">
+          {/* Columna Derecha: Sticky Sidebar (30%) */}
+          <div className="w-full lg:w-[340px] xl:w-[380px] shrink-0 sticky top-0 space-y-6">
               {/* Configuración AIU / IVA */}
               <div className="bg-white p-6 rounded-xl border border-[#D0D4DB] space-y-5">
                 <h3 className="text-sm font-semibold text-[#1F2937] flex items-center gap-2">
@@ -756,7 +787,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
-                        value={budget.aiu_porcentaje}
+                        value={budget.aiu_porcentaje ?? 0}
                         onChange={(e) => handleUpdateBudget({ aiu_porcentaje: parseFloat(e.target.value) || 0 })}
                         className="w-full h-11 bg-[#ECEEF2] border border-[#D0D4DB] rounded-lg px-3 focus:ring-1 focus:ring-[#D95510]/40 font-semibold text-lg text-[#1F2937]"
                       />
@@ -808,9 +839,8 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div className="space-y-5">
+              {/* Resumen Financiero Sticky */}
               <ResumenFinanciero budget={budget} />
               <div className="bg-white p-5 rounded-xl border border-[#D0D4DB]">
                 <h3 className="text-xs font-bold text-[#1F2937] uppercase tracking-[0.15em] mb-3">Exportar Presupuesto</h3>
@@ -819,8 +849,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                   <BotonExportarExcel budget={budget} profile={profile} />
                 </div>
               </div>
-            </div>
-          </div>
+          </div> {/* Fin Columna Derecha */}
         </fieldset>
         </div>
       )}

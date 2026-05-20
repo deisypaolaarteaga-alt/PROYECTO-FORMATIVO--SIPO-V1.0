@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { X, Plus, Trash2, Search, Users, Package, Drill, ShieldCheck, Calculator, RefreshCw, Check, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Decimal from 'decimal.js';
 import { Button } from '@/components/shared/Button';
 import { InputPrecio } from '@/components/shared/InputPrecio';
 import { InputEditable } from '@/components/shared/InputEditable';
@@ -10,9 +11,10 @@ import { formatearCOP } from '@/lib/utils/formato-cop';
 import { obtenerAPU, guardarAPU, actualizarActividad, sincronizarPrecioCuadrilla } from '@/actions/presupuestos';
 import { getCuadrillas } from '@/actions/cuadrillas';
 import { BuscadorInsumos } from '@/components/insumos/BuscadorInsumos';
-import { ModalCuadrillaAPU } from '@/components/presupuestos/ModalCuadrillaAPU';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+
+const UNIDADES = ['m²','m³','ml','kg','gl','un','hr','pto','día','ton'];
 
 interface PanelAPUProps {
   isOpen: boolean;
@@ -28,9 +30,12 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
   const [items, setItems] = useState<any[]>([]);
   const [rendimiento, setRendimiento] = useState(1);
   const [cuadrillas, setCuadrillas] = useState<any[]>([]);
-  const [showCuadrillaModal, setShowCuadrillaModal] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
-  const [searchType, setSearchType] = useState<'material' | 'equipo' | 'mano_obra'>('material');
+  const [searchType, setSearchType] = useState<'material' | 'equipo'>('material');
+
+  // Estados del selector inline de cuadrilla
+  const [selectedCuadrillaId, setSelectedCuadrillaId] = useState<string | null>(null);
+  const [cuadrillaUnidad, setCuadrillaUnidad] = useState('m²');
 
   // Cargar datos
   useEffect(() => {
@@ -40,7 +45,14 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
     const apuEmbebido = Array.isArray(activity.apus) ? activity.apus[0] : activity.apus;
     if (apuEmbebido) {
       setApu(apuEmbebido);
-      setItems(apuEmbebido.apu_items || []);
+      const rawEmbebido = apuEmbebido.apu_items || [];
+      const seenEmbebido = new Set<string>();
+      setItems(rawEmbebido.filter((item: any) => {
+        if (!item.id) return true;
+        if (seenEmbebido.has(item.id)) return false;
+        seenEmbebido.add(item.id);
+        return true;
+      }));
       setRendimiento(apuEmbebido.rendimiento || 1);
     } else {
       setApu(null);
@@ -52,6 +64,15 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
     loadData();
   }, [isOpen, activity?.id]);
 
+  // Pre-llenar rendimiento y unidad al seleccionar cuadrilla
+  useEffect(() => {
+    if (!selectedCuadrillaId) return;
+    const c = cuadrillas.find(c => c.id === selectedCuadrillaId);
+    if (!c || !c.rendimientos?.[0]) return;
+    setRendimiento(c.rendimientos[0].rendimiento_normal);
+    setCuadrillaUnidad(c.rendimientos[0].unidad);
+  }, [selectedCuadrillaId, cuadrillas]);
+
   async function loadData() {
     try {
       const [resApu, resCuad] = await Promise.all([
@@ -62,7 +83,14 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
       if (resApu.data) {
         const apuData = resApu.data as any;
         setApu(apuData);
-        setItems(apuData.apu_items || []);
+        const rawItems = apuData.apu_items || [];
+        const seenIds = new Set<string>();
+        setItems(rawItems.filter((item: any) => {
+          if (!item.id) return true;
+          if (seenIds.has(item.id)) return false;
+          seenIds.add(item.id);
+          return true;
+        }));
         setRendimiento(apuData.rendimiento || 1);
       } else {
         setApu(null);
@@ -75,44 +103,54 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
     }
   }
 
-  // --- CÁLCULOS ---
+  // --- CÁLCULOS con decimal.js ---
+  const itemsMO  = useMemo(() => items.map((item, idx) => ({ item, idx })).filter(({ item }) => item.tipo === 'mano_obra'),  [items]);
+  const itemsMat = useMemo(() => items.map((item, idx) => ({ item, idx })).filter(({ item }) => item.tipo === 'material'),   [items]);
+  const itemsEq  = useMemo(() => items.map((item, idx) => ({ item, idx })).filter(({ item }) => item.tipo === 'equipo'),     [items]);
+
   const totals = useMemo(() => {
-    const mat = items.filter(i => i.tipo === 'material').reduce((acc, i) => acc + (i.cantidad * i.precio_unitario), 0);
-    const eq  = items.filter(i => i.tipo === 'equipo').reduce((acc, i) => acc + (i.cantidad * i.precio_unitario), 0);
-    const mo  = items.filter(i => i.tipo === 'mano_obra').reduce((acc, i) => acc + (i.cantidad * i.precio_unitario), 0);
-    const hm  = mo * 0.03;
-    const epp = mo * 0.01;
-    const costoDirecto = mat + mo + eq + hm + epp;
+    const mat = itemsMat.reduce(
+      (s, { item: i }) => s.plus(new Decimal(i.cantidad).times(i.precio_unitario)),
+      new Decimal(0)
+    ).toNumber();
+    const eq = itemsEq.reduce(
+      (s, { item: i }) => s.plus(new Decimal(i.cantidad).times(i.precio_unitario)),
+      new Decimal(0)
+    ).toNumber();
+    const mo = itemsMO.reduce(
+      (s, { item: i }) => s.plus(new Decimal(i.cantidad).times(i.precio_unitario)),
+      new Decimal(0)
+    ).toNumber();
+    const hm  = new Decimal(mo).times(0.03).toNumber();
+    const epp = new Decimal(mo).times(0.01).toNumber();
+    const costoDirecto = new Decimal(mat).plus(mo).plus(eq).plus(hm).plus(epp).toNumber();
     return { mat, mo, eq, hm, epp, costoDirecto };
-  }, [items]);
+  }, [itemsMat, itemsEq, itemsMO]);
 
   // --- ACCIONES ---
-  const addItem = (tipo: 'material' | 'mano_obra' | 'equipo') => {
-    setItems([...items, { tipo, nombre: 'Nuevo ítem', unidad: tipo === 'mano_obra' ? 'jornal' : 'un', cantidad: 1, precio_unitario: 0 }]);
-  };
+  const addItem = useCallback((tipo: 'material' | 'equipo') => {
+    setItems(prev => [...prev, { tipo, nombre: 'Nuevo ítem', unidad: 'un', cantidad: 1, precio_unitario: 0 }]);
+  }, []);
 
-  const removeItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index));
-  };
+  const removeItem = useCallback((index: number) => {
+    setItems(prev => prev.filter((_, i) => i !== index));
+  }, []);
 
-  const updateItem = (index: number, fields: any) => {
-    const next = [...items];
-    const current = next[index];
-
-    // Si se edita el precio manualmente y hay una cuadrilla vinculada, marcar como editado
-    let extraFields = {};
-    if (fields.precio_unitario !== undefined && current.cuadrilla_id && fields.precio_unitario !== current.precio_unitario) {
-      extraFields = { precio_editado_manual: true };
-    }
-
-    next[index] = { ...current, ...fields, ...extraFields };
-    setItems(next);
-  };
+  const updateItem = useCallback((index: number, fields: any) => {
+    setItems(prev => {
+      const next = [...prev];
+      const current = next[index];
+      let extraFields = {};
+      if (fields.precio_unitario !== undefined && current.cuadrilla_id && fields.precio_unitario !== current.precio_unitario) {
+        extraFields = { precio_editado_manual: true };
+      }
+      next[index] = { ...current, ...fields, ...extraFields };
+      return next;
+    });
+  }, []);
 
   const handleSelectInsumo = (insumo: any) => {
-    // Determinar el tipo correcto según la fuente
-    let tipo: 'material' | 'mano_obra' | 'equipo' = searchType;
-    if (insumo.source === 'labor') tipo = 'mano_obra';
+    let tipo: 'material' | 'equipo' = searchType;
     if (insumo.source === 'equipment') tipo = 'equipo';
     if (insumo.source === 'materials') tipo = 'material';
 
@@ -121,11 +159,38 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
       nombre: insumo.nombre,
       unidad: insumo.unidad,
       cantidad: 1,
-      precio_unitario: insumo.precio_referencia || insumo.precio_diario || insumo.precio_unitario || 0
+      precio_unitario: insumo.precio_referencia || insumo.precio_unitario || 0
     }]);
     setShowSearch(false);
     toast.success(`${insumo.nombre} agregado`);
   };
+
+  const handleAgregarCuadrilla = useCallback(() => {
+    if (!selectedCuadrillaId || rendimiento <= 0) return;
+    const cuadrilla = cuadrillas.find(c => c.id === selectedCuadrillaId);
+    if (!cuadrilla) return;
+
+    const costoJornada = (cuadrilla.trabajadores as any[]).reduce(
+      (s: Decimal, t: any) => s.plus(new Decimal(t.jornal_con_prestaciones).times(t.cantidad)),
+      new Decimal(0)
+    );
+    const precioUnitario = costoJornada
+      .dividedBy(new Decimal(rendimiento))
+      .toDecimalPlaces(2)
+      .toNumber();
+
+    setItems(prev => [...prev, {
+      tipo: 'mano_obra' as const,
+      nombre: cuadrilla.nombre,
+      unidad: cuadrillaUnidad,
+      cantidad: 1,
+      precio_unitario: precioUnitario,
+      cuadrilla_id: cuadrilla.id,
+      precio_editado_manual: false,
+    }]);
+    setSelectedCuadrillaId(null);
+    toast.success(`Cuadrilla agregada: ${cuadrilla.nombre}`);
+  }, [selectedCuadrillaId, cuadrillas, rendimiento, cuadrillaUnidad]);
 
   const handleApply = async () => {
     setSaving(true);
@@ -155,17 +220,12 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
     }
   };
 
-  const handleCuadrillaItem = (item: { nombre: string; tipo: 'mano_obra'; unidad: string; cantidad: number; precio_unitario: number; cuadrilla_id?: string; precio_editado_manual?: boolean }) => {
-    setItems(prev => [...prev, item]);
-    toast.success(`Cuadrilla agregada: ${item.nombre}`);
-  };
-
   const handleSyncCuadrilla = async (item: any) => {
     if (!item.id || !item.cuadrilla_id) {
       toast.error('Guarda el APU antes de sincronizar la cuadrilla.');
       return;
     }
-    
+
     try {
       const res = await sincronizarPrecioCuadrilla(item.id, budgetId);
       if (res.success) {
@@ -221,78 +281,97 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
             {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
 
-              {/* 1. MANO DE OBRA */}
+              {/* 1. CUADRILLAS (MANO DE OBRA) */}
               <section className="space-y-4">
-                <div className="flex items-center justify-between border-b border-concrete pb-2">
+                <div className="flex items-center gap-2 border-b border-concrete pb-2">
+                  <Users className="h-4 w-4 text-steel-mid" />
+                  <h4 className="text-xs font-semibold text-ink uppercase tracking-tight">Cuadrillas</h4>
+                  {itemsMO.length > 0 && (
+                    <span className="text-[9px] font-medium bg-steel-fog text-steel-dark px-1.5 py-0.5 rounded">APU</span>
+                  )}
+                </div>
+
+                {/* Selector inline de cuadrilla */}
+                <div className="space-y-2 bg-sand/30 rounded-lg p-3 border border-concrete">
+                  <select
+                    value={selectedCuadrillaId || ''}
+                    onChange={e => setSelectedCuadrillaId(e.target.value || null)}
+                    className="w-full text-xs border border-concrete rounded-lg px-2 py-1.5 bg-white focus:border-[var(--accent-primary)] outline-none"
+                  >
+                    <option value="">Seleccionar cuadrilla del sistema/personalizadas…</option>
+                    {cuadrillas.map((c: any) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre}{c.categoria_actividad ? ` — ${c.categoria_actividad}` : ''}{c.es_sistema ? ' (sistema)' : ''}
+                      </option>
+                    ))}
+                  </select>
+
                   <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-steel-mid" />
-                    <h4 className="text-xs font-semibold text-ink uppercase tracking-tight">Mano de Obra</h4>
-                    {items.some(i => i.tipo === 'mano_obra') && (
-                      <span className="text-[9px] font-medium bg-steel-fog text-steel-dark px-1.5 py-0.5 rounded">APU</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {cuadrillas.length > 0 && (
-                      <button
-                        onClick={() => setShowCuadrillaModal(true)}
-                        className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-[var(--accent-pale)] text-[var(--accent-primary)] hover:bg-[var(--accent-primary)] hover:text-white transition-all duration-150"
-                        title="Usar cuadrilla"
-                      >
-                        <Users className="h-3 w-3" />
-                        Cuadrilla
-                      </button>
-                    )}
-                    <button
-                      onClick={() => { setSearchType('mano_obra'); setShowSearch(true); }}
-                      className="p-1 hover:bg-steel-fog rounded text-steel-mid transition-colors duration-150"
-                      title="Buscar en catálogo de trabajadores"
+                    <span className="text-[10px] text-stone font-medium whitespace-nowrap">Rendimiento:</span>
+                    <input
+                      type="number"
+                      min={0.01}
+                      step={0.5}
+                      value={rendimiento}
+                      onChange={e => setRendimiento(parseFloat(e.target.value) || 1)}
+                      className="w-20 h-7 px-2 text-xs border border-concrete rounded-lg text-right font-semibold bg-white focus:border-[var(--accent-primary)] outline-none"
+                      placeholder="Ej: 8"
+                    />
+                    <select
+                      value={cuadrillaUnidad}
+                      onChange={e => setCuadrillaUnidad(e.target.value)}
+                      className="w-20 h-7 text-xs border border-concrete rounded-lg px-1.5 bg-white focus:border-[var(--accent-primary)] outline-none"
                     >
-                      <Search className="h-4 w-4" />
-                    </button>
+                      {UNIDADES.map(u => (
+                        <option key={u} value={u}>{u}</option>
+                      ))}
+                    </select>
+                    <span className="text-[10px] text-stone">/ jornada</span>
                     <button
-                      onClick={() => addItem('mano_obra')}
-                      className="p-1 hover:bg-steel-fog rounded text-steel-mid transition-colors duration-150"
-                      title="Agregar ítem manual"
+                      onClick={handleAgregarCuadrilla}
+                      disabled={!selectedCuadrillaId || rendimiento <= 0}
+                      className="ml-auto flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-bold bg-[var(--accent-pale)] text-[var(--accent-primary)] hover:bg-[var(--accent-primary)] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-150"
                     >
-                      <Plus className="h-4 w-4" />
+                      <Plus className="h-3 w-3" />
+                      Agregar
                     </button>
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  {items.filter(i => i.tipo === 'mano_obra').map((item) => (
-                    <div key={item.id || `mo-${items.indexOf(item)}`} className="space-y-1">
+                  {itemsMO.map(({ item, idx }) => (
+                    <div key={item.id || `mo-${idx}`} className="space-y-1">
                       <div className="flex items-center gap-2 group">
                         <InputEditable
                           value={item.nombre}
-                          onChange={(val) => updateItem(items.indexOf(item), { nombre: val })}
+                          onChange={(val) => updateItem(idx, { nombre: val })}
                           className="text-xs flex-1"
-                          placeholder="Trabajador / especialidad"
+                          placeholder="Cuadrilla / mano de obra"
                         />
                         <input
                           value={item.unidad}
-                          onChange={(e) => updateItem(items.indexOf(item), { unidad: e.target.value })}
+                          onChange={(e) => updateItem(idx, { unidad: e.target.value })}
                           className="w-12 text-[10px] font-medium text-stone bg-transparent border-none text-center"
                         />
                         <input
                           type="number"
                           value={item.cantidad}
-                          onChange={(e) => updateItem(items.indexOf(item), { cantidad: parseFloat(e.target.value) || 0 })}
+                          onChange={(e) => updateItem(idx, { cantidad: parseFloat(e.target.value) || 0 })}
                           className="w-12 text-xs text-right bg-transparent border-none font-medium"
                         />
                         <InputPrecio
                           value={item.precio_unitario}
-                          onChange={(val) => updateItem(items.indexOf(item), { precio_unitario: val })}
+                          onChange={(val) => updateItem(idx, { precio_unitario: val })}
                           className={cn(
                             "w-24 text-xs text-right",
                             item.precio_editado_manual ? "text-[var(--accent-primary)] font-bold" : "text-stone"
                           )}
                         />
-                        <button onClick={() => removeItem(items.indexOf(item))} className="p-1 text-mortar hover:text-danger-text opacity-0 group-hover:opacity-100 transition-colors duration-150">
+                        <button onClick={() => removeItem(idx)} className="p-1 text-mortar hover:text-danger-text opacity-0 group-hover:opacity-100 transition-colors duration-150">
                           <Trash2 className="h-3 w-3" />
                         </button>
                       </div>
-                      
+
                       {/* Badge de cuadrilla vinculada */}
                       {item.cuadrilla_id && (
                         <div className="flex items-center gap-2 pl-2">
@@ -300,7 +379,7 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
                             <Users className="h-2.5 w-2.5 text-stone" />
                             <span className="text-[9px] font-bold text-stone uppercase tracking-tight">Cuadrilla vinculada</span>
                           </div>
-                          
+
                           {item.precio_editado_manual ? (
                             <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-[var(--accent-pale)] border border-[var(--accent-primary)]/20">
                               <span className="text-[9px] font-bold text-[var(--accent-primary)] uppercase tracking-tight">✏️ Precio editado manual</span>
@@ -318,9 +397,9 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
                       )}
                     </div>
                   ))}
-                  {items.filter(i => i.tipo === 'mano_obra').length === 0 && (
+                  {itemsMO.length === 0 && (
                     <p className="text-[11px] text-stone italic text-center py-2">
-                      Sin ítems — agrega <strong>Manual</strong>, usa 🔍 para buscar trabajadores o el botón <strong>Cuadrilla</strong>
+                      Sin cuadrillas — selecciona una y define el rendimiento para agregar mano de obra
                     </p>
                   )}
                 </div>
@@ -348,36 +427,36 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
                 </div>
 
                 <div className="space-y-2">
-                  {items.filter(i => i.tipo === 'material').map((item) => (
-                    <div key={item.id || `mat-${items.indexOf(item)}`} className="flex items-center gap-2 group">
+                  {itemsMat.map(({ item, idx }) => (
+                    <div key={item.id || `mat-${idx}`} className="flex items-center gap-2 group">
                       <InputEditable
                         value={item.nombre}
-                        onChange={(val) => updateItem(items.indexOf(item), { nombre: val })}
+                        onChange={(val) => updateItem(idx, { nombre: val })}
                         className="text-xs flex-1"
                         placeholder="Nombre material"
                       />
                       <input
                         value={item.unidad}
-                        onChange={(e) => updateItem(items.indexOf(item), { unidad: e.target.value })}
+                        onChange={(e) => updateItem(idx, { unidad: e.target.value })}
                         className="w-10 text-[10px] font-medium text-stone bg-transparent border-none text-center"
                       />
                       <input
                         type="number"
                         value={item.cantidad}
-                        onChange={(e) => updateItem(items.indexOf(item), { cantidad: parseFloat(e.target.value) || 0 })}
+                        onChange={(e) => updateItem(idx, { cantidad: parseFloat(e.target.value) || 0 })}
                         className="w-12 text-xs text-right bg-transparent border-none font-medium"
                       />
                       <InputPrecio
                         value={item.precio_unitario}
-                        onChange={(val) => updateItem(items.indexOf(item), { precio_unitario: val })}
+                        onChange={(val) => updateItem(idx, { precio_unitario: val })}
                         className="w-24 text-xs text-right text-stone"
                       />
-                      <button onClick={() => removeItem(items.indexOf(item))} className="p-1 text-mortar hover:text-danger-text opacity-0 group-hover:opacity-100 transition-colors duration-150">
+                      <button onClick={() => removeItem(idx)} className="p-1 text-mortar hover:text-danger-text opacity-0 group-hover:opacity-100 transition-colors duration-150">
                         <Trash2 className="h-3 w-3" />
                       </button>
                     </div>
                   ))}
-                  {items.filter(i => i.tipo === 'material').length === 0 && (
+                  {itemsMat.length === 0 && (
                     <p className="text-[11px] text-stone italic text-center py-4">No hay materiales agregados</p>
                   )}
                 </div>
@@ -405,35 +484,35 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
                 </div>
 
                 <div className="space-y-2">
-                  {items.filter(i => i.tipo === 'equipo').map((item) => (
-                    <div key={item.id || `eq-${items.indexOf(item)}`} className="flex items-center gap-2 group">
+                  {itemsEq.map(({ item, idx }) => (
+                    <div key={item.id || `eq-${idx}`} className="flex items-center gap-2 group">
                       <InputEditable
                         value={item.nombre}
-                        onChange={(val) => updateItem(items.indexOf(item), { nombre: val })}
+                        onChange={(val) => updateItem(idx, { nombre: val })}
                         className="text-xs flex-1"
                       />
                       <input
                         value={item.unidad}
-                        onChange={(e) => updateItem(items.indexOf(item), { unidad: e.target.value })}
+                        onChange={(e) => updateItem(idx, { unidad: e.target.value })}
                         className="w-10 text-[10px] font-medium text-stone bg-transparent border-none text-center"
                       />
                       <input
                         type="number"
                         value={item.cantidad}
-                        onChange={(e) => updateItem(items.indexOf(item), { cantidad: parseFloat(e.target.value) || 0 })}
+                        onChange={(e) => updateItem(idx, { cantidad: parseFloat(e.target.value) || 0 })}
                         className="w-12 text-xs text-right bg-transparent border-none font-medium"
                       />
                       <InputPrecio
                         value={item.precio_unitario}
-                        onChange={(val) => updateItem(items.indexOf(item), { precio_unitario: val })}
+                        onChange={(val) => updateItem(idx, { precio_unitario: val })}
                         className="w-24 text-xs text-right text-stone"
                       />
-                      <button onClick={() => removeItem(items.indexOf(item))} className="p-1 text-mortar hover:text-danger-text opacity-0 group-hover:opacity-100 transition-colors duration-150">
+                      <button onClick={() => removeItem(idx)} className="p-1 text-mortar hover:text-danger-text opacity-0 group-hover:opacity-100 transition-colors duration-150">
                         <Trash2 className="h-3 w-3" />
                       </button>
                     </div>
                   ))}
-                  {items.filter(i => i.tipo === 'equipo').length === 0 && (
+                  {itemsEq.length === 0 && (
                     <p className="text-[11px] text-stone italic text-center py-4">No hay equipos agregados</p>
                   )}
                 </div>
@@ -475,7 +554,7 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
               <div className="grid grid-cols-2 gap-y-2 text-[11px] font-medium uppercase tracking-wider text-stone">
                 <span>Materiales</span>
                 <span className="text-right text-ink">{formatearCOP(totals.mat)}</span>
-                <span>Mano de Obra</span>
+                <span>Cuadrillas</span>
                 <span className="text-right text-ink">{formatearCOP(totals.mo)}</span>
                 <span>Equipos</span>
                 <span className="text-right text-ink">{formatearCOP(totals.eq)}</span>
@@ -512,14 +591,6 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
         isOpen={showSearch}
         onClose={() => setShowSearch(false)}
         onSelect={handleSelectInsumo}
-      />
-
-      <ModalCuadrillaAPU
-        isOpen={showCuadrillaModal}
-        onClose={() => setShowCuadrillaModal(false)}
-        cuadrillas={cuadrillas}
-        actividadUnidad={activity?.unidad ?? 'un'}
-        onAplicar={handleCuadrillaItem}
       />
     </AnimatePresence>
   );

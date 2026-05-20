@@ -142,6 +142,10 @@ export async function crearCuadrillaPersonalizada(data: {
   descripcion?: string;
   categoria_actividad?: string;
   trabajadores: { trabajador_id: string; cantidad: number }[];
+  // FIX 5: rendimiento base opcional
+  rendimiento_normal?: number;
+  rendimiento_unidad?: string;
+  rendimiento_fuente?: string;
 }): Promise<{ success: boolean; data?: any; error?: string }> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -176,6 +180,20 @@ export async function crearCuadrillaPersonalizada(data: {
 
     if (errTrabajadores) {
       return { success: false, error: 'Cuadrilla creada pero sin trabajadores' };
+    }
+  }
+
+  // FIX 5: insertar rendimiento base si fue suministrado (fallo no cancela la operación)
+  if (data.rendimiento_normal && data.rendimiento_unidad) {
+    const { error: errRend } = await supabase.from('rendimientos').insert({
+      cuadrilla_id: cuadrilla.id,
+      actividad_tipo: data.categoria_actividad || 'General',
+      unidad: data.rendimiento_unidad,
+      rendimiento_normal: data.rendimiento_normal,
+      fuente: data.rendimiento_fuente || 'SIPO Colombia 2026',
+    });
+    if (errRend) {
+      console.warn('[crearCuadrillaPersonalizada] rendimiento no guardado:', errRend.message);
     }
   }
 

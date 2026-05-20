@@ -69,7 +69,7 @@ NEXT_PUBLIC_APP_URL
 - Triggers: `DROP TRIGGER IF EXISTS name ON table; CREATE TRIGGER ...`
 - Functions: `CREATE OR REPLACE FUNCTION`
 
-### Applied migrations (35 total, in order)
+### Applied migrations (37 total, in order)
 
 | File | Content | Status |
 |------|---------|--------|
@@ -108,12 +108,14 @@ NEXT_PUBLIC_APP_URL
 | `20260516300000_fix_materials_duplicados.sql` | **Bug fix**: Elimina 7 filas duplicadas en `materials` (conserva el de mayor `id` por `nombre+categoria`); agrega `UNIQUE INDEX materials_nombre_categoria_unique` para prevenir recurrencia | ✅ applied |
 | `20260517100000_budget_aprobacion.sql` | **Flujo aprobación**: Normaliza `check_budget_estado` a `borrador\|en_revision\|aprobado\|rechazado\|archivado`; actualiza `fn_increment_budget_version` para limpiar `aprobado_en = NULL` al reabrir a borrador | ✅ applied |
 | `20260517200000_drop_legacy_estado_check.sql` | **Bug fix**: Elimina constraint legado `budgets_estado_check` que bloqueaba la transición `borrador → en_revision` (no incluía `'en_revision'` como valor válido) | ✅ applied |
+| `20260519100000_seed_cuadrillas_base.sql` | **Seed**: 10 cuadrillas de sistema (`es_sistema = true`, `user_id = NULL`) para las categorías base de construcción colombiana — Mampostería, Concreto, Pañete, Hidrosanitaria, Eléctrica, Excavación, Pisos, Pintura, Estructura Metálica, Topografía. Busca trabajadores por nombre exacto sin hardcodear UUIDs. | ✅ applied |
+| `20260519110000_fix_cuadrillas_trabajadores.sql` | **Fix**: Completa los trabajadores de 6 cuadrillas que fallaron por mismatch de tildes (`albañil`, `Topógrafo`, `Ayudante construcción`) en los ILIKE del seed anterior. Usa nombres exactos con tildes. | ✅ applied |
 
 ### Loose SQL files at root (already applied manually — do NOT re-run)
 
 `cuadrillas_schema.sql`, `ai-tables.sql`, `migration_motor_calculo.sql`, `migration_motor_2026.sql`, `preferences_column.sql`, `trigger-profiles.sql`, `seed.sql`, `seed_cuadrillas.sql`, `seed_data.sql` — these were executed directly in Supabase Dashboard and are **already reflected in the database**. Their triggers and functions are now superseded by `20260507100000_fix_trigger_chain.sql`. Do not add them to `migrate.js`.
 
-## Current Database State (as of 2026-05-18)
+## Current Database State (as of 2026-05-19)
 
 **28 tables + 5 views** in `public` schema. Jornales en `trabajadores` actualizados a SMMLV 2026 ($1.423.500/mes). Tabla `materials` deduplicada (46 filas, índice único en `nombre+categoria`). Key tables and their non-obvious columns:
 
@@ -233,7 +235,7 @@ Token reference: `src/lib/design-tokens.ts`. User accent color stored in `profil
 
 ## Known Remaining Tasks
 
-> **Snapshot:** 2026-05-19 — `tsc --noEmit --skipLibCheck` limpio, 35 migraciones aplicadas, 6 commits en rama `main` de `sipo/`. Nueva ruta `/parametros-fiscales`. 3 scripts nuevos `seed:catalogo-items`.
+> **Snapshot:** 2026-05-20 — `tsc --noEmit --skipLibCheck` limpio (0 errores), 37 migraciones aplicadas, rama `rama-deisy`. 16 Server Actions, 5 componentes PDF, motor de cálculo con tests Vitest. Nueva ruta `/parametros-fiscales`. 3 scripts nuevos `seed:catalogo-items`. Tabla `cuadrillas` con 10 cuadrillas de sistema + 20 filas en `cuadrilla_trabajadores` + 10 rendimientos INVIAS/IDU 2025.
 
 ### Pendiente — acción manual requerida
 - Presupuestos creados antes del fix de admin client (2026-05-07) tienen 0 actividades — deben eliminarse y recrearse con "Plantilla Sugerida"
@@ -252,7 +254,7 @@ Token reference: `src/lib/design-tokens.ts`. User accent color stored in `profil
 ~~- **`old_sidebar.tsx` en raíz del proyecto**~~ ✅ 2026-05-18 — archivo ya no existe en el proyecto.
 ~~- **`src/proxy.ts` reemplazado pero no eliminado**~~ ✅ 2026-05-18 — eliminado junto con `middleware.ts.bak`.
 
-~~### Pendiente — errores TypeScript (5 archivos, descubiertos 2026-05-13)~~ ✅ 2026-05-13 — todos resueltos. **Estado actual (2026-05-18): `tsc --noEmit --skipLibCheck` sin errores.**
+~~### Pendiente — errores TypeScript (5 archivos, descubiertos 2026-05-13)~~ ✅ 2026-05-13 — todos resueltos. **Estado actual (2026-05-19): `tsc --noEmit --skipLibCheck` sin errores (0 líneas de output).**
 
 ### Pendiente — deuda técnica (histórico)
 ~~- Turbopack FATAL panic en Windows con `@react-pdf/renderer` — OS error 5 "Acceso denegado" al crear junction points~~ ✅ 2026-05-14 — `package.json` restaurado a `next dev --no-turbo` (flag se perdió al migrar a pnpm)

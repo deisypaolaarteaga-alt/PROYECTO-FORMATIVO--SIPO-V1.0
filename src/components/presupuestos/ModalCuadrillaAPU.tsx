@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { X, Users, ChevronDown, ChevronRight, Calculator, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Decimal from 'decimal.js';
 import { formatearCOP } from '@/lib/utils/formato-cop';
 import { cn } from '@/lib/utils';
-import { calcularCostoCuadrilla, generarItemApuDeCuadrilla } from '@/lib/calculos/presupuesto';
+import { calcularCostoCuadrilla } from '@/lib/calculos/presupuesto';
 import type { CuadrillaConTrabajadores } from '@/lib/calculos/presupuesto';
 
 interface ModalCuadrillaAPUProps {
@@ -33,6 +34,13 @@ export function ModalCuadrillaAPU({
     [cuadrillas, selectedId]
   );
 
+  // Pre-llenar rendimiento automáticamente al seleccionar una cuadrilla
+  useEffect(() => {
+    if (!cuadrillaSelected) return;
+    const r = cuadrillaSelected.rendimientos[0];
+    if (r) setRendimiento(r.rendimiento_normal);
+  }, [selectedId]);
+
   const costo = useMemo(() => {
     if (!cuadrillaSelected || rendimiento <= 0) return null;
     try {
@@ -50,13 +58,21 @@ export function ModalCuadrillaAPU({
 
   function handleAplicar() {
     if (!costo || !cuadrillaSelected) return;
-    const item = generarItemApuDeCuadrilla(costo);
+
+    // Usar decimal.js para costo_jornada / rendimiento (sin pérdida de precisión)
+    const precioUnitario = new Decimal(costo.costoJornadaReal)
+      .dividedBy(rendimiento)
+      .toDecimalPlaces(2)
+      .toNumber();
+
     onAplicar({
-      nombre: cantidadCuadrillas > 1 ? `MO: ${costo.nombre} ×${cantidadCuadrillas}` : item.nombre,
+      nombre: cantidadCuadrillas > 1
+        ? `${cuadrillaSelected.nombre} ×${cantidadCuadrillas}`
+        : cuadrillaSelected.nombre,
       tipo: 'mano_obra' as const,
-      unidad: item.unidad,
-      cantidad: item.cantidad,
-      precio_unitario: Math.round(costo.costoJornadaReal),
+      unidad: actividadUnidad || 'un',
+      cantidad: 1,
+      precio_unitario: precioUnitario,
       cuadrilla_id: cuadrillaSelected.id,
       precio_editado_manual: false,
     });
@@ -173,7 +189,7 @@ export function ModalCuadrillaAPU({
                         {isExpanded && c.trabajadores.length > 0 && (
                           <div className="border-t border-concrete px-4 py-2 space-y-1 bg-slate-50/50">
                             {c.trabajadores.map((t, i) => (
-                              <div key={t.especialidad || i} className="flex items-center justify-between text-[11px]">
+                              <div key={`worker-${i}`} className="flex items-center justify-between text-[11px]">
                                 <span className="text-charcoal">{t.especialidad} ×{t.cantidad}</span>
                                 <span className="text-stone font-mono">
                                   {formatearCOP(t.jornal_base)} × {t.factor_prestacional.toFixed(4)}

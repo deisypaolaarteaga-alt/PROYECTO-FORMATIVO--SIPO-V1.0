@@ -83,6 +83,9 @@ const migrationFiles = [
   'supabase/migrations/20260516300000_fix_materials_duplicados.sql',
   'supabase/migrations/20260517100000_budget_aprobacion.sql',
   'supabase/migrations/20260517200000_drop_legacy_estado_check.sql',
+  'supabase/migrations/20260519100000_seed_cuadrillas_base.sql',
+  'supabase/migrations/20260519110000_fix_cuadrillas_trabajadores.sql',
+  'supabase/migrations/20260520100000_security_rls_audit.sql',
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

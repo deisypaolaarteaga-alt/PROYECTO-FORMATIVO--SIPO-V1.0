@@ -44,6 +44,7 @@ const stubStyles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
     paddingVertical: 5,
     paddingHorizontal: 4,
     borderBottomWidth: 1,

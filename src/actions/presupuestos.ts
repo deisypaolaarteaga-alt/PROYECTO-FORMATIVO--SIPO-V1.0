@@ -368,7 +368,7 @@ export async function guardarAPU(
         const { data, error } = await supabase
           .from('apus')
           .insert({ activity_id: activityId, budget_id: budgetId, user_id: user.id, rendimiento: payload.rendimiento })
-          .select()
+          .select('id')
           .single();
         if (error) throw error;
         apuId = data.id;

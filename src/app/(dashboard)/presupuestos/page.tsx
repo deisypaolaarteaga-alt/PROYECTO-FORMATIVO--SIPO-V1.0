@@ -1,12 +1,42 @@
 import { createClient } from '@/lib/supabase/server';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cn } from '@/lib/utils';
 import Link from 'next/link';
-import { FileText } from 'lucide-react';
 import { PresupuestosNewButton } from '@/components/presupuestos/PresupuestosNewButton';
+import { PresupuestosTable } from '@/components/presupuestos/PresupuestosTable';
 
 export const revalidate = 30;
 
-// ── Constantes ────────────────────────────────────────────────────────────────
+// ── KPI Card Component ────────────────────────────────────────────────────────
+function KPICard({
+  label,
+  value,
+  sub,
+  highlight = false,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  highlight?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        'bg-white rounded-xl border border-[#E5E7EB] shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] px-5 py-4 flex flex-col',
+        highlight && 'border-l-[3px] border-l-[#D95510]'
+      )}
+    >
+      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF] mb-1.5 leading-none">
+        {label}
+      </p>
+      <p className="text-[21px] font-bold tabular-nums leading-none text-[#111827] flex-1">
+        {value}
+      </p>
+      {sub && (
+        <p className="text-[11px] text-[#9CA3AF] mt-2 leading-none">{sub}</p>
+      )}
+    </div>
+  );
+}
 
 const ESTADOS = [
   { key: 'todos',       label: 'Todos'       },
@@ -16,16 +46,6 @@ const ESTADOS = [
   { key: 'rechazado',   label: 'Rechazado'   },
   { key: 'archivado',   label: 'Archivado'   },
 ];
-
-const BADGE: Record<string, { bg: string; text: string; label: string }> = {
-  borrador:    { bg: 'bg-[#F3F4F6]', text: 'text-[#6B7280]', label: 'Borrador'    },
-  en_revision: { bg: 'bg-[#FFF7ED]', text: 'text-[#EA580C]', label: 'En revisión' },
-  aprobado:    { bg: 'bg-[#F0FDF4]', text: 'text-[#059669]', label: 'Aprobado'    },
-  rechazado:   { bg: 'bg-[#FEF2F2]', text: 'text-[#DC2626]', label: 'Rechazado'   },
-  archivado:   { bg: 'bg-[#F3F4F6]', text: 'text-[#9CA3AF]', label: 'Archivado'   },
-};
-
-// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function PresupuestosPage({
   searchParams,
@@ -39,7 +59,27 @@ export default async function PresupuestosPage({
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  // Budgets del usuario
+  const { data: allBudgets } = await supabase
+    .from('budgets')
+    .select('id, estado, created_at, vigencia_dias')
+    .eq('user_id', user.id)
+    .is('deleted_at', null);
+
+  const allIds = (allBudgets ?? []).map((b) => b.id);
+  const { data: allResumenes } = allIds.length > 0
+    ? await supabase
+        .from('v_resumen_presupuesto')
+        .select('budget_id, total_oferta')
+        .in('budget_id', allIds)
+    : { data: [] };
+
+  const globalTotalOferta = (allResumenes ?? []).reduce(
+    (acc, r) => acc + Number(r.total_oferta ?? 0),
+    0
+  );
+  const totalAprobados = (allBudgets ?? []).filter((b) => b.estado === 'aprobado').length;
+  const totalRevision = (allBudgets ?? []).filter((b) => b.estado === 'en_revision').length;
+
   let query = supabase
     .from('budgets')
     .select('id, titulo, estado, created_at, vigencia_dias')
@@ -49,19 +89,18 @@ export default async function PresupuestosPage({
 
   if (filtro) query = query.eq('estado', filtro);
 
-  const { data: budgets } = await query;
-
-  // Datos financieros desde la vista
-  const ids = (budgets ?? []).map((b) => b.id);
-  const { data: resumenes } = ids.length > 0
+  const { data: listBudgets } = await query;
+  const listIds = (listBudgets ?? []).map((b) => b.id);
+  
+  const { data: listResumenes } = listIds.length > 0
     ? await supabase
         .from('v_resumen_presupuesto')
         .select('budget_id, costo_directo, total_oferta')
-        .in('budget_id', ids)
+        .in('budget_id', listIds)
     : { data: [] };
 
   const resumenMap: Record<string, { costo_directo: number; total_oferta: number }> = {};
-  for (const r of resumenes ?? []) {
+  for (const r of listResumenes ?? []) {
     resumenMap[r.budget_id] = {
       costo_directo: Number(r.costo_directo ?? 0),
       total_oferta:  Number(r.total_oferta  ?? 0),
@@ -69,7 +108,7 @@ export default async function PresupuestosPage({
   }
 
   const ahora = Date.now();
-  const rows = (budgets ?? []).map((b) => {
+  const rows = (listBudgets ?? []).map((b) => {
     const resumen = resumenMap[b.id] ?? { costo_directo: 0, total_oferta: 0 };
     const diasRestantes = b.vigencia_dias > 0
       ? Math.ceil((new Date(b.created_at).getTime() + b.vigencia_dias * 86400000 - ahora) / 86400000)
@@ -80,115 +119,84 @@ export default async function PresupuestosPage({
   const estadoActivo = estadoParam ?? 'todos';
 
   return (
-    <div className="space-y-6">
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+    <div className="space-y-6 animate-fade-in pb-12">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
-          <h1 className="text-[22px] font-bold text-[#111827] leading-tight">Presupuestos</h1>
+          <h1 className="text-[22px] font-bold text-[#111827] leading-tight">
+            Presupuestos
+          </h1>
           <p className="text-[13px] text-[#6B7280] mt-0.5">
-            {rows.length} presupuesto{rows.length !== 1 ? 's' : ''}
-            {filtro ? ` · ${BADGE[filtro]?.label ?? filtro}` : ' en total'}
+            Gestión y seguimiento de cotizaciones
           </p>
         </div>
-        <PresupuestosNewButton />
-      </div>
-
-      {/* ── Filtros de estado ── */}
-      <div className="flex gap-2 flex-wrap">
-        {ESTADOS.map(({ key, label }) => (
-          <Link
-            key={key}
-            href={key === 'todos' ? '/presupuestos' : `/presupuestos?estado=${key}`}
-            className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors border ${
-              estadoActivo === key
-                ? 'bg-[#D95510] text-white border-[#D95510]'
-                : 'bg-white text-[#6B7280] border-[#E5E7EB] hover:border-[#D95510] hover:text-[#D95510]'
-            }`}
-          >
-            {label}
-          </Link>
-        ))}
-      </div>
-
-      {/* ── Tabla / Empty state ── */}
-      {rows.length === 0 ? (
-        <div className="bg-white rounded-xl border border-[#E5E7EB] flex flex-col items-center justify-center py-20 gap-4">
-          <div className="w-12 h-12 rounded-xl bg-[#FFF4EE] flex items-center justify-center">
-            <FileText className="w-6 h-6 text-[#D95510]" />
-          </div>
-          <div className="text-center">
-            <p className="text-[15px] font-semibold text-[#111827]">Sin presupuestos</p>
-            <p className="text-[13px] text-[#6B7280] mt-1">
-              {filtro ? 'No hay presupuestos con este estado.' : 'Crea tu primer presupuesto para empezar.'}
-            </p>
-          </div>
-          {!filtro && <PresupuestosNewButton />}
+        <div className="shrink-0">
+          <PresupuestosNewButton />
         </div>
-      ) : (
-        <div className="bg-white rounded-xl border border-[#E5E7EB] overflow-hidden">
-          {/* Encabezado columnas */}
-          <div className="hidden md:grid grid-cols-[1fr_108px_128px_128px_108px_72px] gap-4 px-5 py-2.5 border-b border-[#F3F4F6] bg-[#F9FAFB]">
-            {['Presupuesto', 'Estado', 'Costo directo', 'Total oferta', 'Creado', 'Vigencia'].map((col, i) => (
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <KPICard
+          label="Total Presupuestado"
+          value={formatCurrency(globalTotalOferta)}
+          sub={`${allBudgets?.length ?? 0} presupuestos en total`}
+          highlight
+        />
+        <KPICard
+          label="Aprobados"
+          value={String(totalAprobados)}
+          sub="Listos para ejecución"
+        />
+        <KPICard
+          label="En Revisión"
+          value={String(totalRevision)}
+          sub="Pendientes de validación"
+        />
+        <KPICard
+          label="Promedio por pto."
+          value={
+            allBudgets?.length
+              ? formatCurrency(globalTotalOferta / allBudgets.length)
+              : formatCurrency(0)
+          }
+          sub="Valor medio de cotizaciones"
+        />
+      </div>
+
+      <div className="flex items-center border-b border-[#E5E7EB] overflow-x-auto">
+        {ESTADOS.map(({ key, label }) => {
+          const active = estadoActivo === key;
+          const count =
+            key === 'todos'
+              ? allBudgets?.length ?? 0
+              : allBudgets?.filter((b) => b.estado === key).length ?? 0;
+
+          return (
+            <Link
+              key={key}
+              href={key === 'todos' ? '/presupuestos' : `/presupuestos?estado=${key}`}
+              className={cn(
+                'inline-flex items-center gap-2 px-4 py-2.5 text-[13px] font-medium whitespace-nowrap transition-all border-b-2 -mb-px shrink-0',
+                active
+                  ? 'border-[#D95510] text-[#D95510]'
+                  : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-200'
+              )}
+            >
+              {label}
               <span
-                key={col}
-                className={`text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-wide ${i >= 2 && i <= 3 ? 'text-right' : i === 5 ? 'text-right' : ''}`}
+                className={cn(
+                  'inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-[11px] font-bold tabular-nums',
+                  active ? 'bg-[#D95510] text-white' : 'bg-neutral-100 text-neutral-500'
+                )}
               >
-                {col}
+                {count}
               </span>
-            ))}
-          </div>
+            </Link>
+          );
+        })}
+      </div>
 
-          {/* Filas */}
-          <ul>
-            {rows.map((r) => {
-              const badge = BADGE[r.estado] ?? BADGE['borrador'];
-              const diasColor =
-                r.diasRestantes === null   ? 'text-[#9CA3AF]'
-                : r.diasRestantes <= 0    ? 'text-[#DC2626] font-semibold'
-                : r.diasRestantes <= 7    ? 'text-[#DC2626]'
-                : r.diasRestantes <= 15   ? 'text-[#EA580C]'
-                : 'text-[#6B7280]';
-
-              return (
-                <li key={r.id} className="border-b border-[#F9FAFB] last:border-0 hover:bg-[#FAFAFA] transition-colors">
-                  <Link
-                    href={`/presupuestos/${r.id}`}
-                    className="flex md:grid md:grid-cols-[1fr_108px_128px_128px_108px_72px] gap-4 px-5 py-3.5 items-center flex-wrap"
-                  >
-                    <span className="text-[13px] font-medium text-[#111827] truncate min-w-0">
-                      {r.titulo}
-                    </span>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium w-fit ${badge.bg} ${badge.text}`}>
-                      {badge.label}
-                    </span>
-                    <span className="text-[12px] text-[#6B7280] md:text-right">
-                      {formatCurrency(r.costo_directo)}
-                    </span>
-                    <span className="text-[13px] font-semibold text-[#111827] md:text-right">
-                      {formatCurrency(r.total_oferta)}
-                    </span>
-                    <span className="text-[12px] text-[#6B7280]">
-                      {new Date(r.created_at).toLocaleDateString('es-CO', {
-                        day:      '2-digit',
-                        month:    'short',
-                        year:     'numeric',
-                        timeZone: 'America/Bogota',
-                      })}
-                    </span>
-                    <span className={`text-[12px] md:text-right ${diasColor}`}>
-                      {r.diasRestantes === null
-                        ? '—'
-                        : r.diasRestantes <= 0
-                        ? 'Vencido'
-                        : `${r.diasRestantes}d`}
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
+      {/* ── Contenido: Data Table Paginada ─────────────────────────────────────────── */}
+      <PresupuestosTable rows={rows} filtro={filtro} />
     </div>
   );
 }

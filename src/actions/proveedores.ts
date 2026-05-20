@@ -1,10 +1,10 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { proveedorSchema } from '@/lib/validations/schemas';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import type { ActionResult, Proveedor } from '@/types';
+import type { ActionResult, Proveedor, TipoAPUItem } from '@/types';
 
 export async function getProveedores(filtros?: {
   busqueda?: string;
@@ -139,6 +139,78 @@ export async function eliminarProveedor(proveedorId: string): Promise<ActionResu
   } catch (error: any) {
     console.error('[eliminarProveedor] error:', error);
     return { success: false, error: 'Error al eliminar proveedor' };
+  }
+}
+
+// Asigna (o quita) un proveedor a todos los apu_items con ese nombre/unidad/tipo
+// dentro de un presupuesto dado. Un mass-update es correcto aquí porque la vista de
+// explosión agrega ítems idénticos de distintos APUs — conceptualmente es el mismo insumo.
+export async function asignarProveedorAInsumos(
+  budgetId: string,
+  nombre: string,
+  unidad: string,
+  tipo: TipoAPUItem,
+  proveedorId: string | null
+): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'No autorizado' };
+
+    // Verificar que el presupuesto pertenece al usuario
+    const { data: budget, error: budgetError } = await supabase
+      .from('budgets')
+      .select('id')
+      .eq('id', budgetId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (budgetError || !budget) return { success: false, error: 'Presupuesto no encontrado.' };
+
+    // Obtener los IDs de actividades del presupuesto
+    const { data: activities, error: actError } = await supabase
+      .from('activities')
+      .select('id')
+      .eq('budget_id', budgetId)
+      .eq('user_id', user.id)
+      .is('deleted_at', null);
+
+    if (actError) throw actError;
+    if (!activities || activities.length === 0) return { success: true };
+
+    const activityIds = activities.map(a => a.id);
+
+    // Obtener los IDs de APUs de esas actividades
+    const { data: apus, error: apuError } = await supabase
+      .from('apus')
+      .select('id')
+      .eq('budget_id', budgetId)
+      .eq('user_id', user.id)
+      .is('deleted_at', null)
+      .in('activity_id', activityIds);
+
+    if (apuError) throw apuError;
+    if (!apus || apus.length === 0) return { success: true };
+
+    const apuIds = apus.map(a => a.id);
+
+    // UPDATE con admin client para superar RLS en la escritura cruzada
+    const adminClient = createAdminClient();
+    const { error: updateError } = await adminClient
+      .from('apu_items')
+      .update({ proveedor_id: proveedorId, updated_at: new Date().toISOString() })
+      .in('apu_id', apuIds)
+      .eq('nombre', nombre)
+      .eq('unidad', unidad)
+      .eq('tipo', tipo);
+
+    if (updateError) throw updateError;
+
+    revalidatePath(`/presupuestos/${budgetId}`);
+    return { success: true };
+  } catch (error) {
+    console.error('[asignarProveedorAInsumos] error:', error);
+    return { success: false, error: 'No se pudo asignar el proveedor al insumo.' };
   }
 }
 

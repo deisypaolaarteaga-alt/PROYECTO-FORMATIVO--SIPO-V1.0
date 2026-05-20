@@ -424,6 +424,7 @@ export interface InsumoExplotado {
   cantidad_total: number;
   precio_unitario: number;
   subtotal_total: number;
+  proveedor_id: string | null;
 }
 
 export interface ExplosionInsumos {

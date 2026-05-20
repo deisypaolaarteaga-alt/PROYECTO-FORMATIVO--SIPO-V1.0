@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Package, Hammer, Truck, Wrench, Shield,
   ShoppingCart, AlertCircle, TrendingUp
 } from 'lucide-react';
 import { getExplosionInsumos } from '@/actions/insumos';
 import { Skeleton, SkeletonTable } from '@/components/shared/Skeleton';
+import { ModalProveedorAPUItem } from '@/components/proveedores/ModalProveedorAPUItem';
 import { formatearCOP } from '@/lib/utils/formato-cop';
 import { cn } from '@/lib/utils';
 import type { ExplosionInsumos, InsumoExplotado, TipoAPUItem } from '@/types';
@@ -30,6 +31,9 @@ const TIPO_CONFIG: Record<TipoAPUItem, {
 
 const ORDEN_TIPOS: TipoAPUItem[] = ['material', 'mano_obra', 'equipo', 'herramienta_menor', 'epp'];
 
+// Tipos en los que el carrito está activo (asignación de proveedor habilitada)
+const TIPOS_CON_PROVEEDOR = new Set<TipoAPUItem>(['material']);
+
 // ── Componente principal ──────────────────────────────────────────────────────
 
 interface Props {
@@ -37,9 +41,31 @@ interface Props {
 }
 
 export function ExplosionInsumosView({ budgetId }: Props) {
-  const [data, setData]       = useState<ExplosionInsumos | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState<string | null>(null);
+  const [data, setData]         = useState<ExplosionInsumos | null>(null);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Item cuyo modal de proveedor está abierto (null = cerrado)
+  const [modalItem, setModalItem] = useState<InsumoExplotado | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await getExplosionInsumos(budgetId);
+      if (result.success && result.data) {
+        setData(result.data);
+      } else {
+        setError(result.error ?? 'Error al cargar la explosión de insumos.');
+      }
+    } catch (err) {
+      console.error('[ExplosionInsumosView]', err);
+      setError('Error inesperado al cargar los insumos. Intenta de nuevo.');
+    } finally {
+      setLoading(false);
+    }
+  }, [budgetId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,27 +73,23 @@ export function ExplosionInsumosView({ budgetId }: Props) {
     setError(null);
     setData(null);
 
-    const load = async () => {
-      try {
-        const result = await getExplosionInsumos(budgetId);
-        if (cancelled) return;
-        if (result.success && result.data) {
-          setData(result.data);
-        } else {
-          setError(result.error ?? 'Error al cargar la explosión de insumos.');
-        }
-      } catch (err) {
-        if (cancelled) return;
-        console.error('[ExplosionInsumosView]', err);
-        setError('Error inesperado al cargar los insumos. Intenta de nuevo.');
-      } finally {
-        if (!cancelled) setLoading(false);
+    getExplosionInsumos(budgetId).then(result => {
+      if (cancelled) return;
+      if (result.success && result.data) {
+        setData(result.data);
+      } else {
+        setError(result.error ?? 'Error al cargar la explosión de insumos.');
       }
-    };
+      setLoading(false);
+    }).catch(err => {
+      if (cancelled) return;
+      console.error('[ExplosionInsumosView]', err);
+      setError('Error inesperado al cargar los insumos. Intenta de nuevo.');
+      setLoading(false);
+    });
 
-    load();
     return () => { cancelled = true; };
-  }, [budgetId]);
+  }, [budgetId, refreshKey]);
 
   if (loading) return <ExplosionSkeleton />;
 
@@ -135,12 +157,26 @@ export function ExplosionInsumosView({ budgetId }: Props) {
           items={porTipo.get(tipo)!}
           subtotal={data.totales[tipo]}
           granTotal={data.totales.gran_total}
+          onCartClick={setModalItem}
         />
       ))}
 
       {/* Tarjeta Gran Total */}
       <GranTotalCard data={data} tiposPresentes={tiposPresentes} />
 
+      {/* Modal de proveedor */}
+      {modalItem && (
+        <ModalProveedorAPUItem
+          open={modalItem !== null}
+          onClose={() => setModalItem(null)}
+          budgetId={budgetId}
+          nombre={modalItem.nombre}
+          unidad={modalItem.unidad}
+          tipo={modalItem.tipo}
+          proveedorId={modalItem.proveedor_id}
+          onSuccess={() => setRefreshKey(k => k + 1)}
+        />
+      )}
     </div>
   );
 }
@@ -152,16 +188,18 @@ function CategoriaTable({
   items,
   subtotal,
   granTotal,
+  onCartClick,
 }: {
   tipo: TipoAPUItem;
   items: InsumoExplotado[];
   subtotal: number;
   granTotal: number;
+  onCartClick: (item: InsumoExplotado) => void;
 }) {
   const cfg = TIPO_CONFIG[tipo];
   const { Icon } = cfg;
-  const esMaterial = tipo === 'material';
   const pctGrupo = granTotal > 0 ? (subtotal / granTotal) * 100 : 0;
+  const mostrarColumnaAccion = tipo === 'material' || tipo === 'equipo' || tipo === 'herramienta_menor';
 
   return (
     <div className={cn('rounded-xl border overflow-hidden', cfg.borderColor)}>
@@ -211,7 +249,7 @@ function CategoriaTable({
               <th className="px-4 py-3 text-right font-medium w-36">Precio Unit.</th>
               <th className="px-4 py-3 text-right font-medium w-40">Total</th>
               <th className="px-4 py-3 text-right font-medium w-20">% CD</th>
-              {esMaterial && <th className="px-4 py-3 w-44" />}
+              {mostrarColumnaAccion && <th className="px-4 py-3 w-44" />}
             </tr>
           </thead>
 
@@ -220,8 +258,9 @@ function CategoriaTable({
               <FilaInsumo
                 key={`${item.tipo}|||${item.nombre ?? itemIdx}|||${item.unidad}`}
                 item={item}
-                mostrarAccion={esMaterial}
+                mostrarColumnaAccion={mostrarColumnaAccion}
                 granTotal={granTotal}
+                onCartClick={onCartClick}
               />
             ))}
           </tbody>
@@ -240,7 +279,7 @@ function CategoriaTable({
               <td className={cn('px-4 py-3 text-right text-xs font-bold tabular-nums', cfg.color)}>
                 {pctGrupo.toFixed(1)}%
               </td>
-              {esMaterial && <td />}
+              {mostrarColumnaAccion && <td />}
             </tr>
           </tfoot>
         </table>
@@ -253,14 +292,18 @@ function CategoriaTable({
 
 function FilaInsumo({
   item,
-  mostrarAccion,
+  mostrarColumnaAccion,
   granTotal,
+  onCartClick,
 }: {
   item: InsumoExplotado;
-  mostrarAccion: boolean;
+  mostrarColumnaAccion: boolean;
   granTotal: number;
+  onCartClick: (item: InsumoExplotado) => void;
 }) {
-  const pctCD = granTotal > 0 ? ((item.subtotal_total / granTotal) * 100) : 0;
+  const pctCD    = granTotal > 0 ? ((item.subtotal_total / granTotal) * 100) : 0;
+  const activo   = TIPOS_CON_PROVEEDOR.has(item.tipo);
+  const conProveedor = item.proveedor_id !== null;
 
   return (
     <tr className="hover:bg-sand/60 transition-colors duration-100 group">
@@ -286,22 +329,40 @@ function FilaInsumo({
           {pctCD >= 0.1 ? `${pctCD.toFixed(1)}%` : '<0.1%'}
         </span>
       </td>
-      {mostrarAccion && (
+      {mostrarColumnaAccion && (
         <td className="px-4 py-3.5 text-right">
-          <button
-            className={cn(
-              'opacity-0 group-hover:opacity-100 transition-opacity duration-150',
-              'flex items-center gap-1.5 ml-auto',
-              'text-xs font-medium text-steel-mid hover:text-burn-orange',
-              'border border-concrete hover:border-burn-orange/50',
-              'rounded-lg px-3 py-1.5 bg-white',
-              'whitespace-nowrap'
-            )}
-            title="Próximamente: generar orden de compra para este material"
-          >
-            <ShoppingCart className="h-3 w-3 shrink-0" />
-            Orden de Compra
-          </button>
+          {activo ? (
+            <button
+              onClick={() => onCartClick(item)}
+              className={cn(
+                'flex items-center gap-1.5 ml-auto', 
+                'text-xs font-medium rounded-lg px-3 py-1.5 bg-white',
+                'border whitespace-nowrap',
+                conProveedor
+                  ? 'text-burn-orange border-burn-orange/40 hover:bg-burn-pale'
+                  : 'text-steel-mid border-concrete hover:text-burn-orange hover:border-burn-orange/50'
+              )}
+              title={conProveedor ? 'Ver o cambiar proveedor asignado' : 'Asignar proveedor a este material'}
+            >
+              <ShoppingCart className="h-3 w-3 shrink-0" />
+              {conProveedor ? 'Ver proveedor' : 'Proveedor'}
+            </button>
+          ) : (
+            // Carrito deshabilitado para equipos y herramientas: UI consistente, fácil de habilitar después
+            <button
+              disabled
+              className={cn(
+                'opacity-40',
+                'flex items-center gap-1.5 ml-auto cursor-not-allowed',
+                'text-xs font-medium text-stone border border-concrete',
+                'rounded-lg px-3 py-1.5 bg-white whitespace-nowrap'
+              )}
+              title="Asignación de proveedor disponible solo para materiales"
+            >
+              <ShoppingCart className="h-3 w-3 shrink-0" />
+              Proveedor
+            </button>
+          )}
         </td>
       )}
     </tr>

@@ -171,7 +171,7 @@ export async function getExplosionInsumos(budgetId: string): Promise<ActionResul
     // Query separada para evitar ambigüedad de FK en PostgREST (ver presupuestos.ts línea 74).
     const { data: apusData, error: apusError } = await supabase
       .from('apus')
-      .select('activity_id, apu_items(nombre, unidad, tipo, cantidad, precio_unitario)')
+      .select('activity_id, apu_items(nombre, unidad, tipo, cantidad, precio_unitario, proveedor_id)')
       .eq('budget_id', budgetId)
       .eq('user_id', user.id)
       .is('deleted_at', null)
@@ -193,6 +193,7 @@ export async function getExplosionInsumos(budgetId: string): Promise<ActionResul
       cantidad_total: Decimal;
       precio_unitario: Decimal;
       subtotal_total: Decimal;
+      proveedor_id: string | null;
     }>();
 
     for (const activity of activities) {
@@ -211,14 +212,19 @@ export async function getExplosionInsumos(budgetId: string): Promise<ActionResul
         if (existente) {
           existente.cantidad_total = existente.cantidad_total.add(cantidadTotal);
           existente.subtotal_total = existente.subtotal_total.add(subtotal);
+          // Si algún ítem del grupo ya tiene proveedor asignado, conservarlo
+          if (!existente.proveedor_id && item.proveedor_id) {
+            existente.proveedor_id = item.proveedor_id;
+          }
         } else {
           grupos.set(clave, {
-            nombre:         item.nombre,
-            unidad:         item.unidad,
-            tipo:           item.tipo as TipoAPUItem,
-            cantidad_total: cantidadTotal,
+            nombre:          item.nombre,
+            unidad:          item.unidad,
+            tipo:            item.tipo as TipoAPUItem,
+            cantidad_total:  cantidadTotal,
             precio_unitario: precioUnit,
-            subtotal_total: subtotal,
+            subtotal_total:  subtotal,
+            proveedor_id:    item.proveedor_id ?? null,
           });
         }
       }
@@ -240,6 +246,7 @@ export async function getExplosionInsumos(budgetId: string): Promise<ActionResul
         cantidad_total:  g.cantidad_total.toDecimalPlaces(4).toNumber(),
         precio_unitario: g.precio_unitario.toDecimalPlaces(2).toNumber(),
         subtotal_total:  g.subtotal_total.toDecimalPlaces(2).toNumber(),
+        proveedor_id:    g.proveedor_id,
       }));
 
     const totales = { material: new Decimal(0), mano_obra: new Decimal(0), equipo: new Decimal(0), herramienta_menor: new Decimal(0), epp: new Decimal(0) };

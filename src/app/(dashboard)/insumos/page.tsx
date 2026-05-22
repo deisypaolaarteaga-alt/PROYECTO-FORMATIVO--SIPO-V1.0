@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react';
 import {
-  Package, Drill, Star,
+  Package, Drill, Star, HardHat,
   Plus, Search, Trash2, Edit2,
-  ShieldCheck, Loader2, Info, X, Save, UserPlus, Minus
+  ShieldCheck, Loader2, Info, X, Save, UserPlus, Minus, Copy
 } from 'lucide-react';
 import { Card } from '@/components/shared/Card';
 import { Button } from '@/components/shared/Button';
@@ -15,11 +15,11 @@ import {
 } from '@/actions/insumos';
 import {
   getCuadrillas, getTrabajadores, crearCuadrillaPersonalizada, deleteCuadrilla,
-  importarLaborComoTrabajador,
+  updateCuadrilla, importarLaborComoTrabajador,
 } from '@/actions/cuadrillas';
 import { cn } from '@/lib/utils';
 
-type TabId = 'material' | 'equipment' | 'user' | 'crews';
+type TabId = 'material' | 'equipment' | 'labor' | 'user' | 'crews';
 
 interface UserMaterial {
   id: string;
@@ -47,11 +47,14 @@ export default function InsumosPage() {
 
   const [showInsumoModal, setShowInsumoModal] = useState(false);
   const [editItem, setEditItem] = useState<UserMaterial | null>(null);
+  const [prefillData, setPrefillData] = useState<Partial<UserMaterial> | null>(null);
   const [savingInsumo, setSavingInsumo] = useState(false);
   const [insumoError, setInsumoError] = useState('');
   const [deletingInsumoId, setDeletingInsumoId] = useState<string | null>(null);
 
   const [showCuadrillaModal, setShowCuadrillaModal] = useState(false);
+  const [editCuadrilla, setEditCuadrilla] = useState<any | null>(null);
+  const [cuadrillaModalKey, setCuadrillaModalKey] = useState(0);
   const [trabajadoresDisponibles, setTrabajadoresDisponibles] = useState<any[]>([]);
   const [loadingTrabajadores, setLoadingTrabajadores] = useState(false);
   const [trabajadoresSeleccionados, setTrabajadoresSeleccionados] = useState<TrabajadorSeleccionado[]>([]);
@@ -79,6 +82,7 @@ export default function InsumosPage() {
       let res;
       if (tab === 'material') res = await getMaterials();
       else if (tab === 'equipment') res = await getEquipment();
+      else if (tab === 'labor') res = await getTrabajadores();
       else if (tab === 'user') res = await getUserMaterials();
       else if (tab === 'crews') res = await getCuadrillas();
       setData(res || []);
@@ -91,18 +95,31 @@ export default function InsumosPage() {
 
   function openCreateInsumo() {
     setEditItem(null);
+    setPrefillData(null);
     setInsumoError('');
     setShowInsumoModal(true);
     if (tab !== 'user') setTab('user');
   }
+  function openImportarACatalogo(item: any) {
+    setEditItem(null);
+    setInsumoError('');
+    const tipo = tab === 'equipment' ? 'equipo' : tab === 'labor' ? 'mano_obra' : 'material';
+    const precio = item.precio_referencia ?? item.precio_diario ?? item.jornal_con_prestaciones ?? 0;
+    const unidad = item.unidad || (tab === 'equipment' ? 'día' : tab === 'labor' ? 'jornal' : 'und');
+    const nombre = item.nombre ?? item.especialidad ?? '';
+    setPrefillData({ nombre, tipo, unidad, precio_unitario: precio });
+    setShowInsumoModal(true);
+  }
   function openEditInsumo(item: UserMaterial) {
     setEditItem(item);
+    setPrefillData(null);
     setInsumoError('');
     setShowInsumoModal(true);
   }
   function closeInsumoModal() {
     setShowInsumoModal(false);
     setEditItem(null);
+    setPrefillData(null);
     setInsumoError('');
   }
   async function handleInsumoSubmit(e: { preventDefault(): void; currentTarget: HTMLFormElement }) {
@@ -127,17 +144,53 @@ export default function InsumosPage() {
     loadData();
   }
 
+  async function openEditCuadrilla(cuadrilla: any) {
+    setEditCuadrilla(cuadrilla);
+    setCuadrillaError('');
+    setTrabajadoresSeleccionados(
+      (cuadrilla.trabajadores || []).map((t: any) => ({
+        id: t.id,
+        especialidad: t.especialidad,
+        categoria: t.categoria,
+        jornal_base: t.jornal_base,
+        factor_prestacional: t.factor_prestacional ?? 1.5988,
+        cantidad: t.cantidad,
+      }))
+    );
+    setTrabajadorElegido('');
+    setCantidadTrabajador(1);
+    setShowLaborImport(false);
+    setBusquedaLabor('');
+    const rend = cuadrilla.rendimientos?.[0];
+    setRendimientoNormal(rend ? String(rend.rendimiento_normal) : '');
+    setRendimientoUnidad(rend?.unidad ?? 'm²');
+    setRendimientoFuente(rend?.fuente ?? 'SIPO Colombia 2026');
+    setCuadrillaModalKey(k => k + 1);
+    setShowCuadrillaModal(true);
+    if (trabajadoresDisponibles.length === 0) {
+      setLoadingTrabajadores(true);
+      const list = await getTrabajadores();
+      const unicos = list.filter((t, i, self) => i === self.findIndex(x => x.id === t.id));
+      setTrabajadoresDisponibles(unicos);
+      setLoadingTrabajadores(false);
+    }
+    if (laborCatalog.length === 0) {
+      getLabor().then(list => setLaborCatalog(list || []));
+    }
+  }
+
   async function openCreateCuadrilla() {
+    setEditCuadrilla(null);
     setCuadrillaError('');
     setTrabajadoresSeleccionados([]);
     setTrabajadorElegido('');
     setCantidadTrabajador(1);
     setShowLaborImport(false);
     setBusquedaLabor('');
-    // FIX 5: resetear rendimiento al abrir modal
     setRendimientoNormal('');
     setRendimientoUnidad('m²');
     setRendimientoFuente('SIPO Colombia 2026');
+    setCuadrillaModalKey(k => k + 1);
     setShowCuadrillaModal(true);
     if (tab !== 'crews') setTab('crews');
     const promises: Promise<void>[] = [];
@@ -184,6 +237,7 @@ export default function InsumosPage() {
   }
   function closeCuadrillaModal() {
     setShowCuadrillaModal(false);
+    setEditCuadrilla(null);
     setCuadrillaError('');
   }
   function agregarTrabajador() {
@@ -214,7 +268,7 @@ export default function InsumosPage() {
     setSavingCuadrilla(true);
     setCuadrillaError('');
     // FIX 5: incluir rendimiento si fue diligenciado
-    const result = await crearCuadrillaPersonalizada({
+    const payload = {
       nombre: fd.get('nombre') as string,
       descripcion: fd.get('descripcion') as string || undefined,
       categoria_actividad: fd.get('categoria_actividad') as string || undefined,
@@ -225,9 +279,12 @@ export default function InsumosPage() {
       rendimiento_normal: rendimientoNormal ? Number(rendimientoNormal) : undefined,
       rendimiento_unidad: rendimientoNormal ? rendimientoUnidad : undefined,
       rendimiento_fuente: rendimientoNormal ? rendimientoFuente || 'SIPO Colombia 2026' : undefined,
-    });
+    };
+    const result = editCuadrilla
+      ? await updateCuadrilla(editCuadrilla.id, payload)
+      : await crearCuadrillaPersonalizada(payload);
     setSavingCuadrilla(false);
-    if (!result.success) { setCuadrillaError(result.error || 'Error al crear'); return; }
+    if (!result.success) { setCuadrillaError(result.error || (editCuadrilla ? 'Error al actualizar' : 'Error al crear')); return; }
     closeCuadrillaModal();
     loadData();
   }
@@ -254,6 +311,7 @@ export default function InsumosPage() {
   const tabIconClass: Record<string, string> = {
     material:  'bg-[#FAF0EB] text-[#D95510]',
     equipment: 'bg-[#EBFAF0] text-[#166534]',
+    labor:     'bg-[#EEF2FF] text-[#3730A3]',
     user:      'bg-[#FEF3E2] text-[#7A4B00]',
     crews:     'bg-[#E4E7EC] text-[#4B5563]',
   };
@@ -280,7 +338,7 @@ export default function InsumosPage() {
             icon={<Plus className="h-4 w-4" />}
             onClick={tab === 'crews' ? openCreateCuadrilla : openCreateInsumo}
           >
-            {tab === 'crews' ? 'Nueva Cuadrilla' : 'Agregar Propio'}
+            {tab === 'crews' ? 'Nueva Cuadrilla' : tab === 'user' ? 'Agregar Propio' : 'Agregar a Mis Insumos'}
           </Button>
         </div>
       </div>
@@ -290,6 +348,7 @@ export default function InsumosPage() {
         {[
           { id: 'material',  label: 'Materiales',   icon: Package    },
           { id: 'equipment', label: 'Equipos',       icon: Drill      },
+          { id: 'labor',     label: 'Mano de Obra',  icon: HardHat    },
           { id: 'user',      label: 'Mis Insumos',   icon: Star       },
           { id: 'crews',     label: 'Cuadrillas',    icon: ShieldCheck },
         ].map(t => (
@@ -318,15 +377,19 @@ export default function InsumosPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            {/* Tabla genérica: material | labor | equipment | user */}
+            {/* Tabla genérica: material | equipment | labor | user */}
             {tab !== 'crews' && (
               <table className="w-full text-left">
                 <thead className="bg-[#DDE0E6] border-b border-[#D0D4DB]">
                   <tr>
                     <th className="px-6 py-3 text-[9px] font-bold text-[#6B7A8D] uppercase tracking-wide">Descripción</th>
-                    <th className="px-6 py-3 text-[9px] font-bold text-[#6B7A8D] uppercase tracking-wide">Unidad / Categoría</th>
-                    <th className="px-6 py-3 text-[9px] font-bold text-[#6B7A8D] uppercase tracking-wide text-right">Precio Ref. (COP)</th>
-                    <th className="px-6 py-3 w-24"></th>
+                    <th className="px-6 py-3 text-[9px] font-bold text-[#6B7A8D] uppercase tracking-wide">
+                      {tab === 'labor' ? 'Categoría / Ciudad' : 'Unidad / Categoría'}
+                    </th>
+                    <th className="px-6 py-3 text-[9px] font-bold text-[#6B7A8D] uppercase tracking-wide text-right">
+                      {tab === 'labor' ? 'Jornal c/ Prestaciones' : 'Precio Ref. (COP)'}
+                    </th>
+                    <th className="px-6 py-3 w-28"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#E4E7EC]">
@@ -338,23 +401,43 @@ export default function InsumosPage() {
                             "h-8 w-8 rounded-lg flex items-center justify-center shrink-0",
                             tabIconClass[tab] ?? tabIconClass.material
                           )}>
-                            {tab === 'material'  ? <Package className="h-4 w-4" /> :
-                             tab === 'equipment' ? <Drill   className="h-4 w-4" /> : <Star className="h-4 w-4" />}
+                            {tab === 'material'  ? <Package  className="h-4 w-4" /> :
+                             tab === 'equipment' ? <Drill    className="h-4 w-4" /> :
+                             tab === 'labor'     ? <HardHat  className="h-4 w-4" /> :
+                                                   <Star     className="h-4 w-4" />}
                           </div>
                           <div>
                             <p className="text-sm font-semibold text-[#1F2937]">{item.nombre || item.especialidad}</p>
-                            <p className="text-[10px] text-[#6B7A8D] font-medium">{item.departamento || 'Referencia Nacional'}</p>
+                            <p className="text-[10px] text-[#6B7A8D] font-medium">
+                              {tab === 'labor'
+                                ? (item.ciudad_referencia || 'Referencia Nacional')
+                                : (item.departamento || 'Referencia Nacional')}
+                            </p>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-[#4B5563] bg-[#DDE0E6] px-2 py-0.5 rounded uppercase">{item.unidad || 'Día'}</span>
-                          <span className="text-[10px] text-[#6B7A8D] font-semibold uppercase">{item.categoria || item.oficio || item.tipo}</span>
-                        </div>
+                        {tab === 'labor' ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-[#3730A3] bg-[#EEF2FF] px-2 py-0.5 rounded uppercase">{item.categoria || 'Oficial'}</span>
+                            <span className="text-[10px] text-[#6B7A8D] font-semibold">Base: {formatearCOP(item.jornal_base)}</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-[#4B5563] bg-[#DDE0E6] px-2 py-0.5 rounded uppercase">{item.unidad || 'Día'}</span>
+                            <span className="text-[10px] text-[#6B7A8D] font-semibold uppercase">{item.categoria || item.oficio || item.tipo}</span>
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <p className="text-sm font-bold text-[#1F2937] tabular-nums">{formatearCOP(item.precio_referencia || item.precio_diario || item.precio_unitario || item.jornal_base)}</p>
+                        {tab === 'labor' ? (
+                          <div>
+                            <p className="text-sm font-bold text-[#1F2937] tabular-nums">{formatearCOP(item.jornal_con_prestaciones)}</p>
+                            <p className="text-[10px] text-[#6B7A8D]">factor ×{Number(item.factor_prestacional || 1.5988).toFixed(4)}</p>
+                          </div>
+                        ) : (
+                          <p className="text-sm font-bold text-[#1F2937] tabular-nums">{formatearCOP(item.precio_referencia || item.precio_diario || item.precio_unitario || 0)}</p>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-right">
                         {tab === 'user' ? (
@@ -367,7 +450,15 @@ export default function InsumosPage() {
                             </button>
                           </div>
                         ) : (
-                          <span className="text-[9px] font-bold text-[#C8CDD6] uppercase tracking-tighter">Sistema</span>
+                          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => openImportarACatalogo(item)}
+                              className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-[#D95510] hover:bg-[#FAF0EB] rounded-lg transition-colors uppercase"
+                              title="Copiar a Mis Insumos"
+                            >
+                              <Copy className="h-3 w-3" /> Copiar
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -440,6 +531,13 @@ export default function InsumosPage() {
                         {!item.es_sistema ? (
                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
+                              onClick={() => openEditCuadrilla(item)}
+                              className="p-2 hover:bg-[#DDE0E6] rounded-lg text-[#6B7A8D] hover:text-[#4B5563]"
+                              title="Editar"
+                            >
+                              <Edit2 className="h-3.5 w-3.5" />
+                            </button>
+                            <button
                               onClick={() => handleDeleteCuadrilla(item.id)}
                               disabled={deletingCuadrillaId === item.id}
                               className="p-2 hover:bg-[#FEF0F0] rounded-lg text-[#6B7A8D] hover:text-[#991B1B] disabled:opacity-40"
@@ -464,6 +562,7 @@ export default function InsumosPage() {
                 <div className="h-16 w-16 rounded-full bg-[#ECEEF2] flex items-center justify-center mb-4">
                   {tab === 'user'  ? <Star       className="h-8 w-8 text-[#C8CDD6]" /> :
                    tab === 'crews' ? <ShieldCheck className="h-8 w-8 text-[#C8CDD6]" /> :
+                   tab === 'labor' ? <HardHat     className="h-8 w-8 text-[#C8CDD6]" /> :
                    <Info className="h-8 w-8 text-[#C8CDD6]" />}
                 </div>
                 <h3 className="text-base font-semibold text-[#1F2937]">
@@ -512,7 +611,7 @@ export default function InsumosPage() {
           <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-[#D0D4DB] bg-[#ECEEF2]">
               <h2 className="text-sm font-bold text-[#1F2937] uppercase tracking-wider">
-                {editItem ? 'Editar Insumo' : 'Nuevo Insumo Propio'}
+                {editItem ? 'Editar Insumo' : prefillData ? 'Copiar a Mis Insumos' : 'Nuevo Insumo Propio'}
               </h2>
               <button onClick={closeInsumoModal} className="p-1.5 hover:bg-[#DDE0E6] rounded-lg transition-colors">
                 <X className="h-4 w-4 text-[#6B7A8D]" />
@@ -521,11 +620,11 @@ export default function InsumosPage() {
             <form onSubmit={handleInsumoSubmit} className="p-6 space-y-4">
               <div>
                 <label className="block text-xs font-bold text-[#4B5563] uppercase tracking-wider mb-1.5">Nombre <span className="text-[#991B1B]">*</span></label>
-                <input name="nombre" defaultValue={editItem?.nombre || ''} required maxLength={200} placeholder="Ej: Cemento Portland Tipo I" className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all" />
+                <input name="nombre" defaultValue={editItem?.nombre ?? prefillData?.nombre ?? ''} required maxLength={200} placeholder="Ej: Cemento Portland Tipo I" className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-[#4B5563] uppercase tracking-wider mb-1.5">Tipo <span className="text-[#991B1B]">*</span></label>
-                <select name="tipo" defaultValue={editItem?.tipo || 'material'} required className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all bg-white">
+                <select name="tipo" defaultValue={editItem?.tipo ?? prefillData?.tipo ?? 'material'} required className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all bg-white">
                   <option value="material">Material</option>
                   <option value="mano_obra">Mano de Obra</option>
                   <option value="equipo">Equipo</option>
@@ -534,22 +633,22 @@ export default function InsumosPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-[#4B5563] uppercase tracking-wider mb-1.5">Unidad <span className="text-[#991B1B]">*</span></label>
-                  <input name="unidad" defaultValue={editItem?.unidad || ''} required maxLength={20} placeholder="kg, m², día" className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all" />
+                  <input name="unidad" defaultValue={editItem?.unidad ?? prefillData?.unidad ?? ''} required maxLength={20} placeholder="kg, m², día" className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-[#4B5563] uppercase tracking-wider mb-1.5">Precio Unit. <span className="text-[#991B1B]">*</span></label>
-                  <input name="precio_unitario" type="number" defaultValue={editItem?.precio_unitario ?? ''} required min={0} step="0.01" placeholder="0" className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all" />
+                  <input name="precio_unitario" type="number" defaultValue={editItem?.precio_unitario ?? prefillData?.precio_unitario ?? ''} required min={0} step="0.01" placeholder="0" className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all" />
                 </div>
               </div>
               <div>
                 <label className="block text-xs font-bold text-[#4B5563] uppercase tracking-wider mb-1.5">Descripción <span className="text-[#6B7A8D] font-normal normal-case">(opcional)</span></label>
-                <textarea name="descripcion" defaultValue={editItem?.descripcion || ''} maxLength={500} rows={2} placeholder="Especificaciones adicionales..." className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all resize-none" />
+                <textarea name="descripcion" defaultValue={editItem?.descripcion ?? ''} maxLength={500} rows={2} placeholder="Especificaciones adicionales..." className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all resize-none" />
               </div>
               {insumoError && <p className="text-xs text-[#991B1B] bg-[#FEF0F0] px-3 py-2 rounded-lg border border-[#F5C2C2]">{insumoError}</p>}
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={closeInsumoModal} className="flex-1 px-4 py-2.5 border border-[#C8CDD6] rounded-lg text-sm font-semibold text-[#4B5563] hover:bg-[#E4E7EC] transition-colors">Cancelar</button>
                 <button type="submit" disabled={savingInsumo} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-[#D95510] text-white rounded-lg text-sm font-semibold hover:bg-[#C04A0D] transition-colors disabled:opacity-60">
-                  {savingInsumo ? <><Loader2 className="h-4 w-4 animate-spin" /> Guardando...</> : <><Save className="h-4 w-4" /> {editItem ? 'Guardar Cambios' : 'Crear Insumo'}</>}
+                  {savingInsumo ? <><Loader2 className="h-4 w-4 animate-spin" /> Guardando...</> : <><Save className="h-4 w-4" /> {editItem ? 'Guardar Cambios' : prefillData ? 'Agregar a Mis Insumos' : 'Crear Insumo'}</>}
                 </button>
               </div>
             </form>
@@ -563,25 +662,27 @@ export default function InsumosPage() {
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeCuadrillaModal} />
           <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between px-6 py-4 border-b border-[#D0D4DB] bg-[#ECEEF2] shrink-0">
-              <h2 className="text-sm font-bold text-[#1F2937] uppercase tracking-wider">Nueva Cuadrilla Personalizada</h2>
+              <h2 className="text-sm font-bold text-[#1F2937] uppercase tracking-wider">
+                {editCuadrilla ? 'Editar Cuadrilla' : 'Nueva Cuadrilla Personalizada'}
+              </h2>
               <button onClick={closeCuadrillaModal} className="p-1.5 hover:bg-[#DDE0E6] rounded-lg transition-colors">
                 <X className="h-4 w-4 text-[#6B7A8D]" />
               </button>
             </div>
 
-            <form ref={cuadrillaFormRef} onSubmit={handleCuadrillaSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
+            <form key={cuadrillaModalKey} ref={cuadrillaFormRef} onSubmit={handleCuadrillaSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
                   <label className="block text-xs font-bold text-[#4B5563] uppercase tracking-wider mb-1.5">Nombre <span className="text-[#991B1B]">*</span></label>
-                  <input name="nombre" required maxLength={150} placeholder="Ej: Cuadrilla Mampostería" className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all" />
+                  <input name="nombre" required maxLength={150} defaultValue={editCuadrilla?.nombre ?? ''} placeholder="Ej: Cuadrilla Mampostería" className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-[#4B5563] uppercase tracking-wider mb-1.5">Categoría</label>
-                  <input name="categoria_actividad" maxLength={100} placeholder="Ej: Mampostería" className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all" />
+                  <input name="categoria_actividad" maxLength={100} defaultValue={editCuadrilla?.categoria_actividad ?? ''} placeholder="Ej: Mampostería" className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-[#4B5563] uppercase tracking-wider mb-1.5">Descripción</label>
-                  <input name="descripcion" maxLength={300} placeholder="Opcional" className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all" />
+                  <input name="descripcion" maxLength={300} defaultValue={editCuadrilla?.descripcion ?? ''} placeholder="Opcional" className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all" />
                 </div>
               </div>
 
@@ -758,7 +859,7 @@ export default function InsumosPage() {
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={closeCuadrillaModal} className="flex-1 px-4 py-2.5 border border-[#C8CDD6] rounded-lg text-sm font-semibold text-[#4B5563] hover:bg-[#E4E7EC] transition-colors">Cancelar</button>
                 <button type="submit" disabled={savingCuadrilla} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-[#D95510] text-white rounded-lg text-sm font-semibold hover:bg-[#C04A0D] transition-colors disabled:opacity-60">
-                  {savingCuadrilla ? <><Loader2 className="h-4 w-4 animate-spin" /> Creando...</> : <><Save className="h-4 w-4" /> Crear Cuadrilla</>}
+                  {savingCuadrilla ? <><Loader2 className="h-4 w-4 animate-spin" /> {editCuadrilla ? 'Guardando...' : 'Creando...'}</> : <><Save className="h-4 w-4" /> {editCuadrilla ? 'Guardar Cambios' : 'Crear Cuadrilla'}</>}
                 </button>
               </div>
             </form>

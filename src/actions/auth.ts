@@ -13,7 +13,7 @@ import type { ActionResult } from '@/types';
 /**
  * Iniciar sesión con email y contraseña
  */
-export async function signIn(formData: FormData): Promise<ActionResult> {
+export async function signIn(formData: FormData, captchaToken?: string): Promise<ActionResult> {
   const raw = {
     email: formData.get('email') as string,
     password: formData.get('password') as string,
@@ -28,9 +28,13 @@ export async function signIn(formData: FormData): Promise<ActionResult> {
   const { error } = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
     password: parsed.data.password,
+    options: { captchaToken },
   });
 
   if (error) {
+    if (error.message.includes('captcha')) {
+      return { success: false, error: 'Verificación de seguridad fallida. Intenta de nuevo.' };
+    }
     if (error.message.includes('Email not confirmed')) {
       return { success: false, error: 'Debes confirmar tu email primero. Revisa tu bandeja de entrada (incluyendo spam).' };
     }
@@ -49,7 +53,7 @@ export async function signIn(formData: FormData): Promise<ActionResult> {
 /**
  * Registrar nuevo usuario
  */
-export async function signUp(formData: FormData): Promise<ActionResult> {
+export async function signUp(formData: FormData, captchaToken?: string): Promise<ActionResult> {
   const raw = {
     nombre_completo: formData.get('nombre_completo') as string,
     email: formData.get('email') as string,
@@ -70,12 +74,16 @@ export async function signUp(formData: FormData): Promise<ActionResult> {
     password: parsed.data.password,
     options: {
       emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
-      data: { 
+      captchaToken,
+      data: {
         nombre_completo: parsed.data.nombre_completo,
       }
     }
   });
 
+  if (error?.message?.includes('captcha')) {
+    return { success: false, error: 'Verificación de seguridad fallida. Intenta de nuevo.' };
+  }
   if (error?.message?.includes('already registered')) {
     return { success: false, error: 'Este email ya tiene una cuenta registrada.' };
   }

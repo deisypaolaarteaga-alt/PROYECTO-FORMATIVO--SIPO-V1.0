@@ -2,11 +2,12 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Pencil, UserX } from 'lucide-react';
+import { Pencil, UserX, UserCheck } from 'lucide-react';
 import { Button } from '@/components/shared/Button';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { ModalCliente } from '@/components/clientes/ModalCliente';
-import { desactivarCliente } from '@/actions/clientes';
+import { desactivarCliente, reactivarCliente } from '@/actions/clientes';
+import { toast } from 'sonner';
 import type { Cliente } from '@/types';
 
 interface ClienteDetailActionsProps {
@@ -18,6 +19,7 @@ export function ClienteDetailActions({ cliente }: ClienteDetailActionsProps) {
   const [showEdit,       setShowEdit]       = useState(false);
   const [confirmDesact,  setConfirmDesact]  = useState(false);
   const [desactivando,   setDesactivando]   = useState(false);
+  const [reactivando,    setReactivando]    = useState(false);
 
   async function handleDesactivar() {
     setDesactivando(true);
@@ -27,6 +29,18 @@ export function ClienteDetailActions({ cliente }: ClienteDetailActionsProps) {
       router.push('/clientes');
     } else {
       setConfirmDesact(false);
+    }
+  }
+
+  async function handleReactivar() {
+    setReactivando(true);
+    const result = await reactivarCliente(cliente.id);
+    setReactivando(false);
+    if (result.success) {
+      toast.success('Cliente reactivado');
+      router.refresh();
+    } else {
+      toast.error(result.error || 'Error al reactivar');
     }
   }
 
@@ -41,15 +55,28 @@ export function ClienteDetailActions({ cliente }: ClienteDetailActionsProps) {
         >
           Editar
         </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          icon={<UserX className="h-4 w-4 text-red-500" />}
-          className="text-red-500 hover:bg-red-50"
-          onClick={() => setConfirmDesact(true)}
-        >
-          Desactivar
-        </Button>
+        {cliente.activo ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<UserX className="h-4 w-4 text-red-500" />}
+            className="text-red-500 hover:bg-red-50"
+            onClick={() => setConfirmDesact(true)}
+          >
+            Desactivar
+          </Button>
+        ) : (
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<UserCheck className="h-4 w-4 text-green-600" />}
+            className="text-green-600 hover:bg-green-50 border border-green-200"
+            onClick={handleReactivar}
+            disabled={reactivando}
+          >
+            {reactivando ? 'Reactivando…' : 'Reactivar'}
+          </Button>
+        )}
       </div>
 
       <ModalCliente

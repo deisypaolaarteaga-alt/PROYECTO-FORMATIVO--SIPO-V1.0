@@ -259,13 +259,23 @@ export async function deleteProject(id: string): Promise<ActionResult> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { success: false, error: 'No autorizado' };
 
+    const now = new Date().toISOString();
+
     const { error } = await supabase
       .from('projects')
-      .update({ deleted_at: new Date().toISOString() })
+      .update({ deleted_at: now })
       .eq('id', id)
       .eq('user_id', user.id);
 
     if (error) throw error;
+
+    // Cascade: marcar todos los presupuestos del proyecto como borrados
+    await supabase
+      .from('budgets')
+      .update({ deleted_at: now })
+      .eq('project_id', id)
+      .eq('user_id', user.id)
+      .is('deleted_at', null);
 
     revalidatePath('/proyectos');
     return { success: true };

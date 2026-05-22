@@ -5,6 +5,11 @@ import { BarChart3 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import type { DistribucionCDItem } from '@/actions/analytics';
 
+// Paleta de capas de obra: material, mano de obra, equipo
+const MAT_COLOR = '#C84B1A';  // naranja-óxido
+const MO_COLOR  = '#2D5F8A';  // azul-acero medio
+const EQ_COLOR  = '#6B7B4A';  // verde-oliva técnico
+
 interface Props {
   data: DistribucionCDItem[];
 }
@@ -47,17 +52,20 @@ export function DistribucionCDChart({ data }: Props) {
                   >
                     {item.titulo}
                   </span>
-                  <span className="text-[11px] text-stone shrink-0">
+                  <span
+                    className="text-[11px] text-stone shrink-0"
+                    style={{ fontFamily: 'var(--font-mono)' }}
+                  >
                     {formatCurrency(item.costo_directo)}
                   </span>
                 </div>
 
                 {hasApu ? (
-                  <div className="flex h-5 rounded-[4px] overflow-hidden gap-[1px] bg-concrete">
+                  <div className="flex h-4 rounded-[3px] overflow-hidden gap-[1.5px] bg-[#E8E4DE]">
                     {pctMat > 0 && (
                       <div
-                        className="bg-burn-orange flex items-center justify-center shrink-0"
-                        style={{ width: `${pctMat}%` }}
+                        className="flex items-center justify-center shrink-0"
+                        style={{ width: `${pctMat}%`, background: MAT_COLOR }}
                         title={`Materiales: ${pctMat.toFixed(1)}%`}
                       >
                         {pctMat >= 12 && (
@@ -69,8 +77,8 @@ export function DistribucionCDChart({ data }: Props) {
                     )}
                     {pctMO > 0 && (
                       <div
-                        className="bg-steel-mid flex items-center justify-center shrink-0"
-                        style={{ width: `${pctMO}%` }}
+                        className="flex items-center justify-center shrink-0"
+                        style={{ width: `${pctMO}%`, background: MO_COLOR }}
                         title={`Mano de obra: ${pctMO.toFixed(1)}%`}
                       >
                         {pctMO >= 12 && (
@@ -82,8 +90,8 @@ export function DistribucionCDChart({ data }: Props) {
                     )}
                     {pctEq > 0 && (
                       <div
-                        className="bg-green-600 flex items-center justify-center shrink-0"
-                        style={{ width: `${pctEq}%` }}
+                        className="flex items-center justify-center shrink-0"
+                        style={{ width: `${pctEq}%`, background: EQ_COLOR }}
                         title={`Equipos y HM: ${pctEq.toFixed(1)}%`}
                       >
                         {pctEq >= 12 && (
@@ -95,7 +103,7 @@ export function DistribucionCDChart({ data }: Props) {
                     )}
                   </div>
                 ) : (
-                  <div className="h-5 rounded-[4px] bg-sand border border-concrete flex items-center px-2">
+                  <div className="h-4 rounded-[3px] bg-sand border border-concrete flex items-center px-2">
                     <span className="text-[10px] text-stone italic">Sin APU registrado</span>
                   </div>
                 )}
@@ -108,15 +116,15 @@ export function DistribucionCDChart({ data }: Props) {
       {/* Leyenda */}
       <div className="flex items-center gap-4 mt-5 pt-4 border-t border-concrete">
         <div className="flex items-center gap-1.5">
-          <div className="h-2 w-4 rounded-[2px] bg-burn-orange shrink-0" />
+          <div className="h-2 w-4 rounded-[2px] shrink-0" style={{ background: MAT_COLOR }} />
           <span className="text-[11px] text-stone">Materiales</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="h-2 w-4 rounded-[2px] bg-steel-mid shrink-0" />
+          <div className="h-2 w-4 rounded-[2px] shrink-0" style={{ background: MO_COLOR }} />
           <span className="text-[11px] text-stone">Mano de obra</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="h-2 w-4 rounded-[2px] bg-green-600 shrink-0" />
+          <div className="h-2 w-4 rounded-[2px] shrink-0" style={{ background: EQ_COLOR }} />
           <span className="text-[11px] text-stone">Equipos y HM</span>
         </div>
       </div>

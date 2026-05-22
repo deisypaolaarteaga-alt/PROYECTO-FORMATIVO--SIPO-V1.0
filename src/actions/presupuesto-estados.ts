@@ -30,7 +30,7 @@ export async function cambiarEstadoPresupuesto(
     // 1. Obtener estado actual
     const { data: budget, error: fetchErr } = await supabase
       .from('budgets')
-      .select('estado, version, user_id')
+      .select('estado, version, user_id, project_id')
       .eq('id', budgetId)
       .single();
 
@@ -88,7 +88,25 @@ export async function cambiarEstadoPresupuesto(
 
     if (updateErr) throw updateErr;
 
+    // Registrar cambio en audit_log (fire-and-forget)
+    void (async () => {
+      try {
+        await supabase.from('audit_log').insert({
+          tabla: 'budgets',
+          operacion: 'CAMBIO_ESTADO',
+          registro_id: budgetId,
+          user_id: user.id,
+          datos_anteriores: { estado: estadoActual },
+          datos_nuevos: { estado: nuevoEstado, notas: notas || null },
+        });
+      } catch { /* silencioso */ }
+    })();
+
     revalidatePath(`/presupuestos/${budgetId}`);
+    if (budget.project_id) {
+      revalidatePath(`/proyectos/${budget.project_id}`);
+      revalidatePath('/proyectos');
+    }
     return { success: true };
   } catch (error) {
     return { success: false, error: 'Error al cambiar el estado del presupuesto.' };
@@ -96,7 +114,10 @@ export async function cambiarEstadoPresupuesto(
 }
 
 /**
- * Duplica un presupuesto existente (Deep Copy)
+ * Duplica un presupuesto existente usando una función PostgreSQL atómica.
+ * La función fn_duplicar_presupuesto maneja toda la copia en una sola transacción
+ * (capítulos → actividades → APUs → apu_items), eliminando el riesgo de
+ * estados parciales y los timeouts por N round-trips individuales.
  */
 export async function duplicarPresupuesto(budgetId: string): Promise<ActionResult> {
   try {
@@ -104,116 +125,28 @@ export async function duplicarPresupuesto(budgetId: string): Promise<ActionResul
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { success: false, error: 'No autorizado' };
 
-    // 1. Obtener datos completos
-    const { data: b, error: bErr } = await supabase
+    // Obtener project_id antes del RPC para poder revalidar la ruta del proyecto
+    const { data: budget } = await supabase
       .from('budgets')
-      .select(`
-        *,
-        chapters (
-          *,
-          activities (
-            *,
-            apus (
-              *,
-              apu_items (*)
-            )
-          )
-        )
-      `)
+      .select('project_id')
       .eq('id', budgetId)
+      .eq('user_id', user.id)
       .single();
 
-    if (bErr || !b) return { success: false, error: 'Error al cargar origen' };
+    if (!budget) return { success: false, error: 'Presupuesto no encontrado.' };
 
-    // 2. Insertar nuevo presupuesto
-    const { data: newBudget, error: nbErr } = await supabase
-      .from('budgets')
-      .insert({
-        project_id: b.project_id,
-        user_id: user.id,
-        titulo: `${b.titulo} (copia)`,
-        estado: 'borrador',
-        metodo_aiu: b.metodo_aiu,
-        administracion_pct: b.administracion_pct,
-        imprevistos_pct: b.imprevistos_pct,
-        utilidad_pct: b.utilidad_pct,
-        iva_porcentaje: b.iva_porcentaje,
-        metodo_iva: b.metodo_iva,
-        moneda: b.moneda
-      })
-      .select()
-      .single();
+    const { data: newBudgetId, error } = await supabase.rpc('fn_duplicar_presupuesto', {
+      p_budget_id: budgetId,
+      p_user_id:   user.id,
+    });
 
-    if (nbErr) throw nbErr;
+    if (error) throw error;
 
-    // 3. Duplicar Capítulos -> Actividades -> APUs
-    for (const cap of (b.chapters || [])) {
-      const { data: newCap } = await supabase
-        .from('chapters')
-        .insert({
-          budget_id: newBudget.id,
-          user_id: user.id,
-          nombre: cap.nombre,
-          numero: cap.numero
-        })
-        .select()
-        .single();
-
-      if (!newCap) continue;
-
-      for (const act of (cap.activities || [])) {
-        const { data: newAct } = await supabase
-          .from('activities')
-          .insert({
-            chapter_id: newCap.id,
-            budget_id: newBudget.id,
-            user_id: user.id,
-            nombre: act.nombre,
-            unidad: act.unidad,
-            cantidad: act.cantidad,
-            precio_unitario: act.precio_unitario
-          })
-          .select()
-          .single();
-
-        if (!newAct || !act.apus) continue;
-
-        const sourceApu = act.apus?.[0];
-
-        const { data: newApu } = await supabase
-          .from('apus')
-          .insert({
-            activity_id: newAct.id,
-            budget_id: newBudget.id,
-            user_id: user.id,
-            rendimiento: sourceApu?.rendimiento,
-            costo_material: sourceApu?.costo_material,
-            costo_mano_obra: sourceApu?.costo_mano_obra,
-            costo_equipo: sourceApu?.costo_equipo
-          })
-          .select()
-          .single();
-
-        if (!newApu || !sourceApu?.apu_items) continue;
-
-        const itemsToInsert = sourceApu.apu_items.map((i: any) => ({
-          apu_id: newApu.id,
-          user_id: user.id,
-          nombre: i.nombre,
-          tipo: i.tipo,
-          unidad: i.unidad,
-          cantidad: i.cantidad,
-          precio_unitario: i.precio_unitario
-        }));
-
-        await supabase.from('apu_items').insert(itemsToInsert);
-      }
-    }
-
-    revalidatePath(`/proyectos/${b.project_id}`);
-    return { success: true, data: { id: newBudget.id } };
+    revalidatePath(`/proyectos/${budget.project_id}`);
+    revalidatePath('/proyectos');
+    return { success: true, data: { id: newBudgetId } };
   } catch (error) {
-    console.error('Error duplicar:', error);
+    console.error('[duplicarPresupuesto]', error);
     return { success: false, error: 'Error al duplicar el presupuesto.' };
   }
 }

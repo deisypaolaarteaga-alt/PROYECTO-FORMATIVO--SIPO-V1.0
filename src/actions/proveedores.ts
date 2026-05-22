@@ -214,6 +214,37 @@ export async function asignarProveedorAInsumos(
   }
 }
 
+export async function getInsumosDelProveedor(proveedorId: string) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data: prov } = await supabase
+      .from('proveedores')
+      .select('id')
+      .eq('id', proveedorId)
+      .eq('user_id', user.id)
+      .single();
+    if (!prov) return [];
+
+    const { data, error } = await supabase
+      .from('apu_items')
+      .select('id, nombre, unidad, tipo, cantidad, precio_unitario, subtotal')
+      .eq('proveedor_id', proveedorId)
+      .is('deleted_at', null)
+      .order('tipo')
+      .order('nombre')
+      .limit(100);
+
+    if (error) throw error;
+    return data || [];
+  } catch (err) {
+    console.error('[getInsumosDelProveedor] error:', err);
+    return [];
+  }
+}
+
 export async function buscarProveedores(
   query: string
 ): Promise<Pick<Proveedor, 'id' | 'nombre_razon_social' | 'nit_cedula' | 'ciudad' | 'categoria'>[]> {

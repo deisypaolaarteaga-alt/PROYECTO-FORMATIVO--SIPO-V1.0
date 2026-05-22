@@ -13,10 +13,14 @@
     "seed:apu:reset": "tsx scripts/seed-apu-items.ts --reset",
     "seed:catalogo-items": "tsx scripts/seed_catalogo_items_2026.ts",
     "seed:catalogo-items:reset": "tsx scripts/seed_catalogo_items_2026.ts --reset",
-    "seed:catalogo-items:dry": "tsx scripts/seed_catalogo_items_2026.ts --dry-run"
+    "seed:catalogo-items:dry": "tsx scripts/seed_catalogo_items_2026.ts --dry-run",
+    "diagnostico:huerfanos": "tsx scripts/diagnostico-capitulos-huerfanos.ts",
+    "reimportar:huerfanos": "tsx scripts/reimportar-capitulos-huerfanos.ts",
+    "reimportar:huerfanos:dry": "tsx scripts/reimportar-capitulos-huerfanos.ts --dry-run"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.92.0",
+    "@hcaptcha/react-hcaptcha": "^2.0.2",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@radix-ui/react-slot": "^1.2.4",

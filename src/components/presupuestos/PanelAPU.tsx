@@ -13,13 +13,14 @@ import { getCuadrillas } from '@/actions/cuadrillas';
 import { BuscadorInsumos } from '@/components/insumos/BuscadorInsumos';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import type { ActivityWithAPU } from '@/types';
 
 const UNIDADES = ['m²','m³','ml','kg','gl','un','hr','pto','día','ton'];
 
 interface PanelAPUProps {
   isOpen: boolean;
   onClose: () => void;
-  activity: any;
+  activity: ActivityWithAPU;
   budgetId: string;
 }
 
@@ -271,7 +272,7 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
               </div>
               <div className="text-right px-4">
                 <p className="text-[10px] font-medium text-stone uppercase">P.U. Estimado</p>
-                <p className="text-lg font-bold text-burn-orange leading-none">{formatearCOP(totals.costoDirecto)}</p>
+                <p className="text-lg font-bold text-burn-orange leading-none" style={{ fontFamily: 'var(--font-mono)' }}>{formatearCOP(totals.costoDirecto)}</p>
               </div>
               <button onClick={onClose} className="p-2 hover:bg-sand rounded-full transition-colors duration-150">
                 <X className="h-5 w-5 text-stone" />
@@ -409,18 +410,18 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
               <section className="space-y-4 border-t border-concrete pt-6">
                 <div className="flex items-center justify-between border-b border-concrete pb-2">
                   <div className="flex items-center gap-2">
-                    <Package className="h-4 w-4 text-success-text" />
+                    <Package className="h-4 w-4 text-[#C84B1A]" />
                     <h4 className="text-xs font-semibold text-ink uppercase tracking-tight">Materiales</h4>
                   </div>
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => { setSearchType('material'); setShowSearch(true); }}
-                      className="p-1 hover:bg-success-bg rounded text-success-text transition-colors duration-150"
+                      className="p-1 hover:bg-[#FAF0EB] rounded text-[#C84B1A] transition-colors duration-150"
                       title="Buscar en catálogo"
                     >
                       <Search className="h-4 w-4" />
                     </button>
-                    <button onClick={() => addItem('material')} className="p-1 hover:bg-success-bg rounded text-success-text transition-colors duration-150" title="Agregar manual">
+                    <button onClick={() => addItem('material')} className="p-1 hover:bg-[#FAF0EB] rounded text-[#C84B1A] transition-colors duration-150" title="Agregar manual">
                       <Plus className="h-4 w-4" />
                     </button>
                   </div>
@@ -466,18 +467,18 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
               <section className="space-y-4 border-t border-concrete pt-6">
                 <div className="flex items-center justify-between border-b border-concrete pb-2">
                   <div className="flex items-center gap-2">
-                    <Drill className="h-4 w-4 text-steel-mid" />
+                    <Drill className="h-4 w-4 text-[#6B7B4A]" />
                     <h4 className="text-xs font-semibold text-ink uppercase tracking-tight">Equipos y Alquileres</h4>
                   </div>
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => { setSearchType('equipo'); setShowSearch(true); }}
-                      className="p-1 hover:bg-steel-fog rounded text-steel-mid transition-colors duration-150"
+                      className="p-1 hover:bg-[#E8F0E0] rounded text-[#6B7B4A] transition-colors duration-150"
                       title="Buscar en catálogo"
                     >
                       <Search className="h-4 w-4" />
                     </button>
-                    <button onClick={() => addItem('equipo')} className="p-1 hover:bg-steel-fog rounded text-steel-mid transition-colors duration-150">
+                    <button onClick={() => addItem('equipo')} className="p-1 hover:bg-[#E8F0E0] rounded text-[#6B7B4A] transition-colors duration-150">
                       <Plus className="h-4 w-4" />
                     </button>
                   </div>
@@ -550,22 +551,22 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
             </div>
 
             {/* Footer Summary */}
-            <div className="p-6 bg-white border-t border-concrete space-y-4 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
-              <div className="grid grid-cols-2 gap-y-2 text-[11px] font-medium uppercase tracking-wider text-stone">
+            <div className="p-6 bg-[#1A2535] border-t border-[#0F1922] space-y-4">
+              <div className="grid grid-cols-2 gap-y-2 text-[11px] font-medium uppercase tracking-wider text-white/50">
                 <span>Materiales</span>
-                <span className="text-right text-ink">{formatearCOP(totals.mat)}</span>
+                <span className="text-right text-white/80" style={{ fontFamily: 'var(--font-mono)' }}>{formatearCOP(totals.mat)}</span>
                 <span>Cuadrillas</span>
-                <span className="text-right text-ink">{formatearCOP(totals.mo)}</span>
+                <span className="text-right text-white/80" style={{ fontFamily: 'var(--font-mono)' }}>{formatearCOP(totals.mo)}</span>
                 <span>Equipos</span>
-                <span className="text-right text-ink">{formatearCOP(totals.eq)}</span>
+                <span className="text-right text-white/80" style={{ fontFamily: 'var(--font-mono)' }}>{formatearCOP(totals.eq)}</span>
                 <span>Seguridad</span>
-                <span className="text-right text-ink">{formatearCOP(totals.hm + totals.epp)}</span>
+                <span className="text-right text-white/80" style={{ fontFamily: 'var(--font-mono)' }}>{formatearCOP(totals.hm + totals.epp)}</span>
               </div>
 
-              <div className="pt-4 border-t border-concrete flex justify-between items-end">
+              <div className="pt-4 border-t border-white/10 flex justify-between items-end">
                 <div>
-                  <p className="text-[10px] font-semibold text-steel-mid uppercase tracking-widest mb-1">Costo Directo APU</p>
-                  <p className="text-3xl font-bold text-ink leading-none">{formatearCOP(totals.costoDirecto)}</p>
+                  <p className="text-[10px] font-semibold text-white/50 uppercase tracking-widest mb-1">Costo Directo APU</p>
+                  <p className="text-3xl font-bold text-white leading-none" style={{ fontFamily: 'var(--font-mono)' }}>{formatearCOP(totals.costoDirecto)}</p>
                 </div>
                 <Button
                   onClick={handleApply}

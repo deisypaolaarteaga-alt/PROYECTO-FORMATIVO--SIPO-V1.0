@@ -3,7 +3,7 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { checkRateLimit } from '@/lib/security/rate-limit';
-import type { ActionResult, CatalogoCapitulo } from '@/types';
+import type { ActionResult, CatalogoCapitulo, CatalogoActividad } from '@/types';
 
 type TipoCatalogo = 'residencial' | 'comercial' | 'industrial' | 'infraestructura' | 'institucional' | 'hotelero';
 
@@ -458,5 +458,66 @@ export async function crearPresupuestoConPlantilla(
   } catch (error: any) {
     console.error('crearPresupuestoConPlantilla error:', error);
     return { success: false, error: 'No se pudo crear el presupuesto desde la plantilla.' };
+  }
+}
+
+export async function importarActividadAInsumos(
+  actividad: Pick<CatalogoActividad, 'id' | 'nombre' | 'unidad' | 'precio_referencia_nacional'>
+): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'No autorizado.' };
+
+    const { error } = await supabase
+      .from('user_materials')
+      .insert({
+        user_id: user.id,
+        nombre: actividad.nombre,
+        tipo: 'material',
+        unidad: actividad.unidad,
+        precio_unitario: Number(actividad.precio_referencia_nacional) || 0,
+      });
+
+    if (error) {
+      if (error.code === '23505') return { success: false, error: 'Este insumo ya está en tu catálogo personal.' };
+      throw error;
+    }
+
+    revalidatePath('/insumos');
+    return { success: true };
+  } catch (error: any) {
+    console.error('importarActividadAInsumos:', error);
+    return { success: false, error: 'No se pudo importar el insumo.' };
+  }
+}
+
+export async function sugerirCorreccionPrecio(
+  actividadId: string,
+  precioActual: number,
+  precioSugerido: number,
+  comentario?: string
+): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'No autorizado.' };
+
+    if (precioSugerido <= 0) return { success: false, error: 'El precio sugerido debe ser mayor a cero.' };
+
+    const { error } = await supabase.from('audit_log').insert({
+      tabla: 'catalogo_actividades',
+      operacion: 'SUGERENCIA_PRECIO',
+      registro_id: actividadId,
+      user_id: user.id,
+      datos_anteriores: { precio_actual: precioActual },
+      datos_nuevos: { precio_sugerido: precioSugerido, comentario: comentario?.trim() || null },
+    });
+
+    if (error) throw error;
+    return { success: true };
+  } catch (error: any) {
+    console.error('sugerirCorreccionPrecio:', error);
+    return { success: false, error: 'No se pudo enviar la sugerencia.' };
   }
 }

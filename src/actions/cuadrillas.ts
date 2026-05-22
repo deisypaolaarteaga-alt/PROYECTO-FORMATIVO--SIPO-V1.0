@@ -201,6 +201,73 @@ export async function crearCuadrillaPersonalizada(data: {
 }
 
 /**
+ * Actualiza una cuadrilla personalizada del usuario:
+ * reemplaza trabajadores y rendimientos existentes.
+ */
+export async function updateCuadrilla(
+  id: string,
+  data: {
+    nombre: string;
+    descripcion?: string;
+    categoria_actividad?: string;
+    trabajadores: { trabajador_id: string; cantidad: number }[];
+    rendimiento_normal?: number;
+    rendimiento_unidad?: string;
+    rendimiento_fuente?: string;
+  }
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: 'No autorizado' };
+
+  const { data: existing } = await supabase
+    .from('cuadrillas')
+    .select('id')
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .eq('es_sistema', false)
+    .maybeSingle();
+  if (!existing) return { success: false, error: 'Cuadrilla no encontrada o sin permisos' };
+
+  const { error: updErr } = await supabase
+    .from('cuadrillas')
+    .update({
+      nombre: data.nombre,
+      descripcion: data.descripcion ?? null,
+      categoria_actividad: data.categoria_actividad ?? null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .eq('user_id', user.id);
+  if (updErr) return { success: false, error: 'No se pudo actualizar la cuadrilla' };
+
+  await supabase.from('cuadrilla_trabajadores').delete().eq('cuadrilla_id', id);
+  if (data.trabajadores.length > 0) {
+    const { error: trabErr } = await supabase
+      .from('cuadrilla_trabajadores')
+      .insert(data.trabajadores.map(t => ({
+        cuadrilla_id: id,
+        trabajador_id: t.trabajador_id,
+        cantidad: t.cantidad,
+      })));
+    if (trabErr) return { success: false, error: 'Error al actualizar trabajadores' };
+  }
+
+  await supabase.from('rendimientos').delete().eq('cuadrilla_id', id);
+  if (data.rendimiento_normal && data.rendimiento_unidad) {
+    await supabase.from('rendimientos').insert({
+      cuadrilla_id: id,
+      actividad_tipo: data.categoria_actividad || 'General',
+      unidad: data.rendimiento_unidad,
+      rendimiento_normal: data.rendimiento_normal,
+      fuente: data.rendimiento_fuente || 'SIPO Colombia 2026',
+    });
+  }
+
+  return { success: true };
+}
+
+/**
  * Elimina una cuadrilla personalizada del usuario (nunca las de sistema)
  */
 export async function deleteCuadrilla(id: string): Promise<{ success: boolean; error?: string }> {
@@ -260,6 +327,51 @@ function mapearOficio(oficio: string): string {
   if (o.includes('especialista') || o.includes('técnico') || o.includes('tec') ||
       o.includes('operador') || o.includes('topógrafo')) return 'especialista';
   return 'oficial';
+}
+
+/**
+ * Agrega un trabajador a una cuadrilla existente del usuario.
+ * Si el trabajador ya está en la cuadrilla, suma la cantidad.
+ */
+export async function agregarTrabajadorACuadrilla(
+  cuadrillaId: string,
+  trabajadorId: string,
+  cantidad: number
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: 'No autorizado' };
+
+  const { data: cuadrilla } = await supabase
+    .from('cuadrillas')
+    .select('id')
+    .eq('id', cuadrillaId)
+    .eq('user_id', user.id)
+    .eq('es_sistema', false)
+    .maybeSingle();
+
+  if (!cuadrilla) return { success: false, error: 'Cuadrilla no encontrada o sin permisos' };
+
+  const { data: existing } = await supabase
+    .from('cuadrilla_trabajadores')
+    .select('id, cantidad')
+    .eq('cuadrilla_id', cuadrillaId)
+    .eq('trabajador_id', trabajadorId)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase
+      .from('cuadrilla_trabajadores')
+      .update({ cantidad: Number(existing.cantidad) + cantidad })
+      .eq('id', existing.id);
+    return error ? { success: false, error: 'Error al actualizar cantidad' } : { success: true };
+  }
+
+  const { error } = await supabase
+    .from('cuadrilla_trabajadores')
+    .insert({ cuadrilla_id: cuadrillaId, trabajador_id: trabajadorId, cantidad });
+
+  return error ? { success: false, error: 'No se pudo agregar el trabajador' } : { success: true };
 }
 
 /**

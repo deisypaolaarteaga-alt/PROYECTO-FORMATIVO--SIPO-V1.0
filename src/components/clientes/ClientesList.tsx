@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useTransition, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Search, Building2, User, MoreVertical,
   Edit, Trash2, ExternalLink, Plus, Download,
   ChevronLeft, ChevronRight, SlidersHorizontal,
-  ChevronDown,
+  ChevronDown, MapPin, Loader2,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -16,7 +16,7 @@ import {
   DropdownMenuItem,
 } from '@/components/shared/DropdownMenu';
 import { ModalCliente } from './ModalCliente';
-import { desactivarCliente } from '@/actions/clientes';
+import { desactivarCliente, getClientes } from '@/actions/clientes';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
 
@@ -125,67 +125,105 @@ interface ClientesListProps {
 }
 
 export function ClientesList({ initialClientes }: ClientesListProps) {
-  const [clientes, setClientes] = useState(initialClientes);
-  useEffect(() => setClientes(initialClientes), [initialClientes]);
+  // allClientes: lista completa para estadísticas del sidebar (se actualiza con cada refresh del server)
+  const [allClientes, setAllClientes] = useState(initialClientes);
+  // filteredClientes: resultado de la última búsqueda server-side (inicio = lista completa)
+  const [filteredClientes, setFilteredClientes] = useState(initialClientes);
 
   const [busqueda, setBusqueda] = useState('');
   const [filtroTipo, setFiltroTipo] = useState('todos');
+  const [filtroCiudad, setFiltroCiudad] = useState('todas');
   const [pagina, setPagina] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [clienteAEditar, setClienteAEditar] = useState<any>(undefined);
+  const [isPending, startTransition] = useTransition();
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const router = useRouter();
 
-  const clientesFiltrados = useMemo(() => {
-    return clientes.filter(c => {
-      const q = busqueda.toLowerCase();
-      const matchBusqueda = q === '' ||
-        c.nombre_razon_social.toLowerCase().includes(q) ||
-        (c.nit_cedula || '').toLowerCase().includes(q) ||
-        (c.nombre_contacto || '').toLowerCase().includes(q);
-      const matchTipo = filtroTipo === 'todos' || c.tipo === filtroTipo;
-      return matchBusqueda && matchTipo;
-    });
-  }, [clientes, busqueda, filtroTipo]);
+  // Cuando el server hace refresh (crear/editar/eliminar), sincroniza el sidebar y resetea la tabla
+  useEffect(() => {
+    setAllClientes(initialClientes);
+    setFilteredClientes(initialClientes);
+    setBusqueda('');
+    setFiltroTipo('todos');
+    setFiltroCiudad('todas');
+    setPagina(1);
+  }, [initialClientes]);
 
-  const totalPaginas = Math.max(1, Math.ceil(clientesFiltrados.length / PAGE_SIZE));
+  // Ciudades únicas extraídas de la lista completa (para el dropdown de ciudad)
+  const ciudades = useMemo(() => {
+    const set = new Set(allClientes.map(c => c.ciudad).filter(Boolean));
+    return Array.from(set).sort() as string[];
+  }, [allClientes]);
+
+  function fetchFiltered(q: string, tipo: string, ciudad: string) {
+    startTransition(async () => {
+      const data = await getClientes({
+        busqueda: q || undefined,
+        tipo: tipo !== 'todos' ? tipo : undefined,
+        ciudad: ciudad !== 'todas' ? ciudad : undefined,
+      });
+      setFilteredClientes(data);
+    });
+  }
+
+  function handleBusqueda(q: string) {
+    setBusqueda(q);
+    setPagina(1);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => fetchFiltered(q, filtroTipo, filtroCiudad), 300);
+  }
+
+  function handleFiltroTipo(tipo: string) {
+    setFiltroTipo(tipo);
+    setPagina(1);
+    fetchFiltered(busqueda, tipo, filtroCiudad);
+  }
+
+  function handleFiltroCiudad(ciudad: string) {
+    setFiltroCiudad(ciudad);
+    setPagina(1);
+    fetchFiltered(busqueda, filtroTipo, ciudad);
+  }
+
+  const totalPaginas = Math.max(1, Math.ceil(filteredClientes.length / PAGE_SIZE));
   const paginaActual = Math.min(pagina, totalPaginas);
-  const clientesPagina = clientesFiltrados.slice(
+  const clientesPagina = filteredClientes.slice(
     (paginaActual - 1) * PAGE_SIZE,
     paginaActual * PAGE_SIZE,
   );
 
-  const totalEmpresa = clientes.filter(c => c.tipo === 'empresa').length;
-  const totalNatural = clientes.filter(c => c.tipo === 'persona_natural').length;
+  // Sidebar usa allClientes (no se ve afectada por filtros activos)
+  const totalEmpresa = allClientes.filter(c => c.tipo === 'empresa').length;
+  const totalNatural = allClientes.filter(c => c.tipo === 'persona_natural').length;
   const actividadReciente = useMemo(() =>
-    [...clientes]
+    [...allClientes]
       .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
       .slice(0, 5),
-    [clientes],
+    [allClientes],
   );
-
-  function handleFiltro(tipo: string) { setFiltroTipo(tipo); setPagina(1); }
-  function handleBusqueda(q: string) { setBusqueda(q); setPagina(1); }
 
   async function handleDesactivar(id: string, nombre: string) {
     if (!confirm(`¿Desactivar a "${nombre}"? Ya no aparecerá en el listado.`)) return;
     const res = await desactivarCliente(id);
     if (res.success) {
       toast.success('Cliente desactivado');
-      setClientes(prev => prev.filter(c => c.id !== id));
+      setAllClientes(prev => prev.filter(c => c.id !== id));
+      setFilteredClientes(prev => prev.filter(c => c.id !== id));
     } else {
       toast.error(res.error || 'Error al desactivar');
     }
   }
 
   function handleExportar() {
-    const headers = ['Nombre/Razón Social', 'NIT/Cédula', 'Tipo', 'Contacto', 'Cargo', 'Email', 'Teléfono', 'Ciudad', 'Proyectos', 'Inversión Total'];
-    const rows = clientes.map(c => [
+    const headers = ['Nombre/Razón Social', 'NIT/Cédula', 'Tipo', 'Contacto', 'Cargo', 'Email', 'Teléfono', 'Ciudad', 'Proyectos', 'Presupuestos', 'Inversión Total'];
+    const rows = filteredClientes.map(c => [
       c.nombre_razon_social, c.nit_cedula || '',
       c.tipo === 'empresa' ? 'Persona Jurídica' : 'Persona Natural',
       c.nombre_contacto || '', c.cargo_contacto || '',
       c.email || '', c.telefono || '', c.ciudad || '',
-      c.total_proyectos || 0, c.valor_total_proyectos || 0,
+      c.total_proyectos || 0, c.total_presupuestos || 0, c.valor_total_proyectos || 0,
     ]);
     const csv = [headers, ...rows]
       .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
@@ -200,6 +238,7 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
   }
 
   const tipoLabel = TIPO_OPTIONS.find(o => o.value === filtroTipo)?.label ?? 'Todos los tipos';
+  const ciudadLabel = filtroCiudad === 'todas' ? 'Todas las ciudades' : filtroCiudad;
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 items-start">
@@ -220,7 +259,7 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
             />
           </div>
 
-          {/* Tipo filter — styled dropdown trigger */}
+          {/* Tipo filter */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="h-10 px-3.5 flex items-center gap-2 border border-[#E5E7EB] rounded-lg text-sm bg-white text-[#374151] hover:bg-[#F9FAFB] transition-colors whitespace-nowrap">
@@ -233,7 +272,7 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
               {TIPO_OPTIONS.map(opt => (
                 <DropdownMenuItem
                   key={opt.value}
-                  onClick={() => handleFiltro(opt.value)}
+                  onClick={() => handleFiltroTipo(opt.value)}
                   className={filtroTipo === opt.value ? 'font-semibold text-[#D95510]' : ''}
                 >
                   {opt.label}
@@ -242,12 +281,42 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
             </DropdownMenuContent>
           </DropdownMenu>
 
+          {/* Ciudad filter — solo visible si hay ciudades registradas */}
+          {ciudades.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className={`h-10 px-3.5 flex items-center gap-2 border rounded-lg text-sm bg-white text-[#374151] hover:bg-[#F9FAFB] transition-colors whitespace-nowrap ${filtroCiudad !== 'todas' ? 'border-[#D95510] text-[#D95510]' : 'border-[#E5E7EB]'}`}>
+                  <MapPin className="h-3.5 w-3.5 text-[#6B7280]" />
+                  {ciudadLabel}
+                  <ChevronDown className="h-3.5 w-3.5 text-[#9CA3AF]" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem
+                  onClick={() => handleFiltroCiudad('todas')}
+                  className={filtroCiudad === 'todas' ? 'font-semibold text-[#D95510]' : ''}
+                >
+                  Todas las ciudades
+                </DropdownMenuItem>
+                {ciudades.map(c => (
+                  <DropdownMenuItem
+                    key={c}
+                    onClick={() => handleFiltroCiudad(c)}
+                    className={filtroCiudad === c ? 'font-semibold text-[#D95510]' : ''}
+                  >
+                    {c}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
           <div className="flex-1" />
 
           {/* Exportar */}
           <button
             onClick={handleExportar}
-            disabled={clientes.length === 0}
+            disabled={filteredClientes.length === 0}
             className="h-10 px-4 flex items-center gap-2 border border-[#E5E7EB] rounded-lg text-sm text-[#374151] bg-white hover:bg-[#F9FAFB] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Download className="h-4 w-4 text-[#6B7280]" />
@@ -265,19 +334,25 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
         </div>
 
         {/* ── Table card ── */}
-        <div className="bg-white border border-[#E5E7EB] rounded-2xl overflow-hidden shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
-          {clientesFiltrados.length === 0 ? (
+        <div className={`bg-white border border-[#E5E7EB] rounded-2xl overflow-hidden shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] transition-opacity duration-150 ${isPending ? 'opacity-60' : 'opacity-100'}`}>
+          {isPending && (
+            <div className="flex items-center gap-2 px-5 py-2.5 bg-[#FFF4EE] border-b border-[#FDBA74]">
+              <Loader2 className="h-3.5 w-3.5 text-[#D95510] animate-spin" />
+              <span className="text-[12px] text-[#D95510] font-medium">Buscando…</span>
+            </div>
+          )}
+          {filteredClientes.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center px-6">
               <div className="bg-[#F3F4F6] p-4 rounded-full mb-4">
                 <User className="h-8 w-8 text-[#9CA3AF]" />
               </div>
               <h3 className="font-semibold text-[#111827] mb-1">No hay clientes</h3>
               <p className="text-sm text-[#6B7280] max-w-xs">
-                {busqueda || filtroTipo !== 'todos'
+                {busqueda || filtroTipo !== 'todos' || filtroCiudad !== 'todas'
                   ? 'No se encontraron clientes con los filtros aplicados.'
                   : 'Aún no tienes clientes registrados. Crea el primero.'}
               </p>
-              {!busqueda && filtroTipo === 'todos' && (
+              {!busqueda && filtroTipo === 'todos' && filtroCiudad === 'todas' && (
                 <button
                   onClick={() => { setClienteAEditar(undefined); setIsModalOpen(true); }}
                   className="mt-5 h-10 px-4 flex items-center gap-2 bg-[#D95510] text-white rounded-lg text-sm font-semibold hover:bg-[#C44A0C] transition-colors"
@@ -435,12 +510,12 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
           )}
 
           {/* Footer */}
-          {clientesFiltrados.length > 0 && (
+          {filteredClientes.length > 0 && (
             <div className="px-5 py-3.5 border-t border-[#F3F4F6] bg-[#FAFAFA] flex items-center justify-between gap-4">
               <span className="text-sm text-[#6B7280]">
-                {clientesFiltrados.length <= PAGE_SIZE
-                  ? `${clientesFiltrados.length} cliente${clientesFiltrados.length !== 1 ? 's' : ''}`
-                  : `Mostrando ${(paginaActual - 1) * PAGE_SIZE + 1}–${Math.min(paginaActual * PAGE_SIZE, clientesFiltrados.length)} de ${clientesFiltrados.length} clientes`}
+                {filteredClientes.length <= PAGE_SIZE
+                  ? `${filteredClientes.length} cliente${filteredClientes.length !== 1 ? 's' : ''}`
+                  : `Mostrando ${(paginaActual - 1) * PAGE_SIZE + 1}–${Math.min(paginaActual * PAGE_SIZE, filteredClientes.length)} de ${filteredClientes.length} clientes`}
               </span>
 
               {totalPaginas > 1 && (
@@ -494,7 +569,7 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
           <h3 className="font-semibold text-[#111827] mb-5 text-sm">
             Distribución por tipo de cliente
           </h3>
-          <DonutChart total={clientes.length} empresa={totalEmpresa} natural={totalNatural} />
+          <DonutChart total={allClientes.length} empresa={totalEmpresa} natural={totalNatural} />
           <div className="mt-5 space-y-2">
             {[
               { color: 'bg-[#1E6FB8]', label: 'Persona Jurídica', count: totalEmpresa },
@@ -507,9 +582,9 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
                 </div>
                 <span className="font-semibold text-[#111827]">
                   {count}
-                  {clientes.length > 0 && (
+                  {allClientes.length > 0 && (
                     <span className="text-[#9CA3AF] font-normal ml-1 text-xs">
-                      ({Math.round((count / clientes.length) * 100)}%)
+                      ({Math.round((count / allClientes.length) * 100)}%)
                     </span>
                   )}
                 </span>

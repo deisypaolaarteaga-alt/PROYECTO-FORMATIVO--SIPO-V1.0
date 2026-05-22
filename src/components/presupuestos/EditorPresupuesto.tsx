@@ -34,10 +34,11 @@ import { ModalCatalogo } from './ModalCatalogo';
 import { BotonEnviarRevision } from './BotonEnviarRevision';
 import { EstadoBadge } from './EstadoBadge';
 import { ExplosionInsumosView } from './ExplosionInsumosView';
+import type { BudgetCompleto, ActivityWithAPU, Profile } from '@/types';
 
 interface EditorPresupuestoProps {
-  budget: any;
-  profile: any;
+  budget: BudgetCompleto;
+  profile: Profile;
 }
 
 function formatRelativeTime(date: Date): string {
@@ -48,21 +49,22 @@ function formatRelativeTime(date: Date): string {
 }
 
 export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPresupuestoProps) {
-  const [budget, setBudget] = useState(initialBudget);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [budget, setBudget] = useState<any>(initialBudget);
   const [expanded, setExpanded] = useState<Set<string>>(
-    new Set(initialBudget.chapters?.map((c: any) => c.id) || [])
+    new Set(initialBudget.chapters?.map((c) => c.id) || [])
   );
 
   useEffect(() => {
     setBudget(initialBudget);
-    setExpanded(new Set(initialBudget.chapters?.map((c: any) => c.id) || []));
+    setExpanded(new Set(initialBudget.chapters?.map((c) => c.id) || []));
   }, [initialBudget]);
 
   const [activeTab, setActiveTab] = useState<'estructura' | 'insumos' | 'resumen'>('estructura');
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [, forceRefreshTime] = useState(0);
-  const [activeApuActivity, setActiveApuActivity] = useState<any | null>(null);
+  const [activeApuActivity, setActiveApuActivity] = useState<ActivityWithAPU | null>(null);
   const [confirmState, setConfirmState] = useState<{
     title: string; description?: string; onConfirm: () => void;
     confirmLabel?: string; variant?: 'danger' | 'warning';
@@ -269,9 +271,9 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
 
   const handleMoveActivity = async (actId: string, fromChId: string, toChId: string) => {
     if (fromChId === toChId) return;
-    const act = budget.chapters
+    const act = (budget.chapters ?? [])
       .find((c: any) => c.id === fromChId)
-      ?.activities.find((a: any) => a.id === actId);
+      ?.activities?.find((a: any) => a.id === actId);
     if (!act) return;
     setBudget((prev: any) => ({
       ...prev,
@@ -342,26 +344,26 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
   ] as const;
 
   return (
-    <div className="flex flex-col h-full bg-[#ECEEF2] font-sans">
+    <div className="flex flex-col h-full bg-[#F5F2EE] font-sans">
 
       {/* ── HEADER ─────────────────────────────────────────────────────────── */}
-      <div className="bg-white border-b border-[#D0D4DB] px-6 py-4 sticky top-0 z-20 shadow-sm">
+      <div className="bg-white border-b border-[#E8E4DE] px-6 py-4 sticky top-0 z-20 shadow-sm">
         <div className="flex items-start justify-between gap-6">
 
           {/* Izquierda: título + estado + fecha */}
           <div className="flex items-start gap-3 min-w-0">
-            <div className="mt-0.5 h-9 w-9 rounded-lg bg-[#E4E7EC] flex items-center justify-center shrink-0">
-              <FileText className="h-5 w-5 text-[#6B7A8D]" />
+            <div className="mt-0.5 h-9 w-9 rounded-lg bg-[#FAF0EB] flex items-center justify-center shrink-0">
+              <FileText className="h-5 w-5 text-[#C84B1A]" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 {estaAprobado ? (
-                  <span className="text-xl font-bold text-[#1F2937] max-w-sm truncate">{budget.titulo}</span>
+                  <span className="text-xl font-bold text-[#1C1814] max-w-sm truncate">{budget.titulo}</span>
                 ) : (
                   <InputEditable
                     value={budget.titulo}
                     onChange={(val) => handleUpdateBudget({ titulo: val })}
-                    className="text-xl font-bold text-[#1F2937] max-w-sm"
+                    className="text-xl font-bold text-[#1C1814] max-w-sm"
                   />
                 )}
                 <EstadoBadge
@@ -386,13 +388,13 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
               {!bloqueado && (
                 <div className="h-7 flex items-center">
                   {isSaving ? (
-                    <span className="flex items-center gap-1.5 text-[11px] text-[#6B7A8D]">
+                    <span className="flex items-center gap-1.5 text-[11px] text-stone">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       Guardando…
                     </span>
                   ) : lastSaved ? (
-                    <span className="flex items-center gap-1.5 text-[11px] text-[#6B7A8D]">
-                      <Check className="h-3.5 w-3.5 text-[#166534]" />
+                    <span className="flex items-center gap-1.5 text-[11px] text-stone">
+                      <Check className="h-3.5 w-3.5 text-[#2D7A45]" />
                       Guardado {formatRelativeTime(lastSaved)}
                     </span>
                   ) : null}
@@ -407,7 +409,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                 <button
                   onClick={handleAprobar}
                   disabled={isChangingEstado}
-                  className="inline-flex items-center gap-1.5 h-8 px-3 text-[13px] font-semibold rounded-lg bg-[#D95510] hover:bg-[#C04A0D] text-white disabled:opacity-60 transition-colors"
+                  className="inline-flex items-center gap-1.5 h-8 px-3 text-[13px] font-semibold rounded-lg bg-[#C84B1A] hover:bg-[#A83A14] text-white disabled:opacity-60 transition-colors"
                 >
                   <CheckCircle2 className="h-4 w-4" />
                   {isChangingEstado ? 'Aprobando…' : 'Marcar como aprobado'}
@@ -431,7 +433,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                     },
                   })}
                   disabled={isChangingEstado}
-                  className="inline-flex items-center gap-1.5 h-8 px-3 text-[13px] font-semibold rounded-lg border border-[#6B7A8D]/30 text-[#6B7A8D] hover:text-[#1F2937] hover:border-[#1F2937] disabled:opacity-60 transition-colors"
+                  className="inline-flex items-center gap-1.5 h-8 px-3 text-[13px] font-semibold rounded-lg border border-[#E8E4DE] text-stone hover:text-[#1C1814] hover:border-[#1C1814] disabled:opacity-60 transition-colors"
                 >
                   <LockOpen className="h-4 w-4" />
                   Reabrir para edición
@@ -448,15 +450,15 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
 
             {/* Fila inferior: total */}
             <div className="text-right">
-              <p className="text-[10px] text-[#6B7A8D] uppercase font-bold tracking-widest">Total Presupuesto</p>
-              <p className="text-3xl font-black text-[#1F2937] leading-none">{formatearCOP(totalGeneral)}</p>
+              <p className="text-[10px] text-stone uppercase font-bold tracking-widest">Total Presupuesto</p>
+              <p className="text-3xl font-black text-[#1C1814] leading-none" style={{ fontFamily: 'var(--font-mono)' }}>{formatearCOP(totalGeneral)}</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* ── TABS ──────────────────────────────────────────────────────────── */}
-      <div className="bg-white border-b border-[#D0D4DB] px-6 flex items-center gap-0">
+      <div className="bg-white border-b border-[#E8E4DE] px-6 flex items-center gap-0">
         {tabs.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
@@ -464,8 +466,8 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
             className={cn(
               'px-4 py-3.5 text-sm font-medium transition-colors duration-150 border-b-2 -mb-px flex items-center gap-2 whitespace-nowrap',
               activeTab === key
-                ? 'border-[#D95510] text-[#1F2937]'
-                : 'border-transparent text-[#6B7A8D] hover:text-[#1F2937]'
+                ? 'border-[#C84B1A] text-[#1C1814]'
+                : 'border-transparent text-stone hover:text-[#1C1814]'
             )}
           >
             <Icon className="h-4 w-4" />
@@ -542,34 +544,34 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
             const otrosCapitulos = (budget.chapters || []).filter((c: any) => c.id !== ch.id);
 
             return (
-              <div key={ch.id || `ch-${idx}`} className="bg-white rounded-xl border border-[#D0D4DB] overflow-hidden shadow-sm">
+              <div key={ch.id || `ch-${idx}`} className="bg-white rounded-xl border border-[#E8E4DE] border-l-[3px] border-l-[#C84B1A] overflow-hidden shadow-sm">
 
                 {/* Header capítulo */}
                 <div
-                  className="bg-[#DDE0E6] px-5 py-3.5 flex items-center justify-between cursor-pointer hover:bg-[#D0D4DB]/60 transition-colors duration-150"
+                  className="bg-[#F5F0EA] px-5 py-3.5 flex items-center justify-between cursor-pointer hover:bg-[#EDE6DC] transition-colors duration-150"
                   onClick={() => toggleChapter(ch.id)}
                 >
                   <div className="flex items-center gap-3">
                     {isExpanded
                       ? <ChevronDown className="h-4 w-4 text-[#6B7A8D] shrink-0" />
                       : <ChevronRight className="h-4 w-4 text-[#6B7A8D] shrink-0" />}
-                    <span className="h-6 w-6 rounded bg-[#FAF0EB] flex items-center justify-center shrink-0 text-[10px] font-bold text-[#D95510]">
+                    <span className="h-6 w-6 rounded bg-[#FAF0EB] flex items-center justify-center shrink-0 text-[10px] font-bold text-[#C84B1A]">
                       {String(idx + 1).padStart(2, '0')}
                     </span>
-                    <span className="font-semibold text-[#4B5563] text-[11px] uppercase">
+                    <span className="font-semibold text-[#1C1814] text-[11px] uppercase">
                       {(ch.nombre ?? '').replace(/^\d{2,3}\.\s*/, '')}
                     </span>
                   </div>
                   <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
-                    <span className="font-semibold text-[#4B5563] text-sm tabular-nums">{formatearCOP(chTotal)}</span>
+                    <span className="font-semibold text-[#1C1814] text-sm tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>{formatearCOP(chTotal)}</span>
                     {pctCD && (
-                      <span className="text-[11px] font-bold text-[#D95510] bg-[#FAF0EB] px-2 py-0.5 rounded-full border border-[#D95510]/20">
+                      <span className="text-[11px] font-bold text-[#C84B1A] bg-[#FAF0EB] px-2 py-0.5 rounded-full border border-[#C84B1A]/20">
                         {pctCD}% CD
                       </span>
                     )}
                     <button
                       onClick={() => handleDeleteChapter(ch.id)}
-                      className="text-[#6B7A8D] hover:text-[#991B1B] transition-colors duration-150 p-1 rounded"
+                      className="text-stone hover:text-[#991B1B] transition-colors duration-150 p-1 rounded"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -580,7 +582,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                 {isExpanded && (
                   <div>
                     <table className="w-full text-sm text-left">
-                      <thead className="text-[9px] text-[#6B7A8D] uppercase tracking-wide bg-[#DDE0E6] border-b border-[#D0D4DB]">
+                      <thead className="text-[9px] text-stone uppercase tracking-wide bg-[#F0EDE8] border-b border-[#E8E4DE]">
                         <tr>
                           <th className="w-8 px-2 py-2.5" />
                           <th className="px-4 py-2.5 font-medium">Descripción</th>
@@ -591,7 +593,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                           <th className="px-3 py-2.5 w-28 text-right">Acciones</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-[#E4E7EC]">
+                      <tbody className="divide-y divide-[#F0EDE8]">
                         {(ch.activities || []).map((act: any, aIdx: number) => (
                           <tr
                             key={act.id || `act-${aIdx}`}
@@ -603,23 +605,23 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                             className={cn(
                               'group transition-colors duration-100',
                               dragOverActId === act.id && dragSrcChId === ch.id
-                                ? 'border-t-2 border-[#D95510] bg-[#FAF0EB]/30'
-                                : 'hover:bg-[#DDE0E6]',
+                                ? 'border-t-2 border-[#C84B1A] bg-[#FAF0EB]/30'
+                                : 'hover:bg-[#F5F0EA]',
                               dragSrcActId === act.id && 'opacity-40'
                             )}
                           >
                             {/* Drag handle */}
                             <td className="px-2 py-2.5 text-center">
-                              <GripVertical className="h-4 w-4 text-[#C8CDD6] group-hover:text-[#6B7A8D] cursor-grab active:cursor-grabbing mx-auto transition-colors" />
+                              <GripVertical className="h-4 w-4 text-[#E0DAD4] group-hover:text-stone cursor-grab active:cursor-grabbing mx-auto transition-colors" />
                             </td>
 
                             {/* Descripción */}
                             <td className="px-4 py-2.5">
-                              <div className="rounded hover:bg-[#E4E7EC] focus-within:ring-1 focus-within:ring-[#6B7A8D]/30 transition-colors px-1 -mx-1 cursor-text">
+                              <div className="rounded hover:bg-[#EDE6DC] focus-within:ring-1 focus-within:ring-[#C84B1A]/20 transition-colors px-1 -mx-1 cursor-text">
                                 <InputEditable
                                   value={act.nombre || act.descripcion || ''}
                                   onChange={(val) => handleUpdateAct(act.id, ch.id, { nombre: val })}
-                                  className="text-[#1F2937] w-full"
+                                  className="text-[#1C1814] w-full"
                                 />
                               </div>
                             </td>
@@ -629,7 +631,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                               <select
                                 value={act.unidad ?? 'un'}
                                 onChange={(e) => handleUpdateAct(act.id, ch.id, { unidad: e.target.value })}
-                                className="bg-transparent border-none focus:ring-0 p-0 text-[#6B7A8D] text-xs font-medium cursor-pointer hover:text-[#1F2937] transition-colors"
+                                className="bg-transparent border-none focus:ring-0 p-0 text-stone text-xs font-medium cursor-pointer hover:text-[#1C1814] transition-colors"
                               >
                                 {['m²', 'ml', 'm³', 'kg', 'gl', 'un', 'pza', 'glb'].map(u => (
                                   <option key={u} value={u}>{u}</option>
@@ -639,30 +641,30 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
 
                             {/* Cantidad */}
                             <td className="px-3 py-2.5">
-                              <div className="rounded hover:bg-[#E4E7EC] focus-within:ring-1 focus-within:ring-[#6B7A8D]/30 transition-colors px-1 -mx-1 cursor-text">
+                              <div className="rounded hover:bg-[#EDE6DC] focus-within:ring-1 focus-within:ring-[#C84B1A]/20 transition-colors px-1 -mx-1 cursor-text">
                                 <input
                                   type="number"
                                   value={act.cantidad}
                                   onFocus={(e) => e.target.select()}
                                   onChange={(e) => handleUpdateAct(act.id, ch.id, { cantidad: parseFloat(e.target.value) || 0 })}
-                                  className="w-full bg-transparent border-none focus:ring-0 p-0 text-right text-[#4B5563] text-sm"
+                                  className="w-full bg-transparent border-none focus:ring-0 p-0 text-right text-stone text-sm"
                                 />
                               </div>
                             </td>
 
                             {/* Precio unitario */}
                             <td className="px-3 py-2.5">
-                              <div className="rounded hover:bg-[#E4E7EC] focus-within:ring-1 focus-within:ring-[#6B7A8D]/30 transition-colors px-1 -mx-1 cursor-text">
+                              <div className="rounded hover:bg-[#EDE6DC] focus-within:ring-1 focus-within:ring-[#C84B1A]/20 transition-colors px-1 -mx-1 cursor-text">
                                 <InputPrecio
                                   value={act.precio_unitario}
                                   onChange={(val) => handleUpdateAct(act.id, ch.id, { precio_unitario: val })}
-                                  className="text-right text-[#4B5563] font-medium text-sm"
+                                  className="text-right text-stone font-medium text-sm"
                                 />
                               </div>
                             </td>
 
                             {/* Total */}
-                            <td className="px-3 py-2.5 text-right font-semibold text-[#4B5563] tabular-nums text-sm">
+                            <td className="px-3 py-2.5 text-right font-semibold text-[#1C1814] tabular-nums text-sm" style={{ fontFamily: 'var(--font-mono)' }}>
                               {formatearCOP(Number(act.cantidad) * Number(act.precio_unitario))}
                             </td>
 
@@ -683,7 +685,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <button
-                                      className="p-1 rounded text-[#6B7A8D] hover:text-[#1F2937] hover:bg-[#E4E7EC] transition-colors duration-150"
+                                      className="p-1 rounded text-stone hover:text-[#1C1814] hover:bg-[#EDE6DC] transition-colors duration-150"
                                       title="Más acciones"
                                     >
                                       <MoreHorizontal className="h-4 w-4" />
@@ -701,7 +703,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                                     {otrosCapitulos.length > 0 && (
                                       <>
                                         <DropdownMenuSeparator />
-                                        <DropdownMenuLabel className="text-[10px] text-[#6B7A8D] uppercase tracking-widest font-bold px-2 py-1">
+                                        <DropdownMenuLabel className="text-[10px] text-stone uppercase tracking-widest font-bold px-2 py-1">
                                           Mover a capítulo
                                         </DropdownMenuLabel>
                                         {otrosCapitulos.map((oc: any, ocIdx: number) => (
@@ -710,7 +712,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                                             onClick={() => handleMoveActivity(act.id, ch.id, oc.id)}
                                             className="gap-2 cursor-pointer text-xs"
                                           >
-                                            <span className="h-4 w-4 rounded bg-[#E4E7EC] text-[#6B7A8D] flex items-center justify-center text-[9px] font-bold shrink-0">
+                                            <span className="h-4 w-4 rounded bg-[#F0EDE8] text-stone flex items-center justify-center text-[9px] font-bold shrink-0">
                                               {String((budget.chapters || []).findIndex((c: any) => c.id === oc.id) + 1).padStart(2, '0')}
                                             </span>
                                             <span className="truncate">{oc.nombre.replace(/^\d{2,3}\.\s*/, '')}</span>
@@ -740,7 +742,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                     <div className="px-5 py-3 bg-white border-t border-[#E4E7EC]">
                       <button
                         onClick={() => handleAddActivity(ch.id)}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-[#FAF0EB] text-[#D95510] hover:bg-[#D95510] hover:text-white rounded-lg text-xs font-semibold border border-[#D95510]/20 hover:border-[#D95510] transition-all duration-150"
+                        className="flex items-center gap-2 px-3 py-1.5 bg-[#FAF0EB] text-[#C84B1A] hover:bg-[#C84B1A] hover:text-white rounded-lg text-xs font-semibold border border-[#C84B1A]/20 hover:border-[#C84B1A] transition-all duration-150"
                       >
                         <Plus className="h-3.5 w-3.5" />
                         Agregar actividad
@@ -757,7 +759,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
             <Button
               onClick={handleAddChapter}
               variant="secondary"
-              className="flex-1 border-dashed border-2 py-7 bg-[#ECEEF2] hover:bg-[#DDE0E6]/60 transition-colors duration-150"
+              className="flex-1 border-dashed border-2 py-7 bg-[#F5F2EE] hover:bg-[#EDE6DC] transition-colors duration-150"
             >
               <Plus className="mr-2 h-5 w-5" /> Agregar nuevo capítulo
             </Button>
@@ -774,14 +776,14 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
           {/* Columna Derecha: Sticky Sidebar (30%) */}
           <div className="w-full lg:w-[340px] xl:w-[380px] shrink-0 sticky top-0 space-y-6">
               {/* Configuración AIU / IVA */}
-              <div className="bg-white p-6 rounded-xl border border-[#D0D4DB] space-y-5">
-                <h3 className="text-sm font-semibold text-[#1F2937] flex items-center gap-2">
-                  <Settings className="text-[#6B7A8D] h-4 w-4" /> Configuración de Cascada
+              <div className="bg-white p-6 rounded-xl border border-[#E8E4DE] space-y-5">
+                <h3 className="text-sm font-semibold text-[#1C1814] flex items-center gap-2">
+                  <Settings className="text-stone h-4 w-4" /> Configuración de Cascada
                 </h3>
 
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-[#6B7A8D] uppercase tracking-widest">
+                    <label className="text-[10px] font-bold text-stone uppercase tracking-widest">
                       AIU Total (%)
                     </label>
                     <div className="flex items-center gap-2">
@@ -789,15 +791,15 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                         type="number"
                         value={budget.aiu_porcentaje ?? 0}
                         onChange={(e) => handleUpdateBudget({ aiu_porcentaje: parseFloat(e.target.value) || 0 })}
-                        className="w-full h-11 bg-[#ECEEF2] border border-[#D0D4DB] rounded-lg px-3 focus:ring-1 focus:ring-[#D95510]/40 font-semibold text-lg text-[#1F2937]"
+                        className="w-full h-11 bg-[#F5F2EE] border border-[#E8E4DE] rounded-lg px-3 focus:ring-1 focus:ring-[#C84B1A]/40 font-semibold text-lg text-[#1C1814]"
                       />
                       <span className="text-lg font-semibold text-[#6B7A8D]">%</span>
                     </div>
-                    <p className="text-[10px] text-[#6B7A8D] italic">Se aplica sobre el costo directo total.</p>
+                    <p className="text-[10px] text-stone italic">Se aplica sobre el costo directo total.</p>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-[#6B7A8D] uppercase tracking-widest">
+                    <label className="text-[10px] font-bold text-stone uppercase tracking-widest">
                       IVA sobre Utilidad
                     </label>
                     <button
@@ -805,45 +807,45 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                       className={cn(
                         'w-full h-11 rounded-lg font-semibold text-sm transition-all duration-150 border-2',
                         budget.iva_porcentaje > 0
-                          ? 'bg-[#D95510] border-[#D95510] text-white'
-                          : 'bg-white border-[#D0D4DB] text-[#6B7A8D] hover:border-[#D95510] hover:text-[#1F2937]'
+                          ? 'bg-[#C84B1A] border-[#C84B1A] text-white'
+                          : 'bg-white border-[#E8E4DE] text-stone hover:border-[#C84B1A] hover:text-[#1C1814]'
                       )}
                     >
                       {budget.iva_porcentaje > 0 ? '19% Activado' : 'Sin IVA (0%)'}
                     </button>
-                    <p className="text-[10px] text-[#6B7A8D] italic">Aplica 19% sobre la utilidad calculada.</p>
+                    <p className="text-[10px] text-stone italic">Aplica 19% sobre la utilidad calculada.</p>
                   </div>
                 </div>
               </div>
 
               {/* Resumen rápido */}
-              <div className="bg-white p-5 rounded-xl border border-[#D0D4DB]">
+              <div className="bg-white p-5 rounded-xl border border-[#E8E4DE]">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <p className="text-[10px] uppercase tracking-[0.2em] text-[#6B7A8D] font-semibold">Resumen rápido</p>
-                    <p className="text-2xl font-bold text-[#1F2937]">{formatearCOP(totalGeneral)}</p>
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-stone font-semibold">Resumen rápido</p>
+                    <p className="text-2xl font-bold text-[#1C1814]" style={{ fontFamily: 'var(--font-mono)' }}>{formatearCOP(totalGeneral)}</p>
                   </div>
-                  <div className="text-right text-[#6B7A8D] text-xs">
+                  <div className="text-right text-stone text-xs">
                     <p>Costo Directo</p>
-                    <p className="font-semibold text-[#1F2937]">{formatearCOP(subtotalDirecto)}</p>
+                    <p className="font-semibold text-[#1C1814]">{formatearCOP(subtotalDirecto)}</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3 text-sm text-[#6B7A8D]">
-                  <div className="rounded-lg bg-[#ECEEF2] p-3 border border-[#D0D4DB]">
-                    <p className="font-semibold text-[#1F2937] text-xs uppercase tracking-wide">AIU</p>
-                    <p className="mt-1 font-semibold tabular-nums">{formatearCOP(valorAIU)}</p>
+                <div className="grid grid-cols-2 gap-3 text-sm text-stone">
+                  <div className="rounded-lg bg-[#F5F2EE] p-3 border border-[#E8E4DE]">
+                    <p className="font-semibold text-[#1C1814] text-xs uppercase tracking-wide">AIU</p>
+                    <p className="mt-1 font-semibold tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>{formatearCOP(valorAIU)}</p>
                   </div>
-                  <div className="rounded-lg bg-[#ECEEF2] p-3 border border-[#D0D4DB]">
-                    <p className="font-semibold text-[#1F2937] text-xs uppercase tracking-wide">IVA</p>
-                    <p className="mt-1 font-semibold tabular-nums">{formatearCOP(valorIVA)}</p>
+                  <div className="rounded-lg bg-[#F5F2EE] p-3 border border-[#E8E4DE]">
+                    <p className="font-semibold text-[#1C1814] text-xs uppercase tracking-wide">IVA</p>
+                    <p className="mt-1 font-semibold tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>{formatearCOP(valorIVA)}</p>
                   </div>
                 </div>
               </div>
 
               {/* Resumen Financiero Sticky */}
               <ResumenFinanciero budget={budget} />
-              <div className="bg-white p-5 rounded-xl border border-[#D0D4DB]">
-                <h3 className="text-xs font-bold text-[#1F2937] uppercase tracking-[0.15em] mb-3">Exportar Presupuesto</h3>
+              <div className="bg-white p-5 rounded-xl border border-[#E8E4DE]">
+                <h3 className="text-xs font-bold text-[#1C1814] uppercase tracking-[0.15em] mb-3">Exportar Presupuesto</h3>
                 <div className="flex flex-col gap-2">
                   <BotonExportarPDF budget={budget} profile={profile} />
                   <BotonExportarExcel budget={budget} profile={profile} />
@@ -878,7 +880,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
           setActiveApuActivity(null);
           router.refresh();
         }}
-        activity={activeApuActivity}
+        activity={activeApuActivity!}
         budgetId={budget.id}
       />
     </div>

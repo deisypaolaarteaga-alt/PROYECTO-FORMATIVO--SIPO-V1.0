@@ -66,6 +66,7 @@ export function ModalProveedor({ isOpen, onClose, proveedor, onSuccess }: ModalP
         const res = await actualizarProveedor(proveedor.id, validated);
         if (res.success) {
           toast.success('Proveedor actualizado correctamente');
+          onSuccess?.({} as any);
           onClose();
         } else {
           toast.error(res.error || 'Error al actualizar proveedor');

@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Search, ChevronDown, ChevronRight, FileText } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
+import { ESTADO_PRESUPUESTO_CONFIG } from '@/types';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -25,21 +26,13 @@ export type BudgetRow = {
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { key: 'todos',       label: 'Todos',       dot: ''              },
-  { key: 'borrador',    label: 'Borrador',    dot: 'bg-[#D1D5DB]'  },
-  { key: 'en_revision', label: 'En revisión', dot: 'bg-[#D97706]'  },
-  { key: 'aprobado',    label: 'Aprobado',    dot: 'bg-[#16A34A]'  },
-  { key: 'rechazado',   label: 'Rechazado',   dot: 'bg-[#DC2626]'  },
-  { key: 'archivado',   label: 'Archivado',   dot: 'bg-[#9CA3AF]'  },
+  { key: 'todos',       label: 'Todos',       dot: '' },
+  { key: 'borrador',    ...ESTADO_PRESUPUESTO_CONFIG.borrador    },
+  { key: 'en_revision', ...ESTADO_PRESUPUESTO_CONFIG.en_revision },
+  { key: 'aprobado',    ...ESTADO_PRESUPUESTO_CONFIG.aprobado    },
+  { key: 'rechazado',   ...ESTADO_PRESUPUESTO_CONFIG.rechazado   },
+  { key: 'archivado',   ...ESTADO_PRESUPUESTO_CONFIG.archivado   },
 ] as const;
-
-const BADGE: Record<string, { cls: string; label: string }> = {
-  borrador:    { cls: 'bg-[#F3F4F6] text-[#4B5563]',  label: 'Borrador'    },
-  en_revision: { cls: 'bg-[#FFF7ED] text-[#C2410C]',  label: 'En revisión' },
-  aprobado:    { cls: 'bg-[#F0FDF4] text-[#15803D]',  label: 'Aprobado'    },
-  rechazado:   { cls: 'bg-[#FEF2F2] text-[#DC2626]',  label: 'Rechazado'   },
-  archivado:   { cls: 'bg-[#F3F4F6] text-[#9CA3AF]',  label: 'Archivado'   },
-};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -65,7 +58,8 @@ function diasLabel(d: number | null) {
 
 function BudgetRowItem({ row }: { row: BudgetRow }) {
   const [expanded, setExpanded] = useState(false);
-  const badge = BADGE[row.estado] ?? BADGE.borrador;
+  const badge = ESTADO_PRESUPUESTO_CONFIG[row.estado as keyof typeof ESTADO_PRESUPUESTO_CONFIG]
+    ?? ESTADO_PRESUPUESTO_CONFIG.borrador;
 
   const admin  = row.costo_directo * (row.administracion_pct / 100);
   const imprev = row.costo_directo * (row.imprevistos_pct   / 100);
@@ -106,7 +100,7 @@ function BudgetRowItem({ row }: { row: BudgetRow }) {
         </div>
 
         {/* Estado */}
-        <span className={cn('inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium shrink-0 w-[100px] justify-center', badge.cls)}>
+        <span className={cn('inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium shrink-0 w-[100px] justify-center', badge.badge)}>
           {badge.label}
         </span>
 

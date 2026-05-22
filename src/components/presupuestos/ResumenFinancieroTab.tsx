@@ -130,7 +130,31 @@ export function ResumenFinancieroTab({ budget, subtotalDirecto }: ResumenFinanci
       {/* Main Analytics Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
-        {/* Desglose dona */}
+        {/* Estructura AIU y Fiscal — cascada izquierda */}
+        <div className="bg-white p-6 rounded-2xl border border-concrete shadow-sm space-y-6">
+          <h4 className="text-xs font-black text-ink uppercase tracking-widest flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-[#2D7A45]" /> Estructura AIU y Fiscal
+          </h4>
+
+          <div className="space-y-5">
+            <BarraAIU label="Administración"    pct={adminPct}    base={aiuBase} barClass="bg-[#2D5F8A]"   value={fmt(adminValor)} />
+            <BarraAIU label="Imprevistos"       pct={imprevPct}   base={aiuBase} barClass="bg-[#E8A937]"   value={fmt(imprevistosValor)} />
+            <BarraAIU label="Utilidad (ROI Bruto)" pct={utilidadPct} base={aiuBase} barClass="bg-[#2D7A45]" value={fmt(utilidadValor)} valueClass="text-[#2D7A45] font-bold" />
+
+            <div className="pt-4 border-t border-concrete space-y-3">
+              <div className="flex justify-between items-center text-xs font-bold">
+                <span className="text-stone">IVA ({ivaPct}%)</span>
+                <span className="text-ink">{fmt(ivaValor)}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm font-black">
+                <span className="text-ink uppercase tracking-tighter">Total Oferta</span>
+                <span className="text-burn-orange" style={{ fontFamily: 'var(--font-mono)' }}>{fmt(totalGeneral)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Desglose dona — derecha */}
         <div className="bg-white p-6 rounded-2xl border border-concrete shadow-sm space-y-6">
           <div className="flex items-center justify-between">
             <h4 className="text-xs font-black text-ink uppercase tracking-widest flex items-center gap-2">
@@ -143,10 +167,10 @@ export function ResumenFinancieroTab({ budget, subtotalDirecto }: ResumenFinanci
             <div className="relative h-40 w-40 shrink-0">
               <svg viewBox="0 0 36 36" className="h-full w-full transform -rotate-90">
                 <circle cx="18" cy="18" r="15.9" fill="transparent" stroke="#E2DDD6" strokeWidth="3.5" />
-                <DonutSlice percentage={desglose.pctMateriales}  color="#D95510" offset={0} />
-                <DonutSlice percentage={desglose.pctManoObra}    color="#1A2535" offset={desglose.pctMateriales} />
-                <DonutSlice percentage={desglose.pctEquipos}     color="#6B7A8D" offset={desglose.pctMateriales + desglose.pctManoObra} />
-                <DonutSlice percentage={desglose.pctHerramienta} color="#C8CDD6" offset={desglose.pctMateriales + desglose.pctManoObra + desglose.pctEquipos} />
+                <DonutSlice percentage={desglose.pctMateriales}  color="#C84B1A" offset={0} />
+                <DonutSlice percentage={desglose.pctManoObra}    color="#2D5F8A" offset={desglose.pctMateriales} />
+                <DonutSlice percentage={desglose.pctEquipos}     color="#6B7B4A" offset={desglose.pctMateriales + desglose.pctManoObra} />
+                <DonutSlice percentage={desglose.pctHerramienta} color="#C8C0B5" offset={desglose.pctMateriales + desglose.pctManoObra + desglose.pctEquipos} />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <span className="text-[10px] font-black text-stone uppercase">CD</span>
@@ -155,34 +179,10 @@ export function ResumenFinancieroTab({ budget, subtotalDirecto }: ResumenFinanci
             </div>
 
             <div className="flex-1 w-full space-y-4">
-              <LegendItem label="Materiales"      value={fmt(desglose.materiales)}      pct={desglose.pctMateriales}  color="bg-[#D95510]" />
-              <LegendItem label="Mano de Obra"    value={fmt(desglose.manoObra)}        pct={desglose.pctManoObra}    color="bg-[#1A2535]" />
-              <LegendItem label="Equipos"         value={fmt(desglose.equipos)}         pct={desglose.pctEquipos}     color="bg-[#6B7A8D]" />
-              <LegendItem label="Herramienta/EPP" value={fmt(desglose.herramientaEpp)}  pct={desglose.pctHerramienta} color="bg-[#C8CDD6]" />
-            </div>
-          </div>
-        </div>
-
-        {/* Estructura AIU y Fiscal */}
-        <div className="bg-white p-6 rounded-2xl border border-concrete shadow-sm space-y-6">
-          <h4 className="text-xs font-black text-ink uppercase tracking-widest flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 text-green-600" /> Estructura AIU y Fiscal
-          </h4>
-
-          <div className="space-y-5">
-            <BarraAIU label="Administración"    pct={adminPct}    base={aiuBase} barClass="bg-steel-mid"    value={fmt(adminValor)} />
-            <BarraAIU label="Imprevistos"       pct={imprevPct}   base={aiuBase} barClass="bg-orange-400"   value={fmt(imprevistosValor)} />
-            <BarraAIU label="Utilidad (ROI Bruto)" pct={utilidadPct} base={aiuBase} barClass="bg-green-500" value={fmt(utilidadValor)} valueClass="text-green-700 font-bold" />
-
-            <div className="pt-4 border-t border-concrete space-y-3">
-              <div className="flex justify-between items-center text-xs font-bold">
-                <span className="text-stone">IVA ({ivaPct}%)</span>
-                <span className="text-ink">{fmt(ivaValor)}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm font-black">
-                <span className="text-ink uppercase tracking-tighter">Total Oferta</span>
-                <span className="text-burn-orange">{fmt(totalGeneral)}</span>
-              </div>
+              <LegendItem label="Materiales"      value={fmt(desglose.materiales)}      pct={desglose.pctMateriales}  color="bg-[#C84B1A]" />
+              <LegendItem label="Mano de Obra"    value={fmt(desglose.manoObra)}        pct={desglose.pctManoObra}    color="bg-[#2D5F8A]" />
+              <LegendItem label="Equipos"         value={fmt(desglose.equipos)}         pct={desglose.pctEquipos}     color="bg-[#6B7B4A]" />
+              <LegendItem label="Herramienta/EPP" value={fmt(desglose.herramientaEpp)}  pct={desglose.pctHerramienta} color="bg-[#C8C0B5]" />
             </div>
           </div>
         </div>
@@ -231,7 +231,7 @@ function StatCard({ label, value, icon, color, highlight = false }: {
           {label}
         </span>
       </div>
-      <p className={cn('text-xl font-black tracking-tight', highlight ? 'text-white' : 'text-ink')}>
+      <p className={cn('text-xl font-black tracking-tight', highlight ? 'text-white' : 'text-ink')} style={{ fontFamily: 'var(--font-mono)' }}>
         {value}
       </p>
     </div>

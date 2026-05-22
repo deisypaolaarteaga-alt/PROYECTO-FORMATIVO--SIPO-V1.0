@@ -7,18 +7,16 @@ interface AvatarProps {
 }
 
 const sizeClasses = {
-  sm: 'h-8 w-8 text-[11px]',
-  md: 'h-10 w-10 text-[13px]',
+  sm: 'h-7 w-7 text-[11px]',
+  md: 'h-9 w-9 text-[13px]',
   lg: 'h-14 w-14 text-[17px]',
 };
 
-/**
- * Avatar — steel-fog bg, steel-dark text, burn-orange initials
- */
 export function Avatar({ name, size = 'md', className }: AvatarProps) {
   const initials = name
     .split(' ')
     .map((n) => n[0])
+    .filter(Boolean)
     .slice(0, 2)
     .join('')
     .toUpperCase();
@@ -26,9 +24,9 @@ export function Avatar({ name, size = 'md', className }: AvatarProps) {
   return (
     <div
       className={cn(
-        'inline-flex items-center justify-center rounded-lg font-medium bg-[#D95510] text-white',
+        'inline-flex items-center justify-center rounded-full font-medium tracking-[0.04em] bg-[#C84B1A] text-white select-none shrink-0',
         sizeClasses[size],
-        className
+        className,
       )}
       aria-label={name}
     >

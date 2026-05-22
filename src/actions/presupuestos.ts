@@ -554,6 +554,20 @@ export async function cambiarEstadoPresupuesto(
       .eq('user_id', user.id);
     if (error) throw error;
 
+    // Registrar cambio en audit_log (fire-and-forget, no bloquea si falla)
+    void (async () => {
+      try {
+        await supabase.from('audit_log').insert({
+          tabla: 'budgets',
+          operacion: 'CAMBIO_ESTADO',
+          registro_id: budgetId,
+          user_id: user.id,
+          datos_anteriores: { estado: budget.estado },
+          datos_nuevos: { estado: nuevoEstado },
+        });
+      } catch { /* silencioso */ }
+    })();
+
     // Auto-avanzar proyecto a 'en_progreso' si acaba de aprobarse el presupuesto
     if (nuevoEstado === 'aprobado') {
       const { data: proyecto } = await supabase

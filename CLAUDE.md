@@ -40,7 +40,10 @@ pnpm run seed:apu:reset      # Wipe and re-seed APU reference items
 pnpm run seed:catalogo-items      # Seed masivo de ítems APU de referencia (Colombia 2026) en catalogo_apu_items
 pnpm run seed:catalogo-items:reset # Wipe and re-seed catalogo items 2026
 pnpm run seed:catalogo-items:dry  # Dry-run: muestra qué insertaría sin escribir en BD
-pnpm exec vitest             # Run calculation engine tests
+pnpm exec vitest                      # Run calculation engine tests
+pnpm run diagnostico:huerfanos        # Diagnóstico: capítulos/actividades sin catalogo_apu_items
+pnpm run reimportar:huerfanos         # Reimportar: insertar items faltantes (idempotente, no borra existentes)
+pnpm run reimportar:huerfanos:dry     # Dry-run: muestra qué insertaría sin tocar la BD
 ```
 
 > **Package manager**: El proyecto usa **pnpm** (migrado de npm el 2026-05-14). Usar `pnpm` para todos los comandos. La flag `--webpack` en `pnpm dev` es permanente — Turbopack causa un FATAL panic en Windows con `@react-pdf/renderer`. (Next.js 16 usa `--webpack` para forzar webpack; `--no-turbo` ya no existe).
@@ -57,7 +60,17 @@ SUPABASE_DB_PASSWORD          # PostgreSQL password (≠ service role key)
 SUPABASE_DB_HOST              # e.g. aws-0-us-west-2.pooler.supabase.com
 SUPABASE_DB_PORT              # 6543 for Transaction pooler
 NEXT_PUBLIC_APP_URL
+NEXT_PUBLIC_HCAPTCHA_SITE_KEY # Site key de hCaptcha — requerida en login y registro.
 ```
+
+### hCaptcha — configuración por entorno
+
+| Entorno | Site Key (frontend) | Captcha secret (Supabase Dashboard → Authentication → Attack Protection) |
+|---------|--------------------|--------------------------------------------------------------------|
+| **Dev** (localhost) | `10000000-ffff-ffff-ffff-000000000001` | `0x0000000000000000000000000000000000000000` |
+| **Producción** | `c6b4e730-e20e-484e-8420-b9b21a242408` | Guardado en gestor de secretos (NO commitearlo aquí) |
+
+> El secret key de producción NO se documenta en este archivo porque CLAUDE.md es commiteado a git. Guardarlo en un gestor de contraseñas o en las variables de entorno del proveedor de hosting.
 
 ## Migration System
 
@@ -69,7 +82,7 @@ NEXT_PUBLIC_APP_URL
 - Triggers: `DROP TRIGGER IF EXISTS name ON table; CREATE TRIGGER ...`
 - Functions: `CREATE OR REPLACE FUNCTION`
 
-### Applied migrations (37 total, in order)
+### Applied migrations (38 total, in order)
 
 | File | Content | Status |
 |------|---------|--------|
@@ -110,12 +123,13 @@ NEXT_PUBLIC_APP_URL
 | `20260517200000_drop_legacy_estado_check.sql` | **Bug fix**: Elimina constraint legado `budgets_estado_check` que bloqueaba la transición `borrador → en_revision` (no incluía `'en_revision'` como valor válido) | ✅ applied |
 | `20260519100000_seed_cuadrillas_base.sql` | **Seed**: 10 cuadrillas de sistema (`es_sistema = true`, `user_id = NULL`) para las categorías base de construcción colombiana — Mampostería, Concreto, Pañete, Hidrosanitaria, Eléctrica, Excavación, Pisos, Pintura, Estructura Metálica, Topografía. Busca trabajadores por nombre exacto sin hardcodear UUIDs. | ✅ applied |
 | `20260519110000_fix_cuadrillas_trabajadores.sql` | **Fix**: Completa los trabajadores de 6 cuadrillas que fallaron por mismatch de tildes (`albañil`, `Topógrafo`, `Ayudante construcción`) en los ILIKE del seed anterior. Usa nombres exactos con tildes. | ✅ applied |
+| `20260520100000_security_rls_audit.sql` | **Security audit**: Corrige 5 vulnerabilidades RLS: (1) `v_resumen_presupuesto` recreada con `security_invoker = true` — sin el flag, la vista bypasseaba RLS y exponía presupuestos de otros usuarios; (2) elimina `budgets_update_own` que anulaba el bloqueo de `aprobado` vía OR lógico; (3) agrega políticas INSERT/DELETE faltantes en `budget_snapshots`; (4) elimina `cuadrillas_usuario_crud` (FOR ALL sin `deleted_at`) que rompía el soft-delete; (5) limpia políticas duplicadas en `ai_conversations/ai_usage/ai_messages`. | ✅ applied |
 
 ### Loose SQL files at root (already applied manually — do NOT re-run)
 
 `cuadrillas_schema.sql`, `ai-tables.sql`, `migration_motor_calculo.sql`, `migration_motor_2026.sql`, `preferences_column.sql`, `trigger-profiles.sql`, `seed.sql`, `seed_cuadrillas.sql`, `seed_data.sql` — these were executed directly in Supabase Dashboard and are **already reflected in the database**. Their triggers and functions are now superseded by `20260507100000_fix_trigger_chain.sql`. Do not add them to `migrate.js`.
 
-## Current Database State (as of 2026-05-19)
+## Current Database State (as of 2026-05-21)
 
 **28 tables + 5 views** in `public` schema. Jornales en `trabajadores` actualizados a SMMLV 2026 ($1.423.500/mes). Tabla `materials` deduplicada (46 filas, índice único en `nombre+categoria`). Key tables and their non-obvious columns:
 
@@ -204,6 +218,8 @@ Always use `decimal.js` for these computations. Fiscal rates by city live in `sr
 | `scripts/master-fill-catalogo-prices.ts` | Variante focada de llenado de precios del catálogo |
 | `scripts/seed_catalogo_items_2026.ts` | Seed masivo de ítems APU de referencia (`catalogo_apu_items`) con proporciones por categoría Colombia 2026 — soporta `--reset` y `--dry-run` |
 | `scripts/verificar-rls.ts` | Verifica aislamiento RLS entre usuarios (crea user_A y user_B, valida que cada uno solo ve sus propios datos) |
+| `scripts/diagnostico-capitulos-huerfanos.ts` | Diagnóstico: lista capítulos/actividades del catálogo sin `catalogo_apu_items` (huérfanos), agrupados por tipo_obra. Soporta `--json`. |
+| `scripts/reimportar-capitulos-huerfanos.ts` | Reimportación: inserta `catalogo_apu_items` en actividades huérfanas usando perfiles INVIAS/IDU 2025 + proporciones por categoría. Soporta `--dry-run`, `--force`. |
 
 ### Supabase Clients — dos tipos
 
@@ -235,11 +251,11 @@ Token reference: `src/lib/design-tokens.ts`. User accent color stored in `profil
 
 ## Known Remaining Tasks
 
-> **Snapshot:** 2026-05-20 — `tsc --noEmit --skipLibCheck` limpio (0 errores), 37 migraciones aplicadas, rama `rama-deisy`. 16 Server Actions, 5 componentes PDF, motor de cálculo con tests Vitest. Nueva ruta `/parametros-fiscales`. 3 scripts nuevos `seed:catalogo-items`. Tabla `cuadrillas` con 10 cuadrillas de sistema + 20 filas en `cuadrilla_trabajadores` + 10 rendimientos INVIAS/IDU 2025.
+> **Snapshot:** 2026-05-21 — `tsc --noEmit --skipLibCheck` limpio (0 errores), 38 migraciones aplicadas, rama `rama-deisy`. 16 Server Actions, 5 componentes PDF, motor de cálculo con tests Vitest. Nueva ruta `/parametros-fiscales`. 3 scripts nuevos `seed:catalogo-items`. Tabla `cuadrillas` con 10 cuadrillas de sistema + 20 filas en `cuadrilla_trabajadores` + 10 rendimientos INVIAS/IDU 2025. Auditoría RLS completada: 5 vulnerabilidades corregidas en `v_resumen_presupuesto`, `budgets`, `budget_snapshots`, `cuadrillas`, `ai_messages`.
 
 ### Pendiente — acción manual requerida
 - Presupuestos creados antes del fix de admin client (2026-05-07) tienen 0 actividades — deben eliminarse y recrearse con "Plantilla Sugerida"
-- Reimportar capítulos del catálogo que existan en BD sin `apu_items` (fueron importados antes del fix del `subtotal` GENERATED)
+- ~~Reimportar capítulos del catálogo que existan en BD sin `apu_items`~~ — Scripts listos: `pnpm run diagnostico:huerfanos` (identifica) + `pnpm run reimportar:huerfanos` (corrige). Correr en ese orden. Scripts: `scripts/diagnostico-capitulos-huerfanos.ts` y `scripts/reimportar-capitulos-huerfanos.ts`.
 
 ### Pendiente — próximas features (prioridad alta)
 ~~- **Panel APU — fix duplicados en apu_items**~~ ✅ 2026-05-18 — `guardarAPU` en `presupuestos.ts`: cuando `payload.id` no viene del cliente, ahora busca primero un APU existente para la actividad (`maybeSingle()` con filtro `activity_id + user_id + deleted_at IS NULL`) antes de insertar uno nuevo. Elimina la condición de carrera que creaba APUs duplicados al guardar dos veces sin recargar.
@@ -247,7 +263,9 @@ Token reference: `src/lib/design-tokens.ts`. User accent color stored in `profil
 
 ### Pendiente — autenticación
 ~~- **`middleware.ts` NO EXISTE**~~ ✅ 2026-05-18 — `src/middleware.ts` creado; llama a `updateSession` de `@/lib/supabase/middleware`. Matcher excluye `_next/static`, `_next/image`, `favicon.ico` y archivos estáticos. Archivos obsoletos `src/proxy.ts` y `src/middleware.ts.bak` eliminados.
+~~- **hCaptcha no integrado en login/registro**~~ ✅ 2026-05-22 — `@hcaptcha/react-hcaptcha` instalado. Widget en `(auth)/login/page.tsx` y `(auth)/registro/page.tsx` con `next/dynamic + ssr:false`. `signIn` y `signUp` en `auth.ts` reciben y pasan `captchaToken` a Supabase. CSP en `next.config.ts` actualizado con dominios de hCaptcha (`js.hcaptcha.com`, `newassets.hcaptcha.com`, `api.hcaptcha.com`). Dev usa test key `10000000-ffff-ffff-ffff-000000000001`; prod usa key real en `.env.production` (gitignored). Ver tabla de configuración en sección Database Connection.
 - **Supabase Auth Dashboard**: Verificar en Authentication → URL Configuration que `Site URL = http://localhost:3000` y Redirect URLs incluye `http://localhost:3000/**`. Sin esto el callback de confirmación de email falla.
+- **Supabase hCaptcha en producción**: Al desplegar, cambiar el Captcha secret en Supabase Dashboard → Authentication → Attack Protection al secret real (guardado fuera de git). En dev usar `0x0000000000000000000000000000000000000000`.
 
 ### Pendiente — deuda técnica
 ~~- **`ResumenFinancieroModal.tsx` en disco sin importar**~~ ✅ 2026-05-18 — archivo ya no existe en el proyecto.

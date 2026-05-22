@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { Mail, Lock, User, Building2, MapPin, Globe, CheckCircle2 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { Card } from '@/components/shared/Card';
 import { Button } from '@/components/shared/Button';
 import { Input } from '@/components/shared/Input';
@@ -10,21 +11,27 @@ import { ErrorMessage } from '@/components/shared/ErrorMessage';
 import { signUp, signInWithGoogle } from '@/actions/auth';
 import { CIUDADES_COLOMBIA } from '@/types';
 
+const HCaptcha = dynamic(() => import('@hcaptcha/react-hcaptcha'), { ssr: false });
+
+const SITE_KEY = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY || '10000000-ffff-ffff-ffff-000000000001';
+
 function IndicadorPassword({ password }: { password: string }) {
   const criterios = [
     { label: 'Mínimo 8 caracteres', ok: password.length >= 8 },
     { label: 'Una mayúscula', ok: /[A-Z]/.test(password) },
     { label: 'Un número', ok: /[0-9]/.test(password) },
-    { label: 'Un carácter especial', ok: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~]/.test(password) },
+    { label: 'Un carácter especial', ok: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~]/.test(password) },
   ];
-  
+
   if (!password) return null;
-  
+
   return (
     <ul className="mt-2 space-y-1">
-      {criterios.map(c => (
-        <li key={c.label} className={`text-xs flex items-center gap-1 
-          ${c.ok ? 'text-green-600' : 'text-red-500'}`}>
+      {criterios.map((c) => (
+        <li
+          key={c.label}
+          className={`text-xs flex items-center gap-1 ${c.ok ? 'text-green-600' : 'text-red-500'}`}
+        >
           {c.ok ? '✅' : '❌'} {c.label}
         </li>
       ))}
@@ -37,14 +44,23 @@ export default function RegistroPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [password, setPassword] = useState('');
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaKey, setCaptchaKey] = useState(0);
+
+  function resetCaptcha() {
+    setCaptchaKey((k) => k + 1);
+    setCaptchaToken(null);
+  }
 
   async function handleSubmit(formData: FormData) {
+    if (!captchaToken) return;
     setLoading(true);
     setError(null);
     try {
-      const result = await signUp(formData);
+      const result = await signUp(formData, captchaToken);
       if (!result.success && result.error) {
         setError(result.error);
+        resetCaptcha();
       }
       if (result.success && result.data) {
         const d = result.data as { needsConfirmation?: boolean };
@@ -58,7 +74,11 @@ export default function RegistroPage() {
   }
 
   async function handleGoogle() {
-    try { await signInWithGoogle(); } catch { /* redirect */ }
+    try {
+      await signInWithGoogle();
+    } catch {
+      // redirect esperado
+    }
   }
 
   if (success) {
@@ -146,7 +166,6 @@ export default function RegistroPage() {
             icon={<Building2 className="h-4 w-4" />}
           />
 
-          {/* Select de ciudad */}
           <div className="w-full space-y-1.5">
             <label htmlFor="ciudad" className="block text-[13px] font-medium text-stone">
               Ciudad (opcional)
@@ -170,7 +189,21 @@ export default function RegistroPage() {
             </div>
           </div>
 
-          <Button type="submit" fullWidth loading={loading} className="mt-2">
+          <HCaptcha
+            key={captchaKey}
+            sitekey={SITE_KEY}
+            onVerify={(token) => setCaptchaToken(token)}
+            onExpire={resetCaptcha}
+            onError={resetCaptcha}
+          />
+
+          <Button
+            type="submit"
+            fullWidth
+            loading={loading}
+            disabled={!captchaToken}
+            className="mt-2"
+          >
             Crear cuenta
           </Button>
         </form>

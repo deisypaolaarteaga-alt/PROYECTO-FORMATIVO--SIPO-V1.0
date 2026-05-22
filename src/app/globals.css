@@ -1,22 +1,35 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
 /* ============================================
    SIPO — Sistema de Diseño Profesional
+   Arquitectura Técnica Refinada
    Paleta Construcción Colombia 2025
    ============================================ */
 
 @theme inline {
+  /* ── Fuentes ── */
+  --font-display: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono:    'IBM Plex Mono', 'Cascadia Code', 'Consolas', monospace;
+  --font-sans:    'IBM Plex Sans', var(--font-inter), 'Inter', system-ui, sans-serif;
+
   /* ── Azules Steel ── */
   --color-steel-dark:   #1C2B3A;
   --color-steel-mid:    #2E4A63;
   --color-steel-light:  #8BA3B8;
   --color-steel-fog:    #E6EFF8;
 
-  /* ── Naranjas Burn ── */
-  --color-burn-orange:  #E8571A;
-  --color-burn-light:   #F07848;
-  --color-burn-pale:    #FFF0E8;
-  --color-burn-deep:    #C44A10;
+  /* ── Naranja Óxido (primario) ── */
+  --color-burn-orange:  #C84B1A;
+  --color-burn-light:   #D9652E;
+  --color-burn-pale:    #FAF0EB;
+  --color-burn-deep:    #A83A14;
+
+  /* ── Dorado Arena (secundario) ── */
+  --color-gold-sand:    #E8A937;
+  --color-gold-light:   #F0C060;
+  --color-gold-pale:    #FEF9EC;
+  --color-gold-deep:    #B8821A;
 
   /* ── Neutros cálidos ── */
   --color-sand:         #F4F2EE;
@@ -30,9 +43,9 @@
   --color-success-bg:     #E8F4E8;
   --color-success-text:   #1A5C2A;
   --color-success-border: #B8D9B8;
-  --color-warning-bg:     #FFF8E6;
-  --color-warning-text:   #7A5800;
-  --color-warning-border: #F0D080;
+  --color-warning-bg:     #FEF9EC;
+  --color-warning-text:   #8C5E00;
+  --color-warning-border: #E8C870;
   --color-info-bg:        #E6EFF8;
   --color-info-text:      #1C4A72;
   --color-info-border:    #A8C4DC;
@@ -43,23 +56,23 @@
   --color-draft-text:     #5A5248;
   --color-draft-border:   #D0CCC6;
 
-  /* ── Compatibilidad legacy (los componentes que aún usan primary-*) ── */
-  --color-primary-50:  #FFF0E8;
-  --color-primary-100: #FFF0E8;
-  --color-primary-200: #F0D080;
-  --color-primary-300: #F07848;
-  --color-primary-400: #F07848;
-  --color-primary-500: #E8571A;
-  --color-primary-600: #C44A10;
-  --color-primary-700: #A83D0E;
+  /* ── Compatibilidad legacy (primary-*) ── */
+  --color-primary-50:  #FAF0EB;
+  --color-primary-100: #FAF0EB;
+  --color-primary-200: #E8956A;
+  --color-primary-300: #D9652E;
+  --color-primary-400: #D9652E;
+  --color-primary-500: #C84B1A;
+  --color-primary-600: #A83A14;
+  --color-primary-700: #8C2E10;
   --color-primary-800: #1C2B3A;
   --color-primary-900: #1C1814;
   --color-primary-950: #1C1814;
 
-  --color-secondary-50:  #FFF8E6;
-  --color-secondary-100: #FFF8E6;
-  --color-secondary-500: #7A5800;
-  --color-secondary-600: #5A4200;
+  --color-secondary-50:  #FEF9EC;
+  --color-secondary-100: #FEF9EC;
+  --color-secondary-500: #E8A937;
+  --color-secondary-600: #B8821A;
 
   --color-neutral-0:   #FFFFFF;
   --color-neutral-50:  #F4F2EE;
@@ -78,9 +91,9 @@
   --color-success-500: #1A5C2A;
   --color-success-600: #1A5C2A;
   --color-success-700: #145220;
-  --color-warning-50:  #FFF8E6;
-  --color-warning-500: #7A5800;
-  --color-warning-600: #5A4200;
+  --color-warning-50:  #FEF9EC;
+  --color-warning-500: #8C5E00;
+  --color-warning-600: #6A4600;
   --color-danger-50:   #FDE8E8;
   --color-danger-500:  #991B1B;
   --color-danger-600:  #7F1D1D;
@@ -89,10 +102,10 @@
   --color-info-500:    #1C4A72;
   --color-info-600:    #1C4A72;
 
-  /* ── Grafito SIPO — tokens nuevos ── */
-  --color-sipo-ember:        #D95510;
+  /* ── Grafito SIPO — tokens ── */
+  --color-sipo-ember:        #C84B1A;
   --color-sipo-ember-dim:    #FAF0EB;
-  --color-sipo-ember-mid:    #F0A882;
+  --color-sipo-ember-mid:    #E8956A;
   --color-sipo-steel:        #1A2535;
   --color-sipo-steel-mid:    #2E4257;
   --color-sipo-steel-muted:  #6B7A8D;
@@ -108,15 +121,12 @@
   /* Semánticos Grafito */
   --color-sipo-success:      #166534;
   --color-sipo-success-bg:   #EBFAF0;
-  --color-sipo-warning:      #7A4B00;
-  --color-sipo-warning-bg:   #FEF3E2;
+  --color-sipo-warning:      #8C5E00;
+  --color-sipo-warning-bg:   #FEF9EC;
   --color-sipo-danger:       #991B1B;
   --color-sipo-danger-bg:    #FEF0F0;
   --color-sipo-info:         #1E4D8C;
   --color-sipo-info-bg:      #EBF2FA;
-
-  /* ── Fuente ── */
-  --font-sans: var(--font-inter), 'Inter', system-ui, sans-serif;
 
   /* ── Sombras (mínimas — bordes hacen el trabajo) ── */
   --shadow-xs: 0 1px 2px 0 rgba(28, 24, 20, 0.04);
@@ -157,9 +167,9 @@
   --sidebar-collapsed-width: 64px;
   --header-height: 60px;
   /* Accent theming — overridden by ThemeProvider */
-  --accent-primary: #D95510;
-  --accent-hover: #C04A0D;
-  --accent-pale: #FAF0EB;
+  --accent-primary: #C84B1A;
+  --accent-hover:   #A83A14;
+  --accent-pale:    #FAF0EB;
 }
 
 * { box-sizing: border-box }
@@ -194,7 +204,7 @@ body {
 
 /* ----------- Selection ----------- */
 ::selection {
-  background-color: #FFF0E8;
+  background-color: #FAF0EB;
   color: #1C1814;
 }
 
@@ -202,3 +212,9 @@ body {
 .accent-bg   { background-color: var(--accent-primary) }
 .accent-text { color: var(--accent-primary) }
 .accent-border { border-color: var(--accent-primary) }
+
+/* ----------- Mono para cifras ----------- */
+.font-figures {
+  font-family: var(--font-mono);
+  font-feature-settings: 'tnum' 1;
+}

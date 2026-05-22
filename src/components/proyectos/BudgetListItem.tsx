@@ -15,8 +15,7 @@ import {
 } from '@/components/shared/DropdownMenu';
 import { eliminarPresupuesto, cambiarEstadoPresupuesto, actualizarPresupuesto } from '@/actions/presupuestos';
 import { formatDate, formatCurrency } from '@/lib/utils';
-
-type EstadoPresupuesto = 'borrador' | 'en_revision' | 'aprobado' | 'rechazado' | 'archivado';
+import type { EstadoPresupuesto } from '@/types';
 
 interface Transicion {
   estado: EstadoPresupuesto;

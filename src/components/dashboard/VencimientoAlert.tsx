@@ -1,5 +1,5 @@
 import { Card, CardHeader } from '@/components/shared/Card';
-import { Clock, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Clock, AlertTriangle, CalendarClock } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -9,29 +9,49 @@ interface Props {
   items: VencimientoItem[];
 }
 
-function semaforo(dias: number): { icon: React.ReactNode; cls: string; label: string } {
+// Paleta de semáforo técnico — obra, no genérico
+function semaforo(dias: number): {
+  icon: React.ReactNode;
+  bg: string;
+  border: string;
+  text: string;
+  label: string;
+  dot: string;
+} {
   if (dias <= 0)
     return {
       icon: <AlertTriangle className="h-3.5 w-3.5 shrink-0" />,
-      cls: 'text-danger-text bg-danger-bg border-danger-border',
-      label: 'Vencido',
+      bg:     '#FAF0EB',
+      border: '#E8956A',
+      text:   '#A83A14',
+      dot:    '#C84B1A',
+      label:  'Vencido',
     };
   if (dias <= 7)
     return {
       icon: <AlertTriangle className="h-3.5 w-3.5 shrink-0" />,
-      cls: 'text-danger-text bg-danger-bg border-danger-border',
-      label: `Vence en ${dias} día${dias === 1 ? '' : 's'}`,
+      bg:     '#FAF0EB',
+      border: '#E8956A',
+      text:   '#A83A14',
+      dot:    '#C84B1A',
+      label:  `Vence en ${dias} día${dias === 1 ? '' : 's'}`,
     };
   if (dias <= 15)
     return {
       icon: <Clock className="h-3.5 w-3.5 shrink-0" />,
-      cls: 'text-warning-text bg-warning-bg border-warning-border',
-      label: `Vence en ${dias} días`,
+      bg:     '#FEF9EC',
+      border: '#E8C870',
+      text:   '#8C5E00',
+      dot:    '#B8821A',
+      label:  `Vence en ${dias} días`,
     };
   return {
-    icon: <CheckCircle className="h-3.5 w-3.5 shrink-0" />,
-    cls: 'text-info-text bg-info-bg border-info-border',
-    label: `Vence en ${dias} días`,
+    icon: <CalendarClock className="h-3.5 w-3.5 shrink-0" />,
+    bg:     '#E8F0F8',
+    border: '#8BA3B8',
+    text:   '#2D5F8A',
+    dot:    '#2D5F8A',
+    label:  `Vence en ${dias} días`,
   };
 }
 
@@ -44,7 +64,10 @@ export function VencimientoAlert({ items }: Props) {
         <div className="flex items-center gap-2">
           <Clock className="h-4 w-4 text-stone" />
           <h3 className="text-[14px] font-semibold text-ink">Vigencia de presupuestos</h3>
-          <span className="ml-auto inline-flex items-center px-2 py-0.5 rounded-[20px] text-[10px] font-medium bg-warning-bg text-warning-text">
+          <span
+            className="ml-auto inline-flex items-center px-2 py-[3px] rounded text-[10px] font-semibold tracking-[0.04em]"
+            style={{ background: '#FEF9EC', color: '#8C5E00' }}
+          >
             {items.length} próximo{items.length === 1 ? '' : 's'} a vencer
           </span>
         </div>
@@ -55,25 +78,23 @@ export function VencimientoAlert({ items }: Props) {
 
       <div className="pt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
         {items.map((item) => {
-          const { icon, cls, label } = semaforo(item.dias_restantes);
+          const s = semaforo(item.dias_restantes);
           return (
             <div
               key={item.budget_id}
-              className={cn(
-                'flex items-start gap-2.5 px-3 py-2.5 rounded-[8px] border text-[12px]',
-                cls
-              )}
+              className="flex items-start gap-2.5 px-3 py-2.5 rounded-lg border text-[12px]"
+              style={{ background: s.bg, borderColor: s.border, color: s.text }}
             >
-              {icon}
+              {s.icon}
               <div className="min-w-0 flex-1">
-                <p className="font-medium truncate" title={item.titulo}>
+                <p className="font-semibold truncate" title={item.titulo}>
                   {item.titulo}
                 </p>
                 {item.proyecto_nombre && (
-                  <p className="text-[10px] opacity-75 truncate">{item.proyecto_nombre}</p>
+                  <p className="text-[10px] opacity-70 truncate">{item.proyecto_nombre}</p>
                 )}
-                <p className="text-[10px] opacity-75 mt-0.5">
-                  {label} · vence {formatDate(item.fecha_vence)}
+                <p className="text-[10px] opacity-70 mt-0.5">
+                  {s.label} · vence {formatDate(item.fecha_vence)}
                 </p>
               </div>
             </div>
@@ -83,8 +104,8 @@ export function VencimientoAlert({ items }: Props) {
 
       {items.some((i) => i.dias_restantes <= 7) && (
         <p className="mt-3 text-[11px] text-stone">
-          Ingresa al presupuesto y actualiza la fecha de elaboración o la vigencia para renovarlo.{' '}
-          <Link href="/proyectos" className="text-burn-orange hover:underline font-medium">
+          Actualiza la vigencia en el presupuesto para renovarlo.{' '}
+          <Link href="/proyectos" className="font-medium hover:underline" style={{ color: '#C84B1A' }}>
             Ver proyectos →
           </Link>
         </p>

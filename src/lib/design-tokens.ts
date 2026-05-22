@@ -1,20 +1,26 @@
 // ============================================
 // SIPO — Design Tokens
-// Paleta de construcción profesional Colombia
+// Arquitectura Técnica Refinada — Colombia 2025
 // ============================================
 
 export const colors = {
-  // Azules — autoridad, estructura, confianza
+  // Azules Steel — autoridad, estructura, confianza
   steelDark:    '#1C2B3A',
   steelMid:     '#2E4A63',
   steelLight:   '#8BA3B8',
   steelFog:     '#E6EFF8',
 
-  // Naranjas — energía, construcción, acción
-  burnOrange:   '#E8571A',
-  burnLight:    '#F07848',
-  burnPale:     '#FFF0E8',
-  burnDeep:     '#C44A10',
+  // Naranja Óxido — acción, construcción, energía
+  burnOrange:   '#C84B1A',
+  burnLight:    '#D9652E',
+  burnPale:     '#FAF0EB',
+  burnDeep:     '#A83A14',
+
+  // Dorado Arena — destacado, valor, resultado
+  goldSand:     '#E8A937',
+  goldLight:    '#F0C060',
+  goldPale:     '#FEF9EC',
+  goldDeep:     '#B8821A',
 
   // Neutros cálidos — papel, concreto, arena
   sand:         '#F4F2EE',
@@ -30,9 +36,9 @@ export const colors = {
   successText:  '#1A5C2A',
   successBorder:'#B8D9B8',
 
-  warningBg:    '#FFF8E6',
-  warningText:  '#7A5800',
-  warningBorder:'#F0D080',
+  warningBg:    '#FEF9EC',
+  warningText:  '#8C5E00',
+  warningBorder:'#E8C870',
 
   infoBg:       '#E6EFF8',
   infoText:     '#1C4A72',
@@ -68,7 +74,9 @@ export const borderRadius = {
 
 export const typography = {
   fontFamily: {
-    sans: "var(--font-inter), 'Inter', system-ui, sans-serif",
+    sans:    "'IBM Plex Sans', var(--font-inter), system-ui, sans-serif",
+    display: "'IBM Plex Sans', system-ui, sans-serif",
+    mono:    "'IBM Plex Mono', 'Cascadia Code', 'Consolas', monospace",
   },
   fontSize: {
     xs:   ['11px', { lineHeight: '16px' }],
@@ -91,12 +99,12 @@ export const transitions = {
   normal: '200ms ease-out',
 } as const;
 
-// Accent theme options
+// Accent theme options — 4 colores del sistema SIPO
 export const ACCENT_THEMES = {
-  orange:  { primary: '#E8571A', hover: '#F07848', pale: '#FFF0E8', label: 'Naranja Obra' },
-  blue:    { primary: '#1E6FB8', hover: '#3A8AD4', pale: '#E6EFF8', label: 'Azul Plano' },
-  green:   { primary: '#2D7A45', hover: '#3A9A58', pale: '#E8F4E8', label: 'Verde Topografía' },
-  gray:    { primary: '#4A5568', hover: '#5A6578', pale: '#F0F0EE', label: 'Gris Acero' },
+  orange: { primary: '#C84B1A', hover: '#A83A14', pale: '#FAF0EB', label: 'Naranja Óxido' },
+  gold:   { primary: '#B8821A', hover: '#E8A937', pale: '#FEF9EC', label: 'Dorado Arena' },
+  blue:   { primary: '#1E5FA0', hover: '#3A78C0', pale: '#E6EFF8', label: 'Azul Plano' },
+  green:  { primary: '#2D7A45', hover: '#3A9A58', pale: '#E8F4E8', label: 'Verde Topografía' },
 } as const;
 
 export type AccentTheme = keyof typeof ACCENT_THEMES;

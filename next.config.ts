@@ -22,17 +22,20 @@ const supabaseHost = getSupabaseHost();
 const cspParts = [
   "default-src 'self'",
   isDev
-    ? "script-src 'self' 'unsafe-eval' 'unsafe-inline'"
-    : "script-src 'self' 'unsafe-inline'",
-  "style-src 'self' 'unsafe-inline'",
-  `img-src 'self' data: blob: https://${supabaseHost}`,
+    ? "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.hcaptcha.com"
+    : "script-src 'self' 'unsafe-inline' https://js.hcaptcha.com",
+  "style-src 'self' 'unsafe-inline' https://newassets.hcaptcha.com",
+  `img-src 'self' data: blob: https://${supabaseHost} https://imgs.hcaptcha.com`,
   [
     "connect-src 'self'",
     `https://${supabaseHost}`,
     `wss://${supabaseHost}`,
+    'https://api.hcaptcha.com',
+    'https://*.hcaptcha.com',
     isDev ? 'ws://localhost:* http://localhost:*' : '',
   ].filter(Boolean).join(' '),
   "font-src 'self' data:",
+  "frame-src https://newassets.hcaptcha.com",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

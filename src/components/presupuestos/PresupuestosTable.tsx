@@ -5,24 +5,18 @@ import Link from 'next/link';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Calculator, ChevronRight, ChevronLeft } from 'lucide-react';
 import { PresupuestosNewButton } from '@/components/presupuestos/PresupuestosNewButton';
+import { ESTADO_PRESUPUESTO_CONFIG } from '@/types';
 
 const PAGE_SIZE = 10;
 
-const BADGE: Record<string, { cls: string; label: string }> = {
-  borrador:    { cls: 'bg-[#F3F4F6] text-[#6B7280] border-[#E5E7EB]', label: 'Borrador'    },
-  en_revision: { cls: 'bg-[#FFF4EE] text-[#D95510] border-[#FDBA74]', label: 'En revisión' },
-  aprobado:    { cls: 'bg-[#F0FDF4] text-[#16A34A] border-[#BBF7D0]', label: 'Aprobado'    },
-  rechazado:   { cls: 'bg-[#FEF2F2] text-[#DC2626] border-[#FECACA]', label: 'Rechazado'   },
-  archivado:   { cls: 'bg-[#F3F4F6] text-[#9CA3AF] border-[#E5E7EB]', label: 'Archivado'   },
-};
-
 function StatusBadge({ estado }: { estado: string }) {
-  const cfg = BADGE[estado] ?? BADGE.borrador;
+  const cfg = ESTADO_PRESUPUESTO_CONFIG[estado as keyof typeof ESTADO_PRESUPUESTO_CONFIG]
+    ?? ESTADO_PRESUPUESTO_CONFIG.borrador;
   return (
     <span
       className={cn(
         'inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide border whitespace-nowrap',
-        cfg.cls
+        cfg.badge
       )}
     >
       {cfg.label}

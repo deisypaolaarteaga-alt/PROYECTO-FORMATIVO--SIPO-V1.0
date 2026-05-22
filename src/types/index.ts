@@ -145,9 +145,10 @@ export interface Budget {
   ciudad_ica: string;
 
   moneda: string;
+  aprobado_en: string | null;   // Timestamp auto-rellenado por trigger al aprobar
   created_at: string;
   updated_at: string;
-  
+
   // Relaciones expandidas
   projects?: Partial<Project>;
   chapters?: Chapter[];
@@ -156,6 +157,19 @@ export interface Budget {
 export type EstadoPresupuesto = 'borrador' | 'en_revision' | 'aprobado' | 'rechazado' | 'archivado';
 export type MetodoAIU = 'porcentaje' | 'detallado';
 export type MetodoIVA = 'no_aplica' | 'sobre_utilidad' | 'sobre_aiu' | 'sobre_total';
+
+/** Config centralizada de estados de presupuesto — única fuente de verdad para labels, colores y dots */
+export const ESTADO_PRESUPUESTO_CONFIG: Record<EstadoPresupuesto, {
+  label: string;
+  badge: string;  // clases bg + text para el pill (añade border-radius en el componente)
+  dot: string;    // bg-* para el indicador de punto en tabs
+}> = {
+  borrador:    { label: 'Borrador',    badge: 'bg-[#F3F4F6] text-[#4B5563]', dot: 'bg-[#D1D5DB]' },
+  en_revision: { label: 'En revisión', badge: 'bg-[#FFF4EE] text-[#D95510]', dot: 'bg-[#D97706]' },
+  aprobado:    { label: 'Aprobado',    badge: 'bg-[#EBFAF0] text-[#166534]', dot: 'bg-[#16A34A]' },
+  rechazado:   { label: 'Rechazado',   badge: 'bg-[#FEF0F0] text-[#991B1B]', dot: 'bg-[#DC2626]' },
+  archivado:   { label: 'Archivado',   badge: 'bg-[#F3F4F6] text-[#9CA3AF]', dot: 'bg-[#9CA3AF]' },
+};
 
 export interface ConfigAIU {
   metodo: MetodoAIU;
@@ -236,6 +250,8 @@ export interface APU {
   costo_total: number;
   created_at: string;
   updated_at: string;
+  // Relación expandida (incluida cuando se hace join con apu_items)
+  apu_items?: APUItem[];
 }
 
 // ── Ítem de APU ──
@@ -281,6 +297,30 @@ export const TIPO_APU_LABELS: Record<TipoAPUItem, string> = {
   equipo:             'Equipo',
   herramienta_menor:  'Herramienta Menor',
   epp:                'EPP',
+};
+
+// ── Tipos compuestos para el editor ──
+
+/** Actividad con su APU adjunto (resultado de obtenerPresupuesto) */
+export type ActivityWithAPU = Activity & {
+  apus?: APU[];
+};
+
+/** Capítulo con actividades y APUs (resultado de obtenerPresupuesto) */
+export type ChapterWithActivities = Chapter & {
+  activities?: ActivityWithAPU[];
+};
+
+/** Presupuesto completo con relaciones expandidas (resultado de obtenerPresupuesto) */
+export type BudgetCompleto = Budget & {
+  projects?: {
+    nombre: string;
+    ubicacion: string | null;
+    cliente_id: string | null;
+    cliente_nombre: string | null;
+    clientes?: Cliente;
+  };
+  chapters?: ChapterWithActivities[];
 };
 
 // ── Cálculos del presupuesto ──

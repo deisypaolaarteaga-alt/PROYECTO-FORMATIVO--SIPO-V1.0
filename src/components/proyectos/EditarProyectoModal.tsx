@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/shared/Button';
 import { ClienteSelector } from '@/components/clientes/ClienteSelector';
 import { actualizarProyecto } from '@/actions/proyectos';
+import { CIUDADES_COLOMBIA } from '@/types';
 
 const TIPOS_OBRA = [
   { value: 'residencial',    label: 'Residencial' },
@@ -90,13 +91,16 @@ export function EditarProyectoModal({ isOpen, onClose, proyecto }: EditarProyect
 
           <div>
             <label className="block text-xs font-medium text-neutral-600 mb-1">Ciudad <span className="text-red-500">*</span></label>
-            <input
-              type="text"
+            <select
               value={ubicacion}
               onChange={e => setUbicacion(e.target.value)}
-              className={fieldCls}
-              placeholder="Ciudad"
-            />
+              className={`${fieldCls} bg-white`}
+            >
+              <option value="">Selecciona una ciudad</option>
+              {CIUDADES_COLOMBIA.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
           </div>
 
           <div>

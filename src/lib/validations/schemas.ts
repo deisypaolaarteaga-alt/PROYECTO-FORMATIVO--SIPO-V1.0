@@ -9,9 +9,6 @@ export const createProjectSchema = z.object({
   area_m2: z.coerce.number().positive('El área debe ser mayor a 0').optional().nullable(),
   tipo_obra: z.enum(['residencial', 'comercial', 'industrial', 'infraestructura', 'institucional', 'hotelero', 'otro']).optional().nullable(),
   cliente_id: z.string().uuid().optional().nullable(),
-  cliente_nombre: z.string().max(200).optional().nullable(),
-  cliente_email: z.string().email('Email inválido').optional().or(z.literal('')).nullable(),
-  cliente_telefono: z.string().max(20).optional().nullable(),
 });
 
 export const updateProjectSchema = createProjectSchema.partial().extend({

@@ -3,24 +3,38 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Mail, Lock, Globe } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { Card } from '@/components/shared/Card';
 import { Button } from '@/components/shared/Button';
 import { Input } from '@/components/shared/Input';
 import { ErrorMessage } from '@/components/shared/ErrorMessage';
 import { signIn, signInWithGoogle } from '@/actions/auth';
 
+const HCaptcha = dynamic(() => import('@hcaptcha/react-hcaptcha'), { ssr: false });
+
+const SITE_KEY = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY || '10000000-ffff-ffff-ffff-000000000001';
+
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaKey, setCaptchaKey] = useState(0);
+
+  function resetCaptcha() {
+    setCaptchaKey((k) => k + 1);
+    setCaptchaToken(null);
+  }
 
   async function handleSubmit(formData: FormData) {
+    if (!captchaToken) return;
     setLoading(true);
     setError(null);
     try {
-      const result = await signIn(formData);
+      const result = await signIn(formData, captchaToken);
       if (!result.success && result.error) {
         setError(result.error);
+        resetCaptcha();
       }
     } catch {
       // redirect lanza un error internamente en Next.js — es normal
@@ -52,7 +66,6 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Error global */}
         {error && (
           <ErrorMessage
             message={error}
@@ -61,7 +74,6 @@ export default function LoginPage() {
           />
         )}
 
-        {/* Formulario */}
         <form action={handleSubmit} className="space-y-4">
           <Input
             name="email"
@@ -92,19 +104,30 @@ export default function LoginPage() {
             </Link>
           </div>
 
-          <Button type="submit" fullWidth loading={loading}>
+          <HCaptcha
+            key={captchaKey}
+            sitekey={SITE_KEY}
+            onVerify={(token) => setCaptchaToken(token)}
+            onExpire={resetCaptcha}
+            onError={resetCaptcha}
+          />
+
+          <Button
+            type="submit"
+            fullWidth
+            loading={loading}
+            disabled={!captchaToken}
+          >
             Iniciar sesión
           </Button>
         </form>
 
-        {/* Separador */}
         <div className="my-5 flex items-center gap-3">
           <div className="h-px flex-1 bg-concrete" />
           <span className="text-[11px] text-stone">o continúa con</span>
           <div className="h-px flex-1 bg-concrete" />
         </div>
 
-        {/* Google */}
         <Button
           variant="secondary"
           fullWidth
@@ -116,7 +139,6 @@ export default function LoginPage() {
         </Button>
       </Card>
 
-      {/* Link a registro */}
       <p className="mt-5 text-center text-[13px] text-stone">
         ¿No tienes cuenta?{' '}
         <Link

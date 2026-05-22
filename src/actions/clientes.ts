@@ -61,9 +61,15 @@ export async function getClientes(filtros?: {
         });
       });
 
+      const totalPresupuestos = proyectos.reduce(
+        (acc: number, p: any) => acc + (p.budgets?.length ?? 0),
+        0,
+      );
+
       return {
         ...cliente,
         total_proyectos: totalProyectos,
+        total_presupuestos: totalPresupuestos,
         valor_total_proyectos: valorTotalProyectos
       };
     });
@@ -119,6 +125,19 @@ export async function crearCliente(data: z.infer<typeof clienteSchema>): Promise
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { success: false, error: 'No autorizado' };
+
+    if (validated.nit_cedula) {
+      const { data: existing } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('nit_cedula', validated.nit_cedula)
+        .eq('activo', true)
+        .maybeSingle();
+      if (existing) {
+        return { success: false, error: `Ya existe un cliente activo con el NIT/Cédula "${validated.nit_cedula}".` };
+      }
+    }
 
     const { data: newCliente, error } = await supabase
       .from('clientes')
@@ -194,6 +213,32 @@ export async function desactivarCliente(clienteId: string): Promise<ActionResult
   } catch (error: any) {
     console.error('[desactivarCliente] error:', error);
     return { success: false, error: 'Error al desactivar cliente' };
+  }
+}
+
+/**
+ * Reactivar cliente previamente desactivado
+ */
+export async function reactivarCliente(clienteId: string): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'No autorizado' };
+
+    const { error } = await supabase
+      .from('clientes')
+      .update({ activo: true, updated_at: new Date().toISOString() })
+      .eq('id', clienteId)
+      .eq('user_id', user.id);
+
+    if (error) throw error;
+
+    revalidatePath('/clientes');
+    revalidatePath(`/clientes/${clienteId}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error('[reactivarCliente] error:', error);
+    return { success: false, error: 'Error al reactivar cliente' };
   }
 }
 

@@ -58,15 +58,15 @@ export default function ParametrosFiscalesPage() {
     { nivel: 5, pct: 6.960, color: 'bg-[#FEF0F0] text-[#991B1B] border-[#F5C2C2]', ej: 'Excavaciones, alturas, explosivos, demolición' },
   ];
 
-  const inputClass = "w-full h-10 px-3 border border-[#C8CDD6] rounded-lg focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none text-[#1F2937] font-semibold transition-all";
-  const toggleClass = "w-11 h-6 bg-[#D0D4DB] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-[#C8CDD6] after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#D95510]";
+  const inputClass = "w-full h-10 px-3 border border-[#E8E4DE] rounded-lg focus:border-[#C84B1A] focus:ring-2 focus:ring-[#C84B1A]/20 outline-none text-[#1C1814] font-semibold transition-all";
+  const toggleClass = "w-11 h-6 bg-[#D0D4DB] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-[#C8CDD6] after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#C84B1A]";
 
   return (
     <div className="p-8 max-w-5xl mx-auto space-y-8 animate-fade-in">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <h1 className="text-2xl font-bold text-[#1F2937] tracking-tight">Parámetros Fiscales</h1>
+          <h1 className="text-2xl font-bold text-[#1C1814] tracking-tight">Parámetros Fiscales</h1>
           <p className="text-[#6B7A8D] mt-1 text-sm">
             Define los valores por defecto para AIU, Impuestos y Retenciones de tus nuevos presupuestos.
           </p>
@@ -86,12 +86,12 @@ export default function ParametrosFiscalesPage() {
         <div className="space-y-8">
 
           {/* AIU */}
-          <Card padding="none" className="overflow-hidden border-[#D0D4DB]">
-            <div className="bg-[#ECEEF2] px-6 py-4 border-b border-[#D0D4DB] flex items-center gap-3">
-              <div className="h-8 w-8 rounded-lg bg-[#FAF0EB] flex items-center justify-center text-[#D95510]">
+          <Card padding="none" className="overflow-hidden border-[#E8E4DE]">
+            <div className="bg-[#F0EDE8] px-6 py-4 border-b border-[#E8E4DE] flex items-center gap-3">
+              <div className="h-8 w-8 rounded-lg bg-[#FAF0EB] flex items-center justify-center text-[#C84B1A]">
                 <Calculator className="h-4 w-4" />
               </div>
-              <h2 className="text-base font-bold text-[#1F2937]">Cálculo AIU Base</h2>
+              <h2 className="text-base font-bold text-[#1C1814]">Cálculo AIU Base</h2>
             </div>
             <div className="p-6 space-y-6 bg-white">
               <div className="grid grid-cols-3 gap-4">
@@ -117,27 +117,27 @@ export default function ParametrosFiscalesPage() {
                   </div>
                 </div>
               </div>
-              <div className="flex items-center justify-between p-4 bg-[#ECEEF2] rounded-lg border border-[#D0D4DB]">
+              <div className="flex items-center justify-between p-4 bg-[#F5F2EE] rounded-lg border border-[#E8E4DE]">
                 <div className="flex items-center gap-2">
-                  <Info className="h-4 w-4 text-[#D95510]" />
+                  <Info className="h-4 w-4 text-[#C84B1A]" />
                   <span className="text-xs text-[#4B5563] font-medium">Se aplica sobre el costo directo total</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-[#6B7A8D] uppercase">Total AIU</span>
-                  <span className="text-2xl font-bold text-[#D95510]">{aiuTotal}%</span>
+                  <span className="text-sm font-bold text-stone uppercase">Total AIU</span>
+                  <span className="text-2xl font-bold text-[#C84B1A]">{aiuTotal}%</span>
                 </div>
               </div>
             </div>
           </Card>
 
           {/* IVA */}
-          <Card padding="none" className="overflow-hidden border-[#D0D4DB]">
-            <div className="bg-[#ECEEF2] px-6 py-4 border-b border-[#D0D4DB] flex items-center justify-between">
+          <Card padding="none" className="overflow-hidden border-[#E8E4DE]">
+            <div className="bg-[#F0EDE8] px-6 py-4 border-b border-[#E8E4DE] flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="h-8 w-8 rounded-lg bg-[#EBF2FA] flex items-center justify-center text-[#1E4D8C]">
                   <Percent className="h-4 w-4" />
                 </div>
-                <h2 className="text-base font-bold text-[#1F2937]">Configuración de IVA</h2>
+                <h2 className="text-base font-bold text-[#1C1814]">Configuración de IVA</h2>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" className="sr-only peer" checked={aplicarIva} onChange={e => setAplicarIva(e.target.checked)} />
@@ -168,13 +168,13 @@ export default function ParametrosFiscalesPage() {
         <div className="space-y-8">
 
           {/* RETENCIONES */}
-          <Card padding="none" className="overflow-hidden border-[#D0D4DB]">
-            <div className="bg-[#ECEEF2] px-6 py-4 border-b border-[#D0D4DB] flex items-center justify-between">
+          <Card padding="none" className="overflow-hidden border-[#E8E4DE]">
+            <div className="bg-[#F0EDE8] px-6 py-4 border-b border-[#E8E4DE] flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-lg bg-[#FAF0EB] flex items-center justify-center text-[#D95510]">
+                <div className="h-8 w-8 rounded-lg bg-[#FAF0EB] flex items-center justify-center text-[#C84B1A]">
                   <AlertTriangle className="h-4 w-4" />
                 </div>
-                <h2 className="text-base font-bold text-[#1F2937]">Retenciones (Informativo)</h2>
+                <h2 className="text-base font-bold text-[#1C1814]">Retenciones (Informativo)</h2>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" className="sr-only peer" checked={mostrarRetenciones} onChange={e => setMostrarRetenciones(e.target.checked)} />
@@ -232,12 +232,12 @@ export default function ParametrosFiscalesPage() {
           </Card>
 
           {/* ARL */}
-          <Card padding="none" className="overflow-hidden border-[#D0D4DB]">
-            <div className="bg-[#ECEEF2] px-6 py-4 border-b border-[#D0D4DB] flex items-center gap-3">
+          <Card padding="none" className="overflow-hidden border-[#E8E4DE]">
+            <div className="bg-[#F0EDE8] px-6 py-4 border-b border-[#E8E4DE] flex items-center gap-3">
               <div className="h-8 w-8 rounded-lg bg-[#EBFAF0] flex items-center justify-center text-[#166534]">
                 <Shield className="h-4 w-4" />
               </div>
-              <h2 className="text-base font-bold text-[#1F2937]">Riesgo Laboral (ARL)</h2>
+              <h2 className="text-base font-bold text-[#1C1814]">Riesgo Laboral (ARL)</h2>
             </div>
             <div className="p-6 space-y-4 bg-white">
               <div className="space-y-1.5">
@@ -250,9 +250,9 @@ export default function ParametrosFiscalesPage() {
                   <option value={5}>Riesgo V (6.960%) — Construcción Alturas/Excavación</option>
                 </select>
               </div>
-              <div className="border border-[#D0D4DB] rounded-lg overflow-hidden">
+              <div className="border border-[#E8E4DE] rounded-lg overflow-hidden">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-[#DDE0E6] border-b border-[#D0D4DB]">
+                  <thead className="bg-[#F0EDE8] border-b border-[#E8E4DE]">
                     <tr>
                       <th className="px-3 py-2 font-bold text-[#6B7A8D] uppercase tracking-wide">Nivel</th>
                       <th className="px-3 py-2 font-bold text-[#6B7A8D] uppercase tracking-wide text-right">Tarifa</th>
@@ -261,7 +261,7 @@ export default function ParametrosFiscalesPage() {
                   </thead>
                   <tbody className="divide-y divide-[#E4E7EC]">
                     {arlTable.map(r => (
-                      <tr key={r.nivel} className={cn("transition-colors", arlDefault === r.nivel ? "bg-[#DDE0E6]" : "bg-[#E4E7EC] hover:bg-[#DDE0E6]")}>
+                      <tr key={r.nivel} className={cn("transition-colors", arlDefault === r.nivel ? "bg-[#EDE8E2]" : "bg-[#F5F2EE] hover:bg-[#EDE8E2]")}>
                         <td className="px-3 py-2">
                           <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold border", r.color)}>
                             Riesgo {r.nivel}

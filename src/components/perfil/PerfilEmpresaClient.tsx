@@ -15,6 +15,7 @@ import {
 } from '@/actions/perfil';
 import { cambiarContrasena } from '@/actions/auth';
 import { useTheme } from '@/components/shared/ThemeProvider';
+import { ACCENT_THEMES } from '@/lib/design-tokens';
 
 interface Props {
   profile: Record<string, any>;
@@ -224,17 +225,17 @@ export function PerfilEmpresaClient({ profile, email }: Props) {
 
   // ── Clases reutilizables ──────────────────────────────────────────
   const inputBase =
-    'w-full h-11 px-4 bg-[#F8F7F5] border border-[#E5E1D8] rounded-lg text-sm text-[#1F2937] ' +
+    'w-full h-11 px-4 bg-[#F8F7F5] border border-[#E8E4DE] rounded-lg text-sm text-[#1C1814] ' +
     'placeholder:text-[#C4BBAD] outline-none transition-all ' +
-    'focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20';
+    'focus:border-[#C84B1A] focus:ring-2 focus:ring-[#C84B1A]/20';
   const inputIcon =
-    'w-full h-11 pl-10 pr-4 bg-[#F8F7F5] border border-[#E5E1D8] rounded-lg text-sm text-[#1F2937] ' +
+    'w-full h-11 pl-10 pr-4 bg-[#F8F7F5] border border-[#E8E4DE] rounded-lg text-sm text-[#1C1814] ' +
     'placeholder:text-[#C4BBAD] outline-none transition-all ' +
-    'focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20';
-  const labelCls  = 'text-[11px] font-medium text-[#6B7A8D] tracking-wide';
-  const h2Cls     = 'text-[15px] font-semibold text-[#1F2937]';
+    'focus:border-[#C84B1A] focus:ring-2 focus:ring-[#C84B1A]/20';
+  const labelCls    = 'text-[11px] font-medium text-[#6B7A8D] tracking-wide';
+  const h2Cls       = 'text-[15px] font-semibold text-[#1C1814]';
   const subtitleCls = 'text-[12px] text-[#6B7A8D] mt-0.5';
-  const cardCls   = 'bg-white border border-[#E5E1D8] rounded-xl p-6 scroll-mt-8';
+  const cardCls     = 'bg-white border border-[#E8E4DE] rounded-xl p-6 scroll-mt-8';
 
   // ─────────────────────────────────────────────────────────────────
   return (
@@ -242,7 +243,7 @@ export function PerfilEmpresaClient({ profile, email }: Props) {
 
       {/* Encabezado de página */}
       <div className="mb-8">
-        <h1 className="text-[22px] font-bold text-[#1F2937] tracking-tight">Configuración</h1>
+        <h1 className="text-[22px] font-bold text-[#1C1814] tracking-tight">Configuración</h1>
         <p className="text-sm text-[#6B7A8D] mt-1">
           Gestiona tu perfil, apariencia y seguridad de la cuenta.
         </p>
@@ -265,13 +266,13 @@ export function PerfilEmpresaClient({ profile, email }: Props) {
                   className={cn(
                     'flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-all',
                     seccionActiva === id
-                      ? 'bg-[#FAF0EB] text-[#D95510]'
-                      : 'text-[#6B7A8D] hover:text-[#1F2937] hover:bg-[#F5F4F2]',
+                      ? 'bg-[#FAF0EB] text-[#C84B1A]'
+                      : 'text-[#6B7A8D] hover:text-[#1C1814] hover:bg-[#F5F2EE]',
                   )}
                 >
                   <span className={cn(
                     'w-1.5 h-1.5 rounded-full shrink-0 transition-colors',
-                    seccionActiva === id ? 'bg-[#D95510]' : 'bg-[#D0D4DB]',
+                    seccionActiva === id ? 'bg-[#C84B1A]' : 'bg-[#D0D4DB]',
                   )} />
                   {label}
                 </a>
@@ -304,14 +305,14 @@ export function PerfilEmpresaClient({ profile, email }: Props) {
             </div>
 
             {/* Logo — fila compacta */}
-            <div className="flex items-center gap-4 p-4 bg-[#F8F7F5] border border-[#E5E1D8] rounded-lg mb-6">
+            <div className="flex items-center gap-5 p-5 bg-[#F8F7F5] border border-[#E8E4DE] rounded-xl mb-6">
               <div className="relative group shrink-0">
                 <div className={cn(
-                  'w-16 h-16 rounded-xl border-2 flex items-center justify-center overflow-hidden bg-white',
-                  logoUrl ? 'border-[#E5E1D8]' : 'border-dashed border-[#D0D4DB]',
+                  'w-20 h-20 rounded-xl border-2 flex items-center justify-center overflow-hidden bg-white shadow-sm',
+                  logoUrl ? 'border-[#E8E4DE]' : 'border-dashed border-[#D0D4DB]',
                 )}>
                   {uploadingLogo ? (
-                    <Loader2 className="h-5 w-5 animate-spin text-[#D95510]" />
+                    <Loader2 className="h-5 w-5 animate-spin text-[#C84B1A]" />
                   ) : logoUrl ? (
                     <img src={logoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
                   ) : (
@@ -329,7 +330,7 @@ export function PerfilEmpresaClient({ profile, email }: Props) {
               </div>
 
               <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-medium text-[#1F2937]">Logo oficial</p>
+                <p className="text-[13px] font-medium text-[#1C1814]">Logo oficial</p>
                 <p className="text-[11px] text-[#6B7A8D] mt-0.5">
                   {logoUrl
                     ? 'Visible en PDFs y sidebar'
@@ -476,7 +477,57 @@ export function PerfilEmpresaClient({ profile, email }: Props) {
 
             <div className="mb-6">
               <h2 className={h2Cls}>Apariencia</h2>
-              <p className={subtitleCls}>Densidad de la interfaz.</p>
+              <p className={subtitleCls}>Color de acento y densidad de la interfaz.</p>
+            </div>
+
+            {/* Color de acento */}
+            <div className="space-y-3 mb-7">
+              <label className={labelCls}>Color de acento</label>
+              <div className="flex items-center gap-3">
+                {(Object.entries(ACCENT_THEMES) as [string, typeof ACCENT_THEMES[keyof typeof ACCENT_THEMES]][]).map(([key, theme]) => {
+                  const active = prefs.accentColor === theme.primary;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => updatePref('accentColor', theme.primary)}
+                      title={theme.label}
+                      className={cn(
+                        'relative w-12 h-12 rounded-xl transition-all duration-150 shrink-0',
+                        active
+                          ? 'ring-2 ring-offset-2 scale-105 shadow-md'
+                          : 'hover:scale-105 hover:shadow-sm opacity-80 hover:opacity-100',
+                      )}
+                      style={{
+                        backgroundColor: theme.primary,
+                        outline: active ? `2px solid ${theme.primary}` : undefined,
+                        outlineOffset: active ? '3px' : undefined,
+                      }}
+                    >
+                      {active && (
+                        <span className="absolute inset-0 flex items-center justify-center">
+                          <svg className="w-5 h-5 text-white drop-shadow" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-2">
+                {(Object.entries(ACCENT_THEMES) as [string, typeof ACCENT_THEMES[keyof typeof ACCENT_THEMES]][]).map(([key, theme]) => (
+                  <span
+                    key={key}
+                    className="w-12 text-center text-[10px] text-[#6B7A8D] leading-tight"
+                  >
+                    {theme.label.split(' ')[0]}
+                  </span>
+                ))}
+              </div>
+              <p className="text-[11px] text-[#6B7A8D]">
+                Afecta botones, enlaces y elementos interactivos en toda la plataforma.
+              </p>
             </div>
 
             {/* Densidad */}
@@ -490,8 +541,8 @@ export function PerfilEmpresaClient({ profile, email }: Props) {
                     className={cn(
                       'px-4 py-2 rounded-lg text-[12px] font-medium border transition-all',
                       prefs.density === value
-                        ? 'bg-[#D95510] text-white border-[#D95510]'
-                        : 'bg-[#F8F7F5] text-[#6B7A8D] border-[#E5E1D8] hover:border-[#D95510] hover:text-[#D95510]',
+                        ? 'bg-[#C84B1A] text-white border-[#C84B1A]'
+                        : 'bg-[#F8F7F5] text-[#6B7A8D] border-[#E8E4DE] hover:border-[#C84B1A] hover:text-[#C84B1A]',
                     )}
                   >
                     {label}
@@ -554,14 +605,14 @@ export function PerfilEmpresaClient({ profile, email }: Props) {
             <div className="space-y-2">
               <label className={labelCls}>Firma escaneada</label>
 
-              <div className="flex items-start gap-5 p-4 bg-[#F8F7F5] border border-[#E5E1D8] rounded-lg">
+              <div className="flex items-start gap-5 p-4 bg-[#F8F7F5] border border-[#E8E4DE] rounded-lg">
                 {/* Preview 140px ancho */}
                 <div className={cn(
                   'w-36 h-20 border-2 rounded-lg flex items-center justify-center overflow-hidden bg-white shrink-0',
-                  firmaUrl ? 'border-[#E5E1D8]' : 'border-dashed border-[#D0D4DB]',
+                  firmaUrl ? 'border-[#E8E4DE]' : 'border-dashed border-[#D0D4DB]',
                 )}>
                   {uploadingFirma ? (
-                    <Loader2 className="h-5 w-5 animate-spin text-[#D95510]" />
+                    <Loader2 className="h-5 w-5 animate-spin text-[#C84B1A]" />
                   ) : firmaUrl ? (
                     <img src={firmaUrl} alt="Firma" className="w-full h-full object-contain p-2" />
                   ) : (
@@ -571,7 +622,7 @@ export function PerfilEmpresaClient({ profile, email }: Props) {
 
                 {/* Texto y botones */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-medium text-[#1F2937]">
+                  <p className="text-[13px] font-medium text-[#1C1814]">
                     {firmaUrl ? 'Firma cargada' : 'Sin firma'}
                   </p>
                   <p className="text-[11px] text-[#6B7A8D] mt-0.5 mb-3">
@@ -634,6 +685,16 @@ export function PerfilEmpresaClient({ profile, email }: Props) {
                   className={cn(inputIcon, 'opacity-60 cursor-default select-all')}
                 />
               </div>
+              <p className="text-[11px] text-[#6B7A8D]">
+                El correo no puede cambiarse desde aquí. Contacta soporte si necesitas actualizarlo.
+              </p>
+            </div>
+
+            <div className="border-t border-[#E8E4DE] pt-5 mb-5">
+              <p className="text-[13px] font-medium text-[#1C1814] mb-1">Cambiar contraseña</p>
+              <p className="text-[11px] text-[#6B7A8D]">
+                Usa mínimo 8 caracteres con al menos una mayúscula y un número.
+              </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

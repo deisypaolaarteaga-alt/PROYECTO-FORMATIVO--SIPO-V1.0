@@ -4,7 +4,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Mail, Lock, Globe } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { Card } from '@/components/shared/Card';
 import { Button } from '@/components/shared/Button';
 import { Input } from '@/components/shared/Input';
 import { ErrorMessage } from '@/components/shared/ErrorMessage';
@@ -56,20 +55,23 @@ export default function LoginPage() {
 
   return (
     <>
-      <Card padding="lg" className="border border-concrete">
-        <div className="mb-6">
-          <h1 className="text-[20px] font-semibold text-ink">
-            Bienvenido de vuelta
-          </h1>
-          <p className="mt-1 text-[13px] text-stone">
-            Inicia sesión en tu cuenta SIPO
-          </p>
-        </div>
+      {/* Encabezado */}
+      <div className="mb-8">
+        <h1 className="text-[24px] font-semibold text-[#1C1814] tracking-tight">
+          Bienvenido de vuelta
+        </h1>
+        <p className="mt-1.5 text-[14px] text-[#7A7265]">
+          Inicia sesión en tu cuenta SIPO
+        </p>
+      </div>
+
+      {/* Contenedor del formulario */}
+      <div className="bg-white border border-[#E8E4DE] rounded-2xl p-7 shadow-sm">
 
         {error && (
           <ErrorMessage
             message={error}
-            className="mb-4"
+            className="mb-5"
             onDismiss={() => setError(null)}
           />
         )}
@@ -98,7 +100,7 @@ export default function LoginPage() {
           <div className="flex justify-end">
             <Link
               href="/recuperar-contrasena"
-              className="text-[13px] text-[var(--accent-primary)] hover:text-[var(--accent-hover)] transition-colors"
+              className="text-[13px] text-[#C84B1A] hover:text-[#A83A14] transition-colors"
             >
               ¿Olvidaste tu contraseña?
             </Link>
@@ -123,9 +125,9 @@ export default function LoginPage() {
         </form>
 
         <div className="my-5 flex items-center gap-3">
-          <div className="h-px flex-1 bg-concrete" />
-          <span className="text-[11px] text-stone">o continúa con</span>
-          <div className="h-px flex-1 bg-concrete" />
+          <div className="h-px flex-1 bg-[#E8E4DE]" />
+          <span className="text-[11px] text-[#7A7265]">o continúa con</span>
+          <div className="h-px flex-1 bg-[#E8E4DE]" />
         </div>
 
         <Button
@@ -137,13 +139,13 @@ export default function LoginPage() {
         >
           Continuar con Google
         </Button>
-      </Card>
+      </div>
 
-      <p className="mt-5 text-center text-[13px] text-stone">
+      <p className="mt-5 text-center text-[13px] text-[#7A7265]">
         ¿No tienes cuenta?{' '}
         <Link
           href="/registro"
-          className="font-medium text-[var(--accent-primary)] hover:text-[var(--accent-hover)] transition-colors"
+          className="font-medium text-[#C84B1A] hover:text-[#A83A14] transition-colors"
         >
           Regístrate gratis
         </Link>

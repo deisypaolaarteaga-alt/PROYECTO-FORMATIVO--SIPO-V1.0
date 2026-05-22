@@ -42,10 +42,10 @@ const CATEGORIAS: { key: string; label: string }[] = [
 type CuadrillaBasica = { id: string; nombre: string; categoria_actividad: string | null };
 
 function SortIcon({ col, sortCol, sortDir }: { col: ColKey; sortCol: ColKey; sortDir: SortDir }) {
-  if (col !== sortCol) return <ChevronsUpDown className="h-3.5 w-3.5 text-concrete" />;
+  if (col !== sortCol) return <ChevronsUpDown className="h-3.5 w-3.5 text-white/40" />;
   return sortDir === 'asc'
-    ? <ChevronUp className="h-3.5 w-3.5 text-burn-orange" />
-    : <ChevronDown className="h-3.5 w-3.5 text-burn-orange" />;
+    ? <ChevronUp className="h-3.5 w-3.5 text-[#E8956A]" />
+    : <ChevronDown className="h-3.5 w-3.5 text-[#E8956A]" />;
 }
 
 function valorOrden(t: TrabajadorReferencia, col: ColKey): string | number {
@@ -250,14 +250,14 @@ export default function ManoObraPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-sand/40 border-b border-concrete">
+                <tr className="bg-[#1A2535] border-b border-[#2A3B50]">
                   {COLS.map((col) => (
                     <th
                       key={col.key}
                       onClick={() => toggleSort(col.key)}
                       className={cn(
-                        'px-4 py-3 font-medium text-steel-mid cursor-pointer select-none',
-                        'hover:text-charcoal transition-colors whitespace-nowrap',
+                        'px-4 py-3 font-medium text-white/60 cursor-pointer select-none',
+                        'hover:text-white transition-colors whitespace-nowrap',
                         col.align === 'right' ? 'text-right' : 'text-left',
                       )}
                     >
@@ -273,7 +273,7 @@ export default function ManoObraPage() {
                     </th>
                   ))}
                   {/* Columna acciones sin encabezado */}
-                  <th className="px-4 py-3 w-10" />
+                  <th className="px-4 py-3 w-10 bg-[#1A2535]" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-concrete/50">
@@ -287,7 +287,7 @@ export default function ManoObraPage() {
                           {t.categoria}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right tabular-nums text-charcoal">
+                      <td className="px-4 py-3 text-right tabular-nums text-charcoal" style={{ fontFamily: 'var(--font-mono)' }}>
                         {formatearCOP(t.jornal_base)}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums">
@@ -299,7 +299,7 @@ export default function ManoObraPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums">
-                        <span className="font-semibold text-burn-orange">
+                        <span className="font-semibold text-burn-orange" style={{ fontFamily: 'var(--font-mono)' }}>
                           {formatearCOP(costoHora)}
                         </span>
                       </td>

@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import {
   Search, Building2, User, MoreVertical,
   Edit, Trash2, ExternalLink, Plus, Download,
-  ChevronLeft, ChevronRight, SlidersHorizontal,
+  ChevronLeft, ChevronRight,
   ChevronDown, MapPin, Loader2,
 } from 'lucide-react';
 import {
@@ -237,7 +237,6 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
     URL.revokeObjectURL(url);
   }
 
-  const tipoLabel = TIPO_OPTIONS.find(o => o.value === filtroTipo)?.label ?? 'Todos los tipos';
   const ciudadLabel = filtroCiudad === 'todas' ? 'Todas las ciudades' : filtroCiudad;
 
   return (
@@ -255,37 +254,36 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
               placeholder="Buscar por nombre, NIT o contacto..."
               value={busqueda}
               onChange={e => handleBusqueda(e.target.value)}
-              className="w-full pl-9 pr-4 h-10 border border-[#E5E7EB] rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-[#D95510]/20 focus:border-[#D95510] placeholder:text-[#9CA3AF] text-[#374151]"
+              className="w-full pl-9 pr-4 h-10 border border-[#E8E4DE] rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-[#C84B1A]/20 focus:border-[#C84B1A] placeholder:text-[#9CA3AF] text-[#374151]"
             />
           </div>
 
-          {/* Tipo filter */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="h-10 px-3.5 flex items-center gap-2 border border-[#E5E7EB] rounded-lg text-sm bg-white text-[#374151] hover:bg-[#F9FAFB] transition-colors whitespace-nowrap">
-                <SlidersHorizontal className="h-3.5 w-3.5 text-[#6B7280]" />
-                {tipoLabel}
-                <ChevronDown className="h-3.5 w-3.5 text-[#9CA3AF]" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              {TIPO_OPTIONS.map(opt => (
-                <DropdownMenuItem
+          {/* Tipo filter — pills */}
+          <div className="flex items-center gap-1.5">
+            {TIPO_OPTIONS.map(opt => {
+              const active = filtroTipo === opt.value;
+              return (
+                <button
                   key={opt.value}
+                  type="button"
                   onClick={() => handleFiltroTipo(opt.value)}
-                  className={filtroTipo === opt.value ? 'font-semibold text-[#D95510]' : ''}
+                  className={`h-8 px-3 rounded-lg text-[12px] font-medium transition-colors whitespace-nowrap ${
+                    active
+                      ? 'bg-[#C84B1A] text-white shadow-sm'
+                      : 'bg-white border border-[#E8E4DE] text-[#6B7280] hover:border-[#C84B1A] hover:text-[#C84B1A]'
+                  }`}
                 >
                   {opt.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                </button>
+              );
+            })}
+          </div>
 
           {/* Ciudad filter — solo visible si hay ciudades registradas */}
           {ciudades.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className={`h-10 px-3.5 flex items-center gap-2 border rounded-lg text-sm bg-white text-[#374151] hover:bg-[#F9FAFB] transition-colors whitespace-nowrap ${filtroCiudad !== 'todas' ? 'border-[#D95510] text-[#D95510]' : 'border-[#E5E7EB]'}`}>
+                <button className={`h-10 px-3.5 flex items-center gap-2 border rounded-lg text-sm bg-white text-[#374151] hover:bg-[#F9FAFB] transition-colors whitespace-nowrap ${filtroCiudad !== 'todas' ? 'border-[#C84B1A] text-[#C84B1A]' : 'border-[#E8E4DE]'}`}>
                   <MapPin className="h-3.5 w-3.5 text-[#6B7280]" />
                   {ciudadLabel}
                   <ChevronDown className="h-3.5 w-3.5 text-[#9CA3AF]" />
@@ -294,7 +292,7 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
               <DropdownMenuContent align="start">
                 <DropdownMenuItem
                   onClick={() => handleFiltroCiudad('todas')}
-                  className={filtroCiudad === 'todas' ? 'font-semibold text-[#D95510]' : ''}
+                  className={filtroCiudad === 'todas' ? 'font-semibold text-[#C84B1A]' : ''}
                 >
                   Todas las ciudades
                 </DropdownMenuItem>
@@ -302,7 +300,7 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
                   <DropdownMenuItem
                     key={c}
                     onClick={() => handleFiltroCiudad(c)}
-                    className={filtroCiudad === c ? 'font-semibold text-[#D95510]' : ''}
+                    className={filtroCiudad === c ? 'font-semibold text-[#C84B1A]' : ''}
                   >
                     {c}
                   </DropdownMenuItem>
@@ -317,7 +315,7 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
           <button
             onClick={handleExportar}
             disabled={filteredClientes.length === 0}
-            className="h-10 px-4 flex items-center gap-2 border border-[#E5E7EB] rounded-lg text-sm text-[#374151] bg-white hover:bg-[#F9FAFB] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="h-10 px-4 flex items-center gap-2 border border-[#E8E4DE] rounded-lg text-sm text-[#374151] bg-white hover:bg-[#F9FAFB] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Download className="h-4 w-4 text-[#6B7280]" />
             Exportar
@@ -326,7 +324,7 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
           {/* Nuevo Cliente */}
           <button
             onClick={() => { setClienteAEditar(undefined); setIsModalOpen(true); }}
-            className="h-10 px-4 flex items-center gap-2 bg-[#D95510] text-white rounded-lg text-sm font-semibold hover:bg-[#C44A0C] active:bg-[#B33E09] transition-colors shadow-sm"
+            className="h-10 px-4 flex items-center gap-2 bg-[#C84B1A] text-white rounded-lg text-sm font-semibold hover:bg-[#A83A14] active:bg-[#8E2E0E] transition-colors shadow-sm"
           >
             <Plus className="h-4 w-4" />
             Nuevo Cliente
@@ -334,11 +332,11 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
         </div>
 
         {/* ── Table card ── */}
-        <div className={`bg-white border border-[#E5E7EB] rounded-2xl overflow-hidden shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] transition-opacity duration-150 ${isPending ? 'opacity-60' : 'opacity-100'}`}>
+        <div className={`bg-white border border-[#E8E4DE] rounded-2xl overflow-hidden shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] transition-opacity duration-150 ${isPending ? 'opacity-60' : 'opacity-100'}`}>
           {isPending && (
-            <div className="flex items-center gap-2 px-5 py-2.5 bg-[#FFF4EE] border-b border-[#FDBA74]">
-              <Loader2 className="h-3.5 w-3.5 text-[#D95510] animate-spin" />
-              <span className="text-[12px] text-[#D95510] font-medium">Buscando…</span>
+            <div className="flex items-center gap-2 px-5 py-2.5 bg-[#FAF0EB] border-b border-[#E8956A]">
+              <Loader2 className="h-3.5 w-3.5 text-[#C84B1A] animate-spin" />
+              <span className="text-[12px] text-[#C84B1A] font-medium">Buscando…</span>
             </div>
           )}
           {filteredClientes.length === 0 ? (
@@ -355,7 +353,7 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
               {!busqueda && filtroTipo === 'todos' && filtroCiudad === 'todas' && (
                 <button
                   onClick={() => { setClienteAEditar(undefined); setIsModalOpen(true); }}
-                  className="mt-5 h-10 px-4 flex items-center gap-2 bg-[#D95510] text-white rounded-lg text-sm font-semibold hover:bg-[#C44A0C] transition-colors"
+                  className="mt-5 h-10 px-4 flex items-center gap-2 bg-[#C84B1A] text-white rounded-lg text-sm font-semibold hover:bg-[#A83A14] transition-colors"
                 >
                   <Plus className="h-4 w-4" />
                   Nuevo Cliente
@@ -366,26 +364,26 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b-2 border-[#F3F4F6] bg-[#F8F9FA]">
-                    <th className="px-5 py-3.5 text-left text-[10px] font-bold text-[#6B7280] uppercase tracking-widest">
+                  <tr className="border-b border-[#E8E4DE] bg-[#F0EDE8]">
+                    <th className="px-5 py-3.5 text-left text-[10px] font-bold text-stone uppercase tracking-widest">
                       Cliente
                     </th>
-                    <th className="px-4 py-3.5 text-left text-[10px] font-bold text-[#6B7280] uppercase tracking-widest">
+                    <th className="px-4 py-3.5 text-left text-[10px] font-bold text-stone uppercase tracking-widest">
                       Tipo
                     </th>
-                    <th className="px-4 py-3.5 text-left text-[10px] font-bold text-[#6B7280] uppercase tracking-widest">
+                    <th className="px-4 py-3.5 text-left text-[10px] font-bold text-stone uppercase tracking-widest">
                       Contacto
                     </th>
-                    <th className="px-4 py-3.5 text-center text-[10px] font-bold text-[#6B7280] uppercase tracking-widest">
+                    <th className="px-4 py-3.5 text-center text-[10px] font-bold text-stone uppercase tracking-widest">
                       Proyectos
                     </th>
-                    <th className="px-4 py-3.5 text-right text-[10px] font-bold text-[#6B7280] uppercase tracking-widest">
+                    <th className="px-4 py-3.5 text-right text-[10px] font-bold text-stone uppercase tracking-widest">
                       Inversión Total
                     </th>
-                    <th className="px-4 py-3.5 text-left text-[10px] font-bold text-[#6B7280] uppercase tracking-widest">
+                    <th className="px-4 py-3.5 text-left text-[10px] font-bold text-stone uppercase tracking-widest">
                       Estado
                     </th>
-                    <th className="px-3 py-3.5 text-right text-[10px] font-bold text-[#6B7280] uppercase tracking-widest">
+                    <th className="px-3 py-3.5 text-right text-[10px] font-bold text-stone uppercase tracking-widest">
                       Acciones
                     </th>
                   </tr>
@@ -397,7 +395,7 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
                     return (
                       <tr
                         key={cliente.id}
-                        className="hover:bg-[#FAFAFA] transition-colors group"
+                        className="hover:bg-[#F5F0EA] transition-colors group"
                       >
                         {/* Cliente */}
                         <td className="px-5 py-3.5">
@@ -408,11 +406,11 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
                             <div className="min-w-0">
                               <Link
                                 href={`/clientes/${cliente.id}`}
-                                className="font-semibold text-[#111827] hover:text-[#D95510] transition-colors truncate block leading-tight"
+                                className="font-semibold text-[#111827] hover:text-[#C84B1A] transition-colors truncate block leading-tight"
                               >
                                 {cliente.nombre_razon_social}
                               </Link>
-                              <p className="text-xs text-[#9CA3AF] mt-0.5 truncate">
+                              <p className="text-xs text-[#9CA3AF] mt-0.5 truncate" style={{ fontFamily: 'var(--font-mono)' }}>
                                 {cliente.nit_cedula || 'Sin NIT/Cédula'}
                               </p>
                             </div>
@@ -422,12 +420,12 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
                         {/* Tipo */}
                         <td className="px-4 py-3.5 whitespace-nowrap">
                           {cliente.tipo === 'empresa' ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-[#EFF6FF] text-[#1E6FB8] border border-[#BFDBFE]">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-[#E8F0F8] text-[#2D5F8A] border border-[#C1D8EE]">
                               <Building2 className="h-3 w-3 flex-shrink-0" />
                               Persona Jurídica
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-[#F3F4F6] text-[#6B7280] border border-[#E5E7EB]">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-[#F5F2EE] text-stone border border-[#E8E4DE]">
                               <User className="h-3 w-3 flex-shrink-0" />
                               Persona Natural
                             </span>
@@ -539,7 +537,7 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
                         onClick={() => setPagina(p)}
                         className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-medium transition-colors ${
                           p === paginaActual
-                            ? 'bg-[#D95510] text-white shadow-sm'
+                            ? 'bg-[#C84B1A] text-white shadow-sm'
                             : 'text-[#374151] hover:bg-[#F3F4F6]'
                         }`}
                       >
@@ -565,7 +563,7 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
       <div className="w-full lg:w-72 flex-shrink-0 space-y-4">
 
         {/* Distribución */}
-        <div className="bg-white border border-[#E5E7EB] rounded-2xl p-5 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
+        <div className="bg-white border border-[#E8E4DE] rounded-2xl p-5 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
           <h3 className="font-semibold text-[#111827] mb-5 text-sm">
             Distribución por tipo de cliente
           </h3>
@@ -594,7 +592,7 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
         </div>
 
         {/* Actividad reciente */}
-        <div className="bg-white border border-[#E5E7EB] rounded-2xl p-5 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
+        <div className="bg-white border border-[#E8E4DE] rounded-2xl p-5 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
           <h3 className="font-semibold text-[#111827] mb-4 text-sm">Actividad reciente</h3>
 
           {actividadReciente.length === 0 ? (
@@ -628,7 +626,7 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
             <div className="mt-4 pt-3 border-t border-[#F3F4F6]">
               <Link
                 href="/clientes"
-                className="text-sm font-semibold text-[#D95510] hover:text-[#C44A0C] transition-colors"
+                className="text-sm font-semibold text-[#C84B1A] hover:text-[#A83A14] transition-colors"
               >
                 Ver toda la actividad →
               </Link>

@@ -4,7 +4,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Mail, Lock, User, Building2, MapPin, Globe, CheckCircle2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { Card } from '@/components/shared/Card';
 import { Button } from '@/components/shared/Button';
 import { Input } from '@/components/shared/Input';
 import { ErrorMessage } from '@/components/shared/ErrorMessage';
@@ -83,12 +82,12 @@ export default function RegistroPage() {
 
   if (success) {
     return (
-      <Card padding="lg" className="border border-concrete text-center">
-        <div className="mb-4 mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-success-bg">
-          <CheckCircle2 className="h-8 w-8 text-success-text" />
+      <div className="bg-white border border-[#E8E4DE] rounded-2xl p-8 shadow-sm text-center">
+        <div className="mb-4 mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#E8F4E8]">
+          <CheckCircle2 className="h-8 w-8 text-[#1A5C2A]" />
         </div>
-        <h2 className="text-[20px] font-semibold text-ink">Revisa tu correo</h2>
-        <p className="mt-2 text-[13px] text-stone leading-relaxed">
+        <h2 className="text-[20px] font-semibold text-[#1C1814]">Revisa tu correo</h2>
+        <p className="mt-2 text-[13px] text-[#7A7265] leading-relaxed">
           Te enviamos un enlace de confirmación. Haz clic en él para activar tu cuenta.
         </p>
         <Link href="/login">
@@ -96,24 +95,27 @@ export default function RegistroPage() {
             Volver al inicio de sesión
           </Button>
         </Link>
-      </Card>
+      </div>
     );
   }
 
   return (
     <>
-      <Card padding="lg" className="border border-concrete">
-        <div className="mb-6">
-          <h1 className="text-[20px] font-semibold text-ink">
-            Crea tu cuenta
-          </h1>
-          <p className="mt-1 text-[13px] text-stone">
-            Empieza a presupuestar con IA en minutos
-          </p>
-        </div>
+      {/* Encabezado */}
+      <div className="mb-7">
+        <h1 className="text-[24px] font-semibold text-[#1C1814] tracking-tight">
+          Crea tu cuenta
+        </h1>
+        <p className="mt-1.5 text-[14px] text-[#7A7265]">
+          Empieza a presupuestar con precisión en minutos
+        </p>
+      </div>
+
+      {/* Contenedor del formulario */}
+      <div className="bg-white border border-[#E8E4DE] rounded-2xl p-7 shadow-sm">
 
         {error && (
-          <ErrorMessage message={error} className="mb-4" onDismiss={() => setError(null)} />
+          <ErrorMessage message={error} className="mb-5" onDismiss={() => setError(null)} />
         )}
 
         <form action={handleSubmit} className="space-y-4">
@@ -167,18 +169,18 @@ export default function RegistroPage() {
           />
 
           <div className="w-full space-y-1.5">
-            <label htmlFor="ciudad" className="block text-[13px] font-medium text-stone">
+            <label htmlFor="ciudad" className="block text-[13px] font-medium text-[#7A7265]">
               Ciudad (opcional)
             </label>
             <div className="relative">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-mortar pointer-events-none">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#C8C0B5] pointer-events-none">
                 <MapPin className="h-4 w-4" />
               </div>
               <select
                 id="ciudad"
                 name="ciudad"
-                className="w-full h-10 pl-10 pr-3 text-[15px] rounded-lg border border-concrete bg-white text-ink
-                  hover:border-mortar focus:outline-none focus:border-[var(--accent-primary)]
+                className="w-full h-10 pl-10 pr-3 text-[15px] rounded-lg border border-[#E8E4DE] bg-white text-[#1C1814]
+                  hover:border-[#C8C0B5] focus:outline-none focus:border-[#C84B1A] focus:ring-2 focus:ring-[#C84B1A]/20
                   transition-colors duration-150 appearance-none cursor-pointer"
               >
                 <option value="">Selecciona una ciudad</option>
@@ -209,9 +211,9 @@ export default function RegistroPage() {
         </form>
 
         <div className="my-5 flex items-center gap-3">
-          <div className="h-px flex-1 bg-concrete" />
-          <span className="text-[11px] text-stone">o continúa con</span>
-          <div className="h-px flex-1 bg-concrete" />
+          <div className="h-px flex-1 bg-[#E8E4DE]" />
+          <span className="text-[11px] text-[#7A7265]">o continúa con</span>
+          <div className="h-px flex-1 bg-[#E8E4DE]" />
         </div>
 
         <Button
@@ -222,13 +224,13 @@ export default function RegistroPage() {
         >
           Continuar con Google
         </Button>
-      </Card>
+      </div>
 
-      <p className="mt-5 text-center text-[13px] text-stone">
+      <p className="mt-5 text-center text-[13px] text-[#7A7265]">
         ¿Ya tienes cuenta?{' '}
         <Link
           href="/login"
-          className="font-medium text-[var(--accent-primary)] hover:text-[var(--accent-hover)] transition-colors"
+          className="font-medium text-[#C84B1A] hover:text-[#A83A14] transition-colors"
         >
           Inicia sesión
         </Link>

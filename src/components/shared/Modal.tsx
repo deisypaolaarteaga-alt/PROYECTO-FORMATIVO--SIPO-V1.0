@@ -44,15 +44,15 @@ const ModalContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed z-50 grid w-full max-w-lg scale-100 gap-4 border bg-white p-6 opacity-100 shadow-lg animate-in fade-in-90 zoom-in-90 sm:rounded-2xl md:w-full",
+        "fixed z-50 grid w-full max-w-lg scale-100 gap-4 border border-[#E8E4DE] bg-white p-6 opacity-100 shadow-xl animate-in fade-in-90 zoom-in-90 sm:rounded-2xl md:w-full",
         className
       )}
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-white transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-neutral-100 data-[state=open]:text-neutral-500">
-        <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
+      <DialogPrimitive.Close className="absolute right-4 top-4 h-7 w-7 inline-flex items-center justify-center rounded-lg bg-[#F5F2EE] text-stone hover:bg-[#EDE6DC] hover:text-[#1C1814] transition-colors focus:outline-none focus:ring-2 focus:ring-[#C84B1A]/30 disabled:pointer-events-none">
+        <X className="h-3.5 w-3.5" />
+        <span className="sr-only">Cerrar</span>
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>
   </ModalPortal>
@@ -94,7 +94,7 @@ const ModalTitle = React.forwardRef<
   <DialogPrimitive.Title
     ref={ref}
     className={cn(
-      "text-lg font-semibold leading-none tracking-tight text-neutral-900",
+      "text-lg font-semibold leading-none tracking-tight text-[#1C1814]",
       className
     )}
     {...props}
@@ -108,7 +108,7 @@ const ModalDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Description
     ref={ref}
-    className={cn("text-sm text-neutral-500", className)}
+    className={cn("text-sm text-stone", className)}
     {...props}
   />
 ));

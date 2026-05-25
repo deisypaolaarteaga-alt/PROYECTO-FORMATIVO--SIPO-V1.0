@@ -11,9 +11,13 @@ import {
 import type { ActionResult } from '@/types';
 
 /**
- * Iniciar sesión con email y contraseña
+ * Paso 1 del login con 2FA:
+ * Verifica email + contraseña. Si son correctos, firma la sesión temporal,
+ * la destruye de inmediato (para que el middleware no vea una sesión activa)
+ * y envía el OTP al correo. Devuelve el email para que el cliente muestre
+ * la pantalla de verificación.
  */
-export async function signIn(formData: FormData, captchaToken?: string): Promise<ActionResult> {
+export async function signIn(formData: FormData): Promise<ActionResult<{ email: string }>> {
   const raw = {
     email: formData.get('email') as string,
     password: formData.get('password') as string,
@@ -25,26 +29,85 @@ export async function signIn(formData: FormData, captchaToken?: string): Promise
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({
+
+  // Verificar credenciales
+  const { error: signInError } = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
     password: parsed.data.password,
-    options: { captchaToken },
   });
 
-  if (error) {
-    if (error.message.includes('captcha')) {
-      return { success: false, error: 'Verificación de seguridad fallida. Intenta de nuevo.' };
-    }
-    if (error.message.includes('Email not confirmed')) {
+  if (signInError) {
+    if (signInError.message.includes('Email not confirmed')) {
       return { success: false, error: 'Debes confirmar tu email primero. Revisa tu bandeja de entrada (incluyendo spam).' };
     }
-    if (error.message.includes('Invalid login credentials')) {
+    if (signInError.message.includes('Invalid login credentials')) {
       return { success: false, error: 'Email o contraseña incorrectos.' };
     }
-    if (error.message.includes('Too many requests')) {
+    if (signInError.message.includes('Too many requests')) {
       return { success: false, error: 'Demasiados intentos. Espera unos minutos.' };
     }
     return { success: false, error: 'Error al iniciar sesión. Intenta de nuevo.' };
+  }
+
+  // Destruir la sesión temporal — el usuario completa el login solo después del OTP
+  await supabase.auth.signOut();
+
+  // Enviar OTP al correo
+  const { error: otpError } = await supabase.auth.signInWithOtp({
+    email: parsed.data.email,
+    options: { shouldCreateUser: false },
+  });
+
+  if (otpError) {
+    return { success: false, error: 'No se pudo enviar el código de verificación. Intenta de nuevo.' };
+  }
+
+  return { success: true, data: { email: parsed.data.email } };
+}
+
+/**
+ * Reenviar OTP al correo (desde la pantalla de verificación).
+ */
+export async function sendOtp(email: string): Promise<ActionResult> {
+  if (!email) return { success: false, error: 'Email requerido.' };
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: { shouldCreateUser: false },
+  });
+
+  if (error) {
+    if (error.message.includes('Too many requests')) {
+      return { success: false, error: 'Demasiados intentos. Espera unos minutos antes de reenviar.' };
+    }
+    return { success: false, error: 'No se pudo reenviar el código. Intenta de nuevo.' };
+  }
+
+  return { success: true };
+}
+
+/**
+ * Paso 2 del login con 2FA:
+ * Verifica el OTP de 6 dígitos. Si es correcto establece la sesión y redirige al dashboard.
+ */
+export async function verifyOtp(email: string, token: string): Promise<ActionResult> {
+  if (!email || !token || token.length !== 6) {
+    return { success: false, error: 'Código inválido.' };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.verifyOtp({
+    email,
+    token,
+    type: 'email',
+  });
+
+  if (error) {
+    if (error.message.includes('Token has expired') || error.message.includes('invalid')) {
+      return { success: false, error: 'Código incorrecto o expirado. Solicita uno nuevo.' };
+    }
+    return { success: false, error: 'No se pudo verificar el código. Intenta de nuevo.' };
   }
 
   redirect('/dashboard');
@@ -53,14 +116,12 @@ export async function signIn(formData: FormData, captchaToken?: string): Promise
 /**
  * Registrar nuevo usuario
  */
-export async function signUp(formData: FormData, captchaToken?: string): Promise<ActionResult> {
+export async function signUp(formData: FormData): Promise<ActionResult> {
   const raw = {
     nombre_completo: formData.get('nombre_completo') as string,
     email: formData.get('email') as string,
     password: formData.get('password') as string,
     confirmar_password: formData.get('confirmar_password') as string,
-    empresa: (formData.get('empresa') as string) || undefined,
-    ciudad: (formData.get('ciudad') as string) || undefined,
   };
 
   const parsed = registroSchema.safeParse(raw);
@@ -74,16 +135,12 @@ export async function signUp(formData: FormData, captchaToken?: string): Promise
     password: parsed.data.password,
     options: {
       emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
-      captchaToken,
       data: {
         nombre_completo: parsed.data.nombre_completo,
       }
     }
   });
 
-  if (error?.message?.includes('captcha')) {
-    return { success: false, error: 'Verificación de seguridad fallida. Intenta de nuevo.' };
-  }
   if (error?.message?.includes('already registered')) {
     return { success: false, error: 'Este email ya tiene una cuenta registrada.' };
   }
@@ -92,10 +149,10 @@ export async function signUp(formData: FormData, captchaToken?: string): Promise
   }
 
   if (data.user && !data.session) {
-    return { 
-      success: true, 
+    return {
+      success: true,
       data: { needsConfirmation: true },
-      message: 'Revisa tu correo para confirmar tu cuenta.' 
+      message: 'Revisa tu correo para confirmar tu cuenta.'
     };
   }
 
@@ -139,7 +196,9 @@ export async function signOut(): Promise<void> {
 }
 
 /**
- * Enviar correo de recuperación de contraseña
+ * Enviar correo de recuperación de contraseña.
+ * El enlace del correo va a /auth/callback?next=/nueva-contrasena para que
+ * el callback intercambie el código por sesión y luego lleve al formulario.
  */
 export async function resetPassword(formData: FormData): Promise<ActionResult> {
   const raw = { email: formData.get('email') as string };
@@ -151,7 +210,7 @@ export async function resetPassword(formData: FormData): Promise<ActionResult> {
 
   const supabase = await createClient();
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/nueva-contrasena`,
+    redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/nueva-contrasena`,
   });
 
   if (error) {
@@ -190,7 +249,7 @@ export async function cambiarContrasena(
 }
 
 /**
- * Actualizar contraseña (desde link de recuperación)
+ * Actualizar contraseña (desde link de recuperación — usuario ya tiene sesión via callback)
  */
 export async function updatePassword(formData: FormData): Promise<ActionResult> {
   const raw = {

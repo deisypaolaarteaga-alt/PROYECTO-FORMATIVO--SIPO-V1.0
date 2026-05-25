@@ -90,6 +90,7 @@ export default async function ProjectDetailPage({ params }: Props) {
           projectDescripcion={project.descripcion}
           projectUbicacion={project.ubicacion}
           projectClienteId={project.cliente_id ?? null}
+          projectClienteNombre={(project as any).clientes?.nombre_razon_social ?? project.cliente_nombre ?? null}
         />
       </div>
 

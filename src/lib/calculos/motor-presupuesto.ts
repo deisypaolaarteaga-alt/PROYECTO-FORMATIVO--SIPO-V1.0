@@ -1,6 +1,6 @@
 // ============================================================
 // SIPO — Motor de Cálculo Profesional (Metodología 2026)
-// Basado en normativa IDU / INVIAS y Ley 1819 (IVA sobre Utilidad)
+// Basado en normativa colombiana de construcción y Ley 1819 (IVA sobre Utilidad)
 // ============================================================
 
 import Decimal from 'decimal.js';

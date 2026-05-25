@@ -7,6 +7,16 @@ import { revalidatePath } from 'next/cache';
 import type { ActionResult } from '@/types';
 import Decimal from 'decimal.js';
 
+// Busca la tasa ReteICA en la tabla municipios. Default 0.5% si no se encuentra.
+async function lookupReteICA(supabase: Awaited<ReturnType<typeof createClient>>, ciudad: string): Promise<number> {
+  const { data } = await supabase
+    .from('municipios')
+    .select('reteica_pct')
+    .eq('nombre', ciudad)
+    .maybeSingle();
+  return data?.reteica_pct != null ? Number(data.reteica_pct) : 0.5;
+}
+
 /**
  * Crea un nuevo presupuesto
  */
@@ -30,6 +40,9 @@ export async function crearPresupuesto(
       .eq('id', user.id)
       .single();
 
+    const ciudadFinal = ciudadObra || profile?.municipio || profile?.ciudad || 'Bogotá D.C.';
+    const icaPct = await lookupReteICA(supabase, ciudadFinal);
+
     const validated = presupuestoSchema.parse({
       titulo,
       estado: 'borrador',
@@ -38,7 +51,7 @@ export async function crearPresupuesto(
       utilidad_pct: 10,
       iva_porcentaje: 19,
       retefuente_pct: 2,
-      ica_pct: 0
+      ica_pct: icaPct,
     });
 
     const { data, error } = await supabase
@@ -47,7 +60,7 @@ export async function crearPresupuesto(
         ...validated,
         project_id: projectId,
         user_id: user.id,
-        ciudad_ica: ciudadObra || profile?.municipio || profile?.ciudad || 'Bogotá D.C.',
+        ciudad_ica: ciudadFinal,
       })
       .select()
       .single();
@@ -844,5 +857,36 @@ export async function sincronizarPrecioCuadrilla(
   } catch (err) {
     console.error('[sincronizarPrecioCuadrilla] error:', err);
     return { success: false, error: 'Error al sincronizar precio de cuadrilla.' };
+  }
+}
+
+/**
+ * Actualiza la ciudad ICA de un presupuesto y busca automáticamente
+ * la tasa reteica_pct en la tabla municipios.
+ */
+export async function actualizarCiudadICA(
+  budgetId: string,
+  ciudad: string
+): Promise<ActionResult<{ ica_pct: number }>> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'No autorizado.' };
+
+    const icaPct = await lookupReteICA(supabase, ciudad);
+
+    const { error } = await supabase
+      .from('budgets')
+      .update({ ciudad_ica: ciudad, ica_pct: icaPct, updated_at: new Date().toISOString() })
+      .eq('id', budgetId)
+      .eq('user_id', user.id)
+      .is('deleted_at', null);
+
+    if (error) throw error;
+
+    revalidatePath(`/presupuestos/${budgetId}`);
+    return { success: true, data: { ica_pct: icaPct } };
+  } catch {
+    return { success: false, error: 'No se pudo actualizar la ciudad ICA.' };
   }
 }

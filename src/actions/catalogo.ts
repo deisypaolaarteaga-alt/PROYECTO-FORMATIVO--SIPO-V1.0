@@ -263,6 +263,14 @@ export async function crearPresupuestoConPlantilla(
       .eq('id', user.id)
       .single();
 
+    const ciudadFinal = ciudadObra || profile?.municipio || profile?.ciudad || 'Bogotá D.C.';
+    const { data: munData } = await supabase
+      .from('municipios')
+      .select('reteica_pct')
+      .eq('nombre', ciudadFinal)
+      .maybeSingle();
+    const icaPct = munData?.reteica_pct != null ? Number(munData.reteica_pct) : 0.5;
+
     // ── 1. Crear el presupuesto ───────────────────────────────────────────────
     const { data: budget, error: budgetErr } = await admin
       .from('budgets')
@@ -276,8 +284,8 @@ export async function crearPresupuestoConPlantilla(
         utilidad_pct: 10,
         iva_porcentaje: 19,
         retefuente_pct: 2,
-        ica_pct: 0,
-        ciudad_ica: ciudadObra || profile?.municipio || profile?.ciudad || 'Bogotá D.C.',
+        ica_pct: icaPct,
+        ciudad_ica: ciudadFinal,
       })
       .select()
       .single();

@@ -596,7 +596,7 @@ export default function InsumosPage() {
           <div className="space-y-2 text-center md:text-left">
             <h2 className="text-xl font-bold tracking-tight">Base de Datos 2026 Integrada</h2>
             <p className="text-[#F0A882] text-sm max-w-xl font-medium opacity-90">
-              SIPO incluye por defecto los precios de referencia de la metodología IDU / INVIAS actualizados.
+              SIPO incluye por defecto los precios de referencia del mercado colombiano actualizados.
               Puedes agregar tus propios insumos y cuadrillas personalizadas para un control total de costos.
             </p>
           </div>

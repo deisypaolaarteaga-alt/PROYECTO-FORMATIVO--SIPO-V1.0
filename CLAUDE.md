@@ -82,7 +82,7 @@ NEXT_PUBLIC_HCAPTCHA_SITE_KEY # Site key de hCaptcha — requerida en login y re
 - Triggers: `DROP TRIGGER IF EXISTS name ON table; CREATE TRIGGER ...`
 - Functions: `CREATE OR REPLACE FUNCTION`
 
-### Applied migrations (38 total, in order)
+### Applied migrations (39 total, in order)
 
 | File | Content | Status |
 |------|---------|--------|
@@ -124,12 +124,13 @@ NEXT_PUBLIC_HCAPTCHA_SITE_KEY # Site key de hCaptcha — requerida en login y re
 | `20260519100000_seed_cuadrillas_base.sql` | **Seed**: 10 cuadrillas de sistema (`es_sistema = true`, `user_id = NULL`) para las categorías base de construcción colombiana — Mampostería, Concreto, Pañete, Hidrosanitaria, Eléctrica, Excavación, Pisos, Pintura, Estructura Metálica, Topografía. Busca trabajadores por nombre exacto sin hardcodear UUIDs. | ✅ applied |
 | `20260519110000_fix_cuadrillas_trabajadores.sql` | **Fix**: Completa los trabajadores de 6 cuadrillas que fallaron por mismatch de tildes (`albañil`, `Topógrafo`, `Ayudante construcción`) en los ILIKE del seed anterior. Usa nombres exactos con tildes. | ✅ applied |
 | `20260520100000_security_rls_audit.sql` | **Security audit**: Corrige 5 vulnerabilidades RLS: (1) `v_resumen_presupuesto` recreada con `security_invoker = true` — sin el flag, la vista bypasseaba RLS y exponía presupuestos de otros usuarios; (2) elimina `budgets_update_own` que anulaba el bloqueo de `aprobado` vía OR lógico; (3) agrega políticas INSERT/DELETE faltantes en `budget_snapshots`; (4) elimina `cuadrillas_usuario_crud` (FOR ALL sin `deleted_at`) que rompía el soft-delete; (5) limpia políticas duplicadas en `ai_conversations/ai_usage/ai_messages`. | ✅ applied |
+| `20260521100000_fn_duplicar_presupuesto.sql` | **Función atómica**: `fn_duplicar_presupuesto(p_budget_id, p_user_id)` — duplica presupuesto completo (capítulos + actividades + APUs + apu_items) en una sola transacción. SECURITY DEFINER con verificación de ownership. Reemplaza loop de INSERTs individuales en el Server Action. | ✅ applied |
 
 ### Loose SQL files at root (already applied manually — do NOT re-run)
 
 `cuadrillas_schema.sql`, `ai-tables.sql`, `migration_motor_calculo.sql`, `migration_motor_2026.sql`, `preferences_column.sql`, `trigger-profiles.sql`, `seed.sql`, `seed_cuadrillas.sql`, `seed_data.sql` — these were executed directly in Supabase Dashboard and are **already reflected in the database**. Their triggers and functions are now superseded by `20260507100000_fix_trigger_chain.sql`. Do not add them to `migrate.js`.
 
-## Current Database State (as of 2026-05-21)
+## Current Database State (as of 2026-05-25)
 
 **28 tables + 5 views** in `public` schema. Jornales en `trabajadores` actualizados a SMMLV 2026 ($1.423.500/mes). Tabla `materials` deduplicada (46 filas, índice único en `nombre+categoria`). Key tables and their non-obvious columns:
 
@@ -219,7 +220,7 @@ Always use `decimal.js` for these computations. Fiscal rates by city live in `sr
 | `scripts/seed_catalogo_items_2026.ts` | Seed masivo de ítems APU de referencia (`catalogo_apu_items`) con proporciones por categoría Colombia 2026 — soporta `--reset` y `--dry-run` |
 | `scripts/verificar-rls.ts` | Verifica aislamiento RLS entre usuarios (crea user_A y user_B, valida que cada uno solo ve sus propios datos) |
 | `scripts/diagnostico-capitulos-huerfanos.ts` | Diagnóstico: lista capítulos/actividades del catálogo sin `catalogo_apu_items` (huérfanos), agrupados por tipo_obra. Soporta `--json`. |
-| `scripts/reimportar-capitulos-huerfanos.ts` | Reimportación: inserta `catalogo_apu_items` en actividades huérfanas usando perfiles INVIAS/IDU 2025 + proporciones por categoría. Soporta `--dry-run`, `--force`. |
+| `scripts/reimportar-capitulos-huerfanos.ts` | Reimportación: inserta `catalogo_apu_items` en actividades huérfanas usando proporciones del mercado colombiano 2025 por categoría. Soporta `--dry-run`, `--force`. |
 
 ### Supabase Clients — dos tipos
 
@@ -251,11 +252,12 @@ Token reference: `src/lib/design-tokens.ts`. User accent color stored in `profil
 
 ## Known Remaining Tasks
 
-> **Snapshot:** 2026-05-21 — `tsc --noEmit --skipLibCheck` limpio (0 errores), 38 migraciones aplicadas, rama `rama-deisy`. 16 Server Actions, 5 componentes PDF, motor de cálculo con tests Vitest. Nueva ruta `/parametros-fiscales`. 3 scripts nuevos `seed:catalogo-items`. Tabla `cuadrillas` con 10 cuadrillas de sistema + 20 filas en `cuadrilla_trabajadores` + 10 rendimientos INVIAS/IDU 2025. Auditoría RLS completada: 5 vulnerabilidades corregidas en `v_resumen_presupuesto`, `budgets`, `budget_snapshots`, `cuadrillas`, `ai_messages`.
+> **Snapshot:** 2026-05-25 — `tsc --noEmit --skipLibCheck` limpio (0 errores), 39 migraciones aplicadas en `migrate.js` (+ 1 archivo `20260522100000_seed_municipios_completo.sql` en la carpeta pero aún no agregado a migrate.js), rama `rama-deisy`. 16 Server Actions, 5 componentes PDF, motor de cálculo con tests Vitest. `fn_duplicar_presupuesto` implementada como función atómica DB-side. hCaptcha integrado en login/registro. 28 tablas + 5 vistas en BD.
 
 ### Pendiente — acción manual requerida
 - Presupuestos creados antes del fix de admin client (2026-05-07) tienen 0 actividades — deben eliminarse y recrearse con "Plantilla Sugerida"
 - ~~Reimportar capítulos del catálogo que existan en BD sin `apu_items`~~ — Scripts listos: `pnpm run diagnostico:huerfanos` (identifica) + `pnpm run reimportar:huerfanos` (corrige). Correr en ese orden. Scripts: `scripts/diagnostico-capitulos-huerfanos.ts` y `scripts/reimportar-capitulos-huerfanos.ts`.
+- **`20260522100000_seed_municipios_completo.sql` no está en `migrate.js`** — el archivo existe en `supabase/migrations/` pero no fue agregado al array `migrationFiles`. Agregar manualmente al final de `migrate.js` y ejecutar `pnpm run migrate` para sembrar todos los municipios de Colombia con tasas ReteICA.
 
 ### Pendiente — próximas features (prioridad alta)
 ~~- **Panel APU — fix duplicados en apu_items**~~ ✅ 2026-05-18 — `guardarAPU` en `presupuestos.ts`: cuando `payload.id` no viene del cliente, ahora busca primero un APU existente para la actividad (`maybeSingle()` con filtro `activity_id + user_id + deleted_at IS NULL`) antes de insertar uno nuevo. Elimina la condición de carrera que creaba APUs duplicados al guardar dos veces sin recargar.
@@ -263,7 +265,7 @@ Token reference: `src/lib/design-tokens.ts`. User accent color stored in `profil
 
 ### Pendiente — autenticación
 ~~- **`middleware.ts` NO EXISTE**~~ ✅ 2026-05-18 — `src/middleware.ts` creado; llama a `updateSession` de `@/lib/supabase/middleware`. Matcher excluye `_next/static`, `_next/image`, `favicon.ico` y archivos estáticos. Archivos obsoletos `src/proxy.ts` y `src/middleware.ts.bak` eliminados.
-~~- **hCaptcha no integrado en login/registro**~~ ✅ 2026-05-22 — `@hcaptcha/react-hcaptcha` instalado. Widget en `(auth)/login/page.tsx` y `(auth)/registro/page.tsx` con `next/dynamic + ssr:false`. `signIn` y `signUp` en `auth.ts` reciben y pasan `captchaToken` a Supabase. CSP en `next.config.ts` actualizado con dominios de hCaptcha (`js.hcaptcha.com`, `newassets.hcaptcha.com`, `api.hcaptcha.com`). Dev usa test key `10000000-ffff-ffff-ffff-000000000001`; prod usa key real en `.env.production` (gitignored). Ver tabla de configuración en sección Database Connection.
+~~- **hCaptcha no integrado en login/registro**~~ ~~✅ 2026-05-22~~ **Revertido 2026-05-25** — hCaptcha eliminado completamente. `@hcaptcha/react-hcaptcha` desinstalado. Widgets, estados `captchaToken`, imports `dynamic` y parámetros `captchaToken` removidos de `login/page.tsx`, `registro/page.tsx` y `auth.ts`. Entradas CSP de hCaptcha eliminadas de `next.config.ts`.
 - **Supabase Auth Dashboard**: Verificar en Authentication → URL Configuration que `Site URL = http://localhost:3000` y Redirect URLs incluye `http://localhost:3000/**`. Sin esto el callback de confirmación de email falla.
 - **Supabase hCaptcha en producción**: Al desplegar, cambiar el Captcha secret en Supabase Dashboard → Authentication → Attack Protection al secret real (guardado fuera de git). En dev usar `0x0000000000000000000000000000000000000000`.
 
@@ -287,7 +289,7 @@ Token reference: `src/lib/design-tokens.ts`. User accent color stored in `profil
 - ~~**`guardarApariencia` server action**~~ — `src/actions/apariencia.ts`: fusiona (`{ ...current.preferences, ...prefs }`) y persiste en `profiles.preferences` JSONB; disponible para uso desde otros componentes ✅ 2026-05-17
 - ~~**`cambiarContrasena` en `auth.ts`**~~ — `src/actions/auth.ts`: acción para usuario autenticado que valida longitud ≥8 + coincidencia, luego llama `supabase.auth.updateUser({ password })` ✅ 2026-05-17
 - ~~**Excel export**~~ — `src/lib/excel/exportarPresupuestoExcel.ts` genera `.xlsx` en browser con 4 hojas: **Resumen** (CD, AIU, IVA, Total Oferta, retenciones informativas + datos del proyecto/elaborador), **Presupuesto** (capítulos + actividades con cantidad, precio unit., total y % C.D.), **APUs** (todos los `apu_items` agrupados por actividad con tipo, cantidad, precio y subtotal), **Insumos** (explosión consolidada: agrupa por tipo+nombre+precio, multiplica `item.cantidad × act.cantidad` para obtener cantidad total en obra). `BotonExportarExcel.tsx` con import dinámico del helper. Botón aparece en header del editor y en panel lateral de exportación. Dependencia `xlsx 0.18.5` agregada. `tsc` + `pnpm build` limpios ✅ 2026-05-17
-- ~~**PDF — 4 bugs corregidos**~~ — (1) **% C.D. por actividad** (`PresupuestoPDF.tsx`): cada fila de actividad ahora calcula y muestra `vrTotal / costoDirecto × 100` con 1 decimal, usando `Decimal.js`; antes estaba vacío con `<Text></Text>`. (2) **Página de firmas** (`PresupuestoPDF.tsx`): bloque rediseñado con texto introductorio legal, dos `signatureBox` al 44% de ancho con `signatureName` (bold), `signatureRole` (cargo/matrícula/empresa), y pie "Elaboró y Presentó" / "Aceptó y Firmó" — ya no se ve como nombres flotando. (3) **Numeración dinámica APU** (`APUDetallePDF.tsx`): `sectionNum` se incrementa solo cuando la sección existe — si no hay equipos, materiales arranca como "1. MATERIALES" en lugar de "2. MATERIALES". (4) **Nota aclaratoria genéricos** (`APUDetallePDF.tsx`): si algún `apu_item.nombre` coincide con `/actividad general|sin definir|por definir/i`, aparece nota al pie: "Precios de referencia INVIAS/IDU 2025. Verificar con cotización real del mercado local." ✅ 2026-05-17
+- ~~**PDF — 4 bugs corregidos**~~ — (1) **% C.D. por actividad** (`PresupuestoPDF.tsx`): cada fila de actividad ahora calcula y muestra `vrTotal / costoDirecto × 100` con 1 decimal, usando `Decimal.js`; antes estaba vacío con `<Text></Text>`. (2) **Página de firmas** (`PresupuestoPDF.tsx`): bloque rediseñado con texto introductorio legal, dos `signatureBox` al 44% de ancho con `signatureName` (bold), `signatureRole` (cargo/matrícula/empresa), y pie "Elaboró y Presentó" / "Aceptó y Firmó" — ya no se ve como nombres flotando. (3) **Numeración dinámica APU** (`APUDetallePDF.tsx`): `sectionNum` se incrementa solo cuando la sección existe — si no hay equipos, materiales arranca como "1. MATERIALES" en lugar de "2. MATERIALES". (4) **Nota aclaratoria genéricos** (`APUDetallePDF.tsx`): si algún `apu_item.nombre` coincide con `/actividad general|sin definir|por definir/i`, aparece nota al pie: "Precios de referencia del mercado colombiano 2025. Verificar con cotización real del mercado local." ✅ 2026-05-17
 - ~~**BotonEnviarRevision + ModalValidacionExport**~~ — `BotonEnviarRevision.tsx` permite al usuario enviar el presupuesto a revisión desde el editor; `ModalValidacionExport.tsx` muestra validación pre-PDF (alertas de campos faltantes, estado, etc.); `presupuesto-estados.ts` centraliza las transiciones del estado machine; `ResumenFinanciero.tsx` y `ResumenFinancieroVisual.tsx` como variantes de presentación del resumen ✅ 2026-05-17
 - ~~**configuracion-fiscal Server Action**~~ — `src/actions/configuracion-fiscal.ts` gestiona parámetros IVA/AIU/retenciones del presupuesto ✅ 2026-05-17
 - ~~**Flujo de aprobación de presupuestos**~~ — Máquina de estados `borrador → en_revision → aprobado` con posibilidad de reabrir (`aprobado → borrador`). Migración `20260517100000_budget_aprobacion.sql`: constraint normalizado, trigger `fn_increment_budget_version` llena/limpia `aprobado_en` automáticamente. Server Actions `aprobarPresupuesto` + `reabrirPresupuesto` en `src/actions/presupuestos.ts` (admin client, RLS-safe). `EditorPresupuesto`: botón verde "Marcar como aprobado" en `en_revision`; banner verde + editor bloqueado vía `<fieldset disabled>` + botón "Reabrir para edición" con `ConfirmDialog` en `aprobado`. `tsc` + `pnpm build` limpios ✅ 2026-05-17

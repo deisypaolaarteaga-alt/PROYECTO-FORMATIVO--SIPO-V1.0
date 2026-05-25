@@ -6,14 +6,16 @@ import { createProject } from '@/actions/proyectos';
 import { Card } from '@/components/shared/Card';
 import { Button } from '@/components/shared/Button';
 import { Input } from '@/components/shared/Input';
-import { ArrowLeft, Building2, MapPin, User, FileText, Ruler } from 'lucide-react';
-import { CIUDADES_COLOMBIA, TIPO_OBRA_LABELS } from '@/types';
+import { ArrowLeft, Building2, FileText, Ruler } from 'lucide-react';
+import { TIPO_OBRA_LABELS } from '@/types';
 import { toast } from 'sonner';
 import { ClienteSelector } from '@/components/clientes/ClienteSelector';
+import { MunicipioCombobox } from '@/components/clientes/MunicipioCombobox';
 import Link from 'next/link';
 
 export default function NuevoProyectoPage() {
   const [loading, setLoading] = useState(false);
+  const [ubicacion, setUbicacion] = useState('');
   const router = useRouter();
 
   const handleSubmit = async (formData: FormData) => {
@@ -54,22 +56,13 @@ export default function NuevoProyectoPage() {
           />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <div className="space-y-1.5">
-              <label className="text-[13px] font-medium text-stone">Ciudad *</label>
-              <div className="relative">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-mortar pointer-events-none">
-                  <MapPin className="h-4 w-4" />
-                </div>
-                <select 
-                  name="ubicacion" 
-                  required 
-                  className="w-full h-10 pl-10 pr-3 text-[14px] rounded-lg border border-concrete bg-white text-ink hover:border-mortar focus:outline-none focus:border-[var(--accent-primary)] transition-all cursor-pointer appearance-none"
-                >
-                  <option value="">Selecciona una ciudad</option>
-                  {CIUDADES_COLOMBIA.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-            </div>
+            <MunicipioCombobox
+              value={ubicacion}
+              onChange={setUbicacion}
+              label="Ciudad *"
+              placeholder="Buscar municipio..."
+            />
+            <input type="hidden" name="ubicacion" value={ubicacion} />
 
             <div className="space-y-1.5">
               <label className="text-[13px] font-medium text-stone">Tipo de obra</label>

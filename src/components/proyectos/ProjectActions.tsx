@@ -18,6 +18,7 @@ interface ProjectActionsProps {
   projectDescripcion?: string | null;
   projectUbicacion?: string | null;
   projectClienteId?: string | null;
+  projectClienteNombre?: string | null;
 }
 
 export function ProjectActions({
@@ -28,6 +29,7 @@ export function ProjectActions({
   projectDescripcion,
   projectUbicacion,
   projectClienteId,
+  projectClienteNombre,
 }: ProjectActionsProps) {
   const router = useRouter();
   const [showModal,        setShowModal]        = useState(false);
@@ -140,18 +142,20 @@ export function ProjectActions({
         proyectoId={projectId}
         proyectoNombre={projectNombre}
         proyectoTipoObra={projectTipoObra}
+        proyectoUbicacion={projectUbicacion}
       />
 
       <EditarProyectoModal
         isOpen={showEdit}
         onClose={() => setShowEdit(false)}
         proyecto={{
-          id:          projectId,
-          nombre:      projectNombre,
-          descripcion: projectDescripcion,
-          ubicacion:   projectUbicacion,
-          tipo_obra:   projectTipoObra,
-          cliente_id:  projectClienteId,
+          id:             projectId,
+          nombre:         projectNombre,
+          descripcion:    projectDescripcion,
+          ubicacion:      projectUbicacion,
+          tipo_obra:      projectTipoObra,
+          cliente_id:     projectClienteId,
+          cliente_nombre: projectClienteNombre,
         }}
       />
 

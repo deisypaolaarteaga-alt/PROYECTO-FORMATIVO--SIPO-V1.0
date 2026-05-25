@@ -11,8 +11,8 @@ import {
 } from '@/components/shared/Modal';
 import { Button } from '@/components/shared/Button';
 import { ClienteSelector } from '@/components/clientes/ClienteSelector';
+import { MunicipioCombobox } from '@/components/clientes/MunicipioCombobox';
 import { actualizarProyecto } from '@/actions/proyectos';
-import { CIUDADES_COLOMBIA } from '@/types';
 
 const TIPOS_OBRA = [
   { value: 'residencial',    label: 'Residencial' },
@@ -20,6 +20,7 @@ const TIPOS_OBRA = [
   { value: 'industrial',     label: 'Industrial' },
   { value: 'infraestructura',label: 'Infraestructura' },
   { value: 'institucional',  label: 'Institucional' },
+  { value: 'hotelero',       label: 'Hotelero' },
   { value: 'otro',           label: 'Otro' },
 ];
 
@@ -54,7 +55,7 @@ export function EditarProyectoModal({ isOpen, onClose, proyecto }: EditarProyect
     setError('');
     const result = await actualizarProyecto(proyecto.id, {
       nombre:      nombre.trim(),
-      descripcion: descripcion.trim() || null,
+      descripcion: descripcion.trim() || undefined,
       ubicacion:   ubicacion.trim(),
       tipo_obra:   tipoObra || null,
       cliente_id:  clienteId ?? null,
@@ -89,19 +90,12 @@ export function EditarProyectoModal({ isOpen, onClose, proyecto }: EditarProyect
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-medium text-neutral-600 mb-1">Ciudad <span className="text-red-500">*</span></label>
-            <select
-              value={ubicacion}
-              onChange={e => setUbicacion(e.target.value)}
-              className={`${fieldCls} bg-white`}
-            >
-              <option value="">Selecciona una ciudad</option>
-              {CIUDADES_COLOMBIA.map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
+          <MunicipioCombobox
+            value={ubicacion}
+            onChange={setUbicacion}
+            label="Ciudad *"
+            placeholder="Buscar municipio..."
+          />
 
           <div>
             <label className="block text-xs font-medium text-neutral-600 mb-1">Tipo de obra</label>
@@ -119,7 +113,13 @@ export function EditarProyectoModal({ isOpen, onClose, proyecto }: EditarProyect
 
           <div>
             <label className="block text-xs font-medium text-neutral-600 mb-1">Cliente</label>
-            <ClienteSelector selectedId={clienteId} onSelect={setClienteId} />
+            <ClienteSelector
+              selectedId={clienteId}
+              onSelect={setClienteId}
+              initialCliente={proyecto.cliente_id && proyecto.cliente_nombre
+                ? { id: proyecto.cliente_id, nombre_razon_social: proyecto.cliente_nombre }
+                : null}
+            />
           </div>
 
           <div>

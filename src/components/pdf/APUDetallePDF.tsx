@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
 interface Props {
   projectName: string;
   activity: Activity;
-  configAiu?: ConfigAIU; // Por si hay AIU a nivel de APU, aunque la IDU lo suma a veces al final, pero se pide mostrarlo.
+  configAiu?: ConfigAIU; // Por si hay AIU a nivel de APU, aunque en algunos contratos se suma al final, pero se pide mostrarlo.
   parametros?: ParametrosFiscales;
   chapterNumber: number;
   activityIndex?: number; // Índice secuencial 1-based; si se provee, reemplaza activity.numero
@@ -186,7 +186,7 @@ export const APUDetallePDF = ({ projectName, activity, parametros, chapterNumber
   const subtotalMO = itemsMO.reduce((s, i) => s + (Number(i.subtotal) || 0), 0);
   const subtotalEq = itemsEquipo.reduce((s, i) => s + (Number(i.subtotal) || 0), 0);
 
-  // Cálculos INVIAS HM y EPP
+  // Cálculos HM y EPP según referencia colombiana
   const pctHM = apu.pct_herramienta_menor ?? (parametros?.herramienta_menor_porcentaje || 3);
   const pctEPP = apu.pct_epp ?? (parametros?.epp_porcentaje || 1);
   const costoHM = subtotalMO * (pctHM / 100);
@@ -229,7 +229,7 @@ export const APUDetallePDF = ({ projectName, activity, parametros, chapterNumber
         </View>
         <View style={styles.projectRow}>
           <Text style={styles.label}>Metodología:</Text>
-          <Text style={styles.value}>IDU/INVIAS (Divisor APU: {parametros?.divisor_apu || 182}h)</Text>
+          <Text style={styles.value}>Referencia mercado colombiano (Divisor APU: {parametros?.divisor_apu || 182}h)</Text>
         </View>
       </View>
 
@@ -331,7 +331,7 @@ export const APUDetallePDF = ({ projectName, activity, parametros, chapterNumber
       {/* Nota aclaratoria — precios de referencia */}
       {tieneItemsGenericos && (
         <Text style={styles.notaReferencia}>
-          * Algunos ítems contienen precios de referencia INVIAS/IDU 2025. Deben verificarse y actualizarse con cotización real del mercado local antes de presentar la oferta.
+          * Algunos ítems contienen precios de referencia del mercado colombiano 2025. Deben verificarse y actualizarse con cotización real del mercado local antes de presentar la oferta.
         </Text>
       )}
 
@@ -362,7 +362,7 @@ export const APUDetallePDF = ({ projectName, activity, parametros, chapterNumber
       <View style={styles.footer} fixed>
         <Text style={styles.footerText}>
           Los precios incluyen todos los costos directos e indirectos. Las retenciones son responsabilidad del contratante. 
-          Factor prestacional según INVIAS/IDU.
+          Factor prestacional según normativa colombiana.
         </Text>
         <Text style={styles.footerText} render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`} />
       </View>

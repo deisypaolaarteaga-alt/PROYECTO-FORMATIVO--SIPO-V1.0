@@ -414,7 +414,7 @@ const CATALOGO_APU: ApuSeed[] = [
   {
     actividadCodigo: 'VIA-04-001', // Sub-base granular compactada (m³)
     items: [
-      { tipo: 'material',  nombre: 'Material SBG-1 INVIAS (cantera)',  unidad: 'm³',     cantidad: 1.25,  precio_unitario: 42_000,  orden: 1 },
+      { tipo: 'material',  nombre: 'Material SBG-1 ref. colombiana (cantera)',  unidad: 'm³',     cantidad: 1.25,  precio_unitario: 42_000,  orden: 1 },
       { tipo: 'material',  nombre: 'Agua para humectación',             unidad: 'm³',     cantidad: 0.12,  precio_unitario: 5_000,   orden: 2 },
       { tipo: 'equipo',    nombre: 'Motoniveladora 140G',               unidad: 'hr',     cantidad: 0.02,  precio_unitario: 325_000, orden: 3 },
       { tipo: 'equipo',    nombre: 'Vibrocompactador pata de cabra',   unidad: 'hr',     cantidad: 0.02,  precio_unitario: 145_000, orden: 4 },
@@ -426,7 +426,7 @@ const CATALOGO_APU: ApuSeed[] = [
   {
     actividadCodigo: 'VIA-04-002', // Base granular compactada (m³)
     items: [
-      { tipo: 'material',  nombre: 'Material BG-1 INVIAS triturado',   unidad: 'm³',     cantidad: 1.25,  precio_unitario: 58_000,  orden: 1 },
+      { tipo: 'material',  nombre: 'Material BG-1 ref. colombiana triturado',   unidad: 'm³',     cantidad: 1.25,  precio_unitario: 58_000,  orden: 1 },
       { tipo: 'material',  nombre: 'Agua para humectación',             unidad: 'm³',     cantidad: 0.10,  precio_unitario: 5_000,   orden: 2 },
       { tipo: 'equipo',    nombre: 'Motoniveladora 140G',               unidad: 'hr',     cantidad: 0.025, precio_unitario: 325_000, orden: 3 },
       { tipo: 'equipo',    nombre: 'Vibrocompactador pata de cabra',   unidad: 'hr',     cantidad: 0.025, precio_unitario: 145_000, orden: 4 },

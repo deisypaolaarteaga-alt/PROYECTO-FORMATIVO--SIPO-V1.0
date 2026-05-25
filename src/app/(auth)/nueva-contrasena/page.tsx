@@ -57,7 +57,7 @@ export default function NuevaContrasenaPage() {
         />
 
         <Input
-          name="confirmPassword"
+          name="confirmar_password"
           type="password"
           label="Confirmar contraseña"
           placeholder="Repite tu nueva contraseña"

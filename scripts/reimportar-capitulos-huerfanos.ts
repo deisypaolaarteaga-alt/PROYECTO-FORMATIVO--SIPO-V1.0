@@ -58,7 +58,7 @@ interface ActividadHuerfana {
 }
 
 // ─── Perfiles APU por categoría de capítulo ───────────────────────────────────
-// Proporciones INVIAS/IDU 2025 — cada perfil suma 100 %.
+// Proporciones del mercado colombiano 2025 — cada perfil suma 100 %.
 
 const PERFILES: Record<string, PerfilAPU> = {
   preliminar: {

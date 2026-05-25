@@ -22,7 +22,7 @@ export function ResumenFinancieroVisual({ resumen, budget }: ResumenFinancieroVi
           Resumen Financiero
         </h3>
         <span className="text-[10px] text-steel-light font-medium bg-white/10 px-2 py-1 rounded">
-          Metodología IDU/INVIAS
+          Metodología colombiana de construcción
         </span>
       </div>
 

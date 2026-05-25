@@ -529,7 +529,7 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
                   <div className="flex justify-between items-center text-[11px]">
                     <span
                       className="text-stone flex items-center gap-1 cursor-help"
-                      title="Herramienta Menor: se calcula automáticamente como el 3% del costo total de Mano de Obra (INVIAS/IDU 2025). Incluye herramientas de mano como palas, picas, llanas y consumibles menores."
+                      title="Herramienta Menor: se calcula automáticamente como el 3% del costo total de Mano de Obra (referencia mercado colombiano 2025). Incluye herramientas de mano como palas, picas, llanas y consumibles menores."
                     >
                       Herramienta Menor (3% MO)
                       <Info className="h-3 w-3 text-mortar shrink-0" />

@@ -99,7 +99,7 @@ export function CatalogoView({ capitulosIniciales }: Props) {
               <div>
                 <h1 className="text-[17px] font-bold text-slate-900 leading-tight">Catálogo de referencia</h1>
                 <p className="text-[12px] text-slate-400 mt-0.5">
-                  Precios de referencia INVIAS / IDU · Colombia 2025–2026
+                  Precios de referencia del mercado colombiano 2025–2026
                 </p>
               </div>
             </div>

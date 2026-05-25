@@ -56,7 +56,7 @@ export async function generarPresupuestoPDF(
       }));
     }
 
-    // 4. Obtener Parámetros Fiscales Actuales (INVIAS/IDU)
+    // 4. Obtener Parámetros Fiscales Actuales
     const { data: paramFiscales } = await supabase
       .from('parametros_fiscales')
       .select('*')

@@ -1230,14 +1230,14 @@ const CATALOGO: CapituloSeed[] = [
         nombre: 'Sub-base granular compactada (CBR>50%, Proctor>100%)',
         unidad: 'm³',
         precio: 90_000, min: 65_000, max: 132_000,
-        descripcion: 'Material SBG-1 INVIAS, esp. según diseño (típico 0.20m).',
+        descripcion: 'Material SBG-1 norma colombiana, esp. según diseño (típico 0.20m).',
       },
       {
         codigo: 'VIA-04-002',
         nombre: 'Base granular compactada (CBR>80%, Proctor>100%)',
         unidad: 'm³',
         precio: 118_000, min: 88_000, max: 172_000,
-        descripcion: 'Material BG-1 INVIAS, capa típica 0.15-0.20m.',
+        descripcion: 'Material BG-1 norma colombiana, capa típica 0.15-0.20m.',
       },
       {
         codigo: 'VIA-04-003',

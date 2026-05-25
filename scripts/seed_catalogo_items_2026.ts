@@ -68,7 +68,7 @@ interface PerfilAPU {
 
 // ─── Perfiles por categoría de capítulo ──────────────────────────────────────
 //
-// Las proporciones siguen la metodología de costos directos de INVIAS/IDU 2025
+// Las proporciones siguen la metodología de costos directos del mercado colombiano 2025
 // y prácticas de mercado colombiano 2026.  Cada perfil suma exactamente 100 %.
 //
 // Distribución típica por capítulo:

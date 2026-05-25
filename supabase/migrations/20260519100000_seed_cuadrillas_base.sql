@@ -1,6 +1,6 @@
 -- ============================================================
 -- SIPO: Seed cuadrillas base de sistema — Colombia 2026
--- Fuente de rendimientos: INVIAS/IDU 2025
+-- Fuente de rendimientos: referencia del mercado colombiano 2025
 -- Idempotente: usa SELECT INTO + WHERE NOT EXISTS, sin UUIDs hardcodeados
 -- ============================================================
 
@@ -92,7 +92,7 @@ BEGIN
 
   IF NOT EXISTS (SELECT 1 FROM rendimientos WHERE cuadrilla_id = v_cuadrilla_id) THEN
     INSERT INTO rendimientos (cuadrilla_id, actividad_tipo, unidad, rendimiento_normal, rendimiento_minimo, rendimiento_optimo, fuente)
-    VALUES (v_cuadrilla_id, 'Mampostería', 'm²', 8, 5, 12, 'INVIAS/IDU Colombia 2025');
+    VALUES (v_cuadrilla_id, 'Mampostería', 'm²', 8, 5, 12, 'Referencia mercado colombiano 2025');
   END IF;
 
 
@@ -132,7 +132,7 @@ BEGIN
 
   IF NOT EXISTS (SELECT 1 FROM rendimientos WHERE cuadrilla_id = v_cuadrilla_id) THEN
     INSERT INTO rendimientos (cuadrilla_id, actividad_tipo, unidad, rendimiento_normal, rendimiento_minimo, rendimiento_optimo, fuente)
-    VALUES (v_cuadrilla_id, 'Concreto / Vaciado', 'm³', 6, 3, 9, 'INVIAS/IDU Colombia 2025');
+    VALUES (v_cuadrilla_id, 'Concreto / Vaciado', 'm³', 6, 3, 9, 'Referencia mercado colombiano 2025');
   END IF;
 
 
@@ -172,7 +172,7 @@ BEGIN
 
   IF NOT EXISTS (SELECT 1 FROM rendimientos WHERE cuadrilla_id = v_cuadrilla_id) THEN
     INSERT INTO rendimientos (cuadrilla_id, actividad_tipo, unidad, rendimiento_normal, rendimiento_minimo, rendimiento_optimo, fuente)
-    VALUES (v_cuadrilla_id, 'Pañete y Revoque', 'm²', 12, 8, 18, 'INVIAS/IDU Colombia 2025');
+    VALUES (v_cuadrilla_id, 'Pañete y Revoque', 'm²', 12, 8, 18, 'Referencia mercado colombiano 2025');
   END IF;
 
 
@@ -212,7 +212,7 @@ BEGIN
 
   IF NOT EXISTS (SELECT 1 FROM rendimientos WHERE cuadrilla_id = v_cuadrilla_id) THEN
     INSERT INTO rendimientos (cuadrilla_id, actividad_tipo, unidad, rendimiento_normal, rendimiento_minimo, rendimiento_optimo, fuente)
-    VALUES (v_cuadrilla_id, 'Instalaciones Hidrosanitarias', 'pto', 4, 2, 6, 'INVIAS/IDU Colombia 2025');
+    VALUES (v_cuadrilla_id, 'Instalaciones Hidrosanitarias', 'pto', 4, 2, 6, 'Referencia mercado colombiano 2025');
   END IF;
 
 
@@ -252,7 +252,7 @@ BEGIN
 
   IF NOT EXISTS (SELECT 1 FROM rendimientos WHERE cuadrilla_id = v_cuadrilla_id) THEN
     INSERT INTO rendimientos (cuadrilla_id, actividad_tipo, unidad, rendimiento_normal, rendimiento_minimo, rendimiento_optimo, fuente)
-    VALUES (v_cuadrilla_id, 'Instalaciones Eléctricas', 'pto', 5, 3, 8, 'INVIAS/IDU Colombia 2025');
+    VALUES (v_cuadrilla_id, 'Instalaciones Eléctricas', 'pto', 5, 3, 8, 'Referencia mercado colombiano 2025');
   END IF;
 
 
@@ -293,7 +293,7 @@ BEGIN
 
   IF NOT EXISTS (SELECT 1 FROM rendimientos WHERE cuadrilla_id = v_cuadrilla_id) THEN
     INSERT INTO rendimientos (cuadrilla_id, actividad_tipo, unidad, rendimiento_normal, rendimiento_minimo, rendimiento_optimo, fuente)
-    VALUES (v_cuadrilla_id, 'Excavación Manual', 'm³', 4, 2, 6, 'INVIAS/IDU Colombia 2025');
+    VALUES (v_cuadrilla_id, 'Excavación Manual', 'm³', 4, 2, 6, 'Referencia mercado colombiano 2025');
   END IF;
 
 
@@ -333,7 +333,7 @@ BEGIN
 
   IF NOT EXISTS (SELECT 1 FROM rendimientos WHERE cuadrilla_id = v_cuadrilla_id) THEN
     INSERT INTO rendimientos (cuadrilla_id, actividad_tipo, unidad, rendimiento_normal, rendimiento_minimo, rendimiento_optimo, fuente)
-    VALUES (v_cuadrilla_id, 'Pisos y Enchapes', 'm²', 10, 6, 15, 'INVIAS/IDU Colombia 2025');
+    VALUES (v_cuadrilla_id, 'Pisos y Enchapes', 'm²', 10, 6, 15, 'Referencia mercado colombiano 2025');
   END IF;
 
 
@@ -373,7 +373,7 @@ BEGIN
 
   IF NOT EXISTS (SELECT 1 FROM rendimientos WHERE cuadrilla_id = v_cuadrilla_id) THEN
     INSERT INTO rendimientos (cuadrilla_id, actividad_tipo, unidad, rendimiento_normal, rendimiento_minimo, rendimiento_optimo, fuente)
-    VALUES (v_cuadrilla_id, 'Pintura', 'm²', 20, 12, 30, 'INVIAS/IDU Colombia 2025');
+    VALUES (v_cuadrilla_id, 'Pintura', 'm²', 20, 12, 30, 'Referencia mercado colombiano 2025');
   END IF;
 
 
@@ -413,7 +413,7 @@ BEGIN
 
   IF NOT EXISTS (SELECT 1 FROM rendimientos WHERE cuadrilla_id = v_cuadrilla_id) THEN
     INSERT INTO rendimientos (cuadrilla_id, actividad_tipo, unidad, rendimiento_normal, rendimiento_minimo, rendimiento_optimo, fuente)
-    VALUES (v_cuadrilla_id, 'Estructura Metálica', 'kg', 80, 50, 120, 'INVIAS/IDU Colombia 2025');
+    VALUES (v_cuadrilla_id, 'Estructura Metálica', 'kg', 80, 50, 120, 'Referencia mercado colombiano 2025');
   END IF;
 
 
@@ -454,7 +454,7 @@ BEGIN
 
   IF NOT EXISTS (SELECT 1 FROM rendimientos WHERE cuadrilla_id = v_cuadrilla_id) THEN
     INSERT INTO rendimientos (cuadrilla_id, actividad_tipo, unidad, rendimiento_normal, rendimiento_minimo, rendimiento_optimo, fuente)
-    VALUES (v_cuadrilla_id, 'Topografía', 'ml', 200, 100, 400, 'INVIAS/IDU Colombia 2025');
+    VALUES (v_cuadrilla_id, 'Topografía', 'ml', 200, 100, 400, 'Referencia mercado colombiano 2025');
   END IF;
 
   RAISE NOTICE 'Seed cuadrillas base completado — 10 cuadrillas de sistema insertadas (o ya existentes).';

@@ -69,12 +69,14 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={isDisabled}
         {...props}
       >
-        {loading ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : icon ? (
-          <span className="shrink-0">{icon}</span>
-        ) : null}
-        {children}
+        <span style={{ display: 'contents' }}>
+          {loading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : icon ? (
+            <span className="shrink-0">{icon}</span>
+          ) : null}
+          {children}
+        </span>
       </button>
     );
   }

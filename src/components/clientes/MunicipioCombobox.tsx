@@ -37,10 +37,10 @@ export function MunicipioCombobox({
     : null;
 
   const handleSelect = (m: MunicipioItem) => {
-    onChange(m.nombre);
-    onDepartamentoChange?.(m.departamento);
     setSearch('');
     setIsOpen(false);
+    onChange(m.nombre);
+    onDepartamentoChange?.(m.departamento);
   };
 
   const handleClear = (e: React.MouseEvent) => {

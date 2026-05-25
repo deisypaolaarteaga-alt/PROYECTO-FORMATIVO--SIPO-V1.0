@@ -23,6 +23,7 @@ import {
 import { Button } from '@/components/shared/Button';
 import { Card } from '@/components/shared/Card';
 import { cn } from '@/lib/utils';
+import { MunicipioCombobox } from '@/components/clientes/MunicipioCombobox';
 import { crearPresupuesto } from '@/actions/presupuestos';
 import { crearPresupuestoConPlantilla } from '@/actions/catalogo';
 import { getProjects } from '@/actions/proyectos';
@@ -60,6 +61,7 @@ interface ModalNuevoPresupuestoProps {
   proyectoId?: string;
   proyectoNombre?: string;
   proyectoTipoObra?: string;
+  proyectoUbicacion?: string | null;
 }
 
 export function ModalNuevoPresupuesto({
@@ -68,6 +70,7 @@ export function ModalNuevoPresupuesto({
   proyectoId,
   proyectoNombre,
   proyectoTipoObra,
+  proyectoUbicacion,
 }: ModalNuevoPresupuestoProps) {
   const proyectoFijo = !!proyectoId;
 
@@ -101,15 +104,18 @@ export function ModalNuevoPresupuesto({
       setStartingPoint('blank');
       setSelectedTipoObra(normalizarTipo(proyectoTipoObra));
       setCustomChapters([]);
-      setCiudadObra('');
+      setCiudadObra(proyectoUbicacion || '');
       if (!proyectoFijo) loadProjects();
     }
   }, [isOpen]);
 
-  // Cuando el proyecto seleccionado cambia (paso 1→2), pre-llenar el tipo
+  // Cuando el proyecto seleccionado cambia (paso 1→2), pre-llenar tipo y ciudad
   useEffect(() => {
     if (selectedProject?.tipo_obra) {
       setSelectedTipoObra(normalizarTipo(selectedProject.tipo_obra));
+    }
+    if (selectedProject?.ubicacion) {
+      setCiudadObra(selectedProject.ubicacion);
     }
   }, [selectedProjectId]);
 
@@ -315,15 +321,14 @@ export function ModalNuevoPresupuesto({
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-[14px] font-bold text-ink">Ciudad de la obra</label>
-                  <input
-                    placeholder="Ej: Medellín, Cali, Bogotá D.C."
+                <div className="space-y-1">
+                  <MunicipioCombobox
                     value={ciudadObra}
-                    onChange={e => setCiudadObra(e.target.value)}
-                    className="w-full h-12 px-4 text-[14px] border border-concrete rounded-xl focus:border-burn-orange outline-none shadow-sm transition-all"
+                    onChange={setCiudadObra}
+                    label="Ciudad de la obra"
+                    placeholder="Buscar municipio..."
                   />
-                  <p className="text-[11px] text-stone">Define la ciudad donde se ejecuta la obra — determina la tarifa ICA aplicable.</p>
+                  <p className="text-[11px] text-stone">Determina la tarifa ICA aplicable al presupuesto.</p>
                 </div>
 
                 <div className="space-y-3">

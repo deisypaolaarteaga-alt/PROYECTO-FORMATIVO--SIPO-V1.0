@@ -1,5 +1,5 @@
 -- SIPO Migration: Fix Catalogo APU Prices (Colombia 2026) - REFINED V3
--- Reference: INVIAS 2025-2, SMMLV Decreto 1572/2024
+-- Reference: precios de referencia del mercado colombiano 2025, SMMLV Decreto 1572/2024
 
 BEGIN;
 

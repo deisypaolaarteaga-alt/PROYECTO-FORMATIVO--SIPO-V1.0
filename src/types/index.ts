@@ -119,6 +119,7 @@ export interface MaterialConPrecio {
   departamento: string;
   categoria: string;
   precio_usuario: number | null;
+  activo: boolean;
 }
 
 export interface EquipoConPrecio {
@@ -131,6 +132,7 @@ export interface EquipoConPrecio {
   precio_mensual: number;
   departamento: string;
   precio_usuario: number | null;
+  activo: boolean;
 }
 
 // ── Nivel 2: Presupuesto ──

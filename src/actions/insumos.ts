@@ -108,21 +108,31 @@ export async function getMaterialesConPrecio(): Promise<MaterialConPrecio[]> {
 
   const { data: overrides } = await supabase
     .from('user_material_precios')
-    .select('material_id, precio_unitario')
+    .select('material_id, precio_unitario, activo')
     .eq('user_id', user.id);
 
-  const overrideMap = new Map((overrides || []).map((o) => [o.material_id, o.precio_unitario]));
+  type OvEntry = { precio: number | null; activo: boolean };
+  const overrideMap = new Map<string, OvEntry>(
+    (overrides || []).map((o) => [
+      o.material_id,
+      { precio: o.precio_unitario != null ? Number(o.precio_unitario) : null, activo: o.activo ?? true },
+    ])
+  );
 
-  return materiales.map((m) => ({
-    id:               m.id,
-    nombre:           m.nombre ?? '',
-    descripcion:      m.descripcion ?? '',
-    unidad:           m.unidad ?? '',
-    precio_referencia: Number(m.precio_referencia ?? 0),
-    departamento:     m.departamento ?? '',
-    categoria:        m.categoria ?? '',
-    precio_usuario:   overrideMap.has(m.id) ? Number(overrideMap.get(m.id)) : null,
-  }));
+  return materiales.map((m) => {
+    const ov = overrideMap.get(m.id);
+    return {
+      id:                m.id,
+      nombre:            m.nombre ?? '',
+      descripcion:       m.descripcion ?? '',
+      unidad:            m.unidad ?? '',
+      precio_referencia: Number(m.precio_referencia ?? 0),
+      departamento:      m.departamento ?? '',
+      categoria:         m.categoria ?? '',
+      precio_usuario:    ov?.precio ?? null,
+      activo:            ov ? (ov.activo ?? true) : true,
+    };
+  });
 }
 
 export async function upsertMaterialPrecio(materialId: string, precioUnitario: number): Promise<void> {
@@ -131,9 +141,47 @@ export async function upsertMaterialPrecio(materialId: string, precioUnitario: n
   if (!user) return;
 
   await supabase.from('user_material_precios').upsert(
-    { user_id: user.id, material_id: materialId, precio_unitario: new Decimal(precioUnitario).toDecimalPlaces(2).toNumber(), updated_at: new Date().toISOString() },
+    {
+      user_id: user.id,
+      material_id: materialId,
+      precio_unitario: new Decimal(precioUnitario).toDecimalPlaces(2).toNumber(),
+      activo: true,
+      updated_at: new Date().toISOString(),
+    },
     { onConflict: 'user_id,material_id' }
   );
+}
+
+export async function toggleMaterialActivo(
+  materialId: string
+): Promise<{ success: boolean; activo: boolean }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, activo: true };
+
+  const { data: existing } = await supabase
+    .from('user_material_precios')
+    .select('activo')
+    .eq('user_id', user.id)
+    .eq('material_id', materialId)
+    .maybeSingle();
+
+  const newActivo = existing ? !(existing.activo ?? true) : false;
+
+  if (existing) {
+    await supabase
+      .from('user_material_precios')
+      .update({ activo: newActivo })
+      .eq('user_id', user.id)
+      .eq('material_id', materialId);
+  } else {
+    // Sin override previo: crear registro solo con estado activo (sin precio personalizado)
+    await supabase
+      .from('user_material_precios')
+      .insert({ user_id: user.id, material_id: materialId, precio_unitario: null, activo: false });
+  }
+
+  return { success: true, activo: newActivo };
 }
 
 export async function resetMaterialPrecio(materialId: string): Promise<void> {
@@ -161,22 +209,32 @@ export async function getEquiposConPrecio(): Promise<EquipoConPrecio[]> {
 
   const { data: overrides } = await supabase
     .from('user_equipment_precios')
-    .select('equipment_id, precio_diario')
+    .select('equipment_id, precio_diario, activo')
     .eq('user_id', user.id);
 
-  const overrideMap = new Map((overrides || []).map((o) => [o.equipment_id, o.precio_diario]));
+  type EqOv = { precio: number | null; activo: boolean };
+  const overrideMap = new Map<string, EqOv>(
+    (overrides || []).map((o) => [
+      o.equipment_id,
+      { precio: o.precio_diario != null ? Number(o.precio_diario) : null, activo: o.activo ?? true },
+    ])
+  );
 
-  return equipos.map((e) => ({
-    id:            e.id,
-    nombre:        e.nombre ?? '',
-    descripcion:   e.descripcion ?? '',
-    tipo:          e.tipo ?? '',
-    precio_diario:   Number(e.precio_diario ?? 0),
-    precio_semanal:  Number(e.precio_semanal ?? 0),
-    precio_mensual:  Number(e.precio_mensual ?? 0),
-    departamento:    e.departamento ?? '',
-    precio_usuario:  overrideMap.has(e.id) ? Number(overrideMap.get(e.id)) : null,
-  }));
+  return equipos.map((e) => {
+    const ov = overrideMap.get(e.id);
+    return {
+      id:             e.id,
+      nombre:         e.nombre ?? '',
+      descripcion:    e.descripcion ?? '',
+      tipo:           e.tipo ?? '',
+      precio_diario:  Number(e.precio_diario ?? 0),
+      precio_semanal: Number(e.precio_semanal ?? 0),
+      precio_mensual: Number(e.precio_mensual ?? 0),
+      departamento:   e.departamento ?? '',
+      precio_usuario: ov?.precio ?? null,
+      activo:         ov ? (ov.activo ?? true) : true,
+    };
+  });
 }
 
 export async function upsertEquipoPrecio(equipmentId: string, precioDiario: number): Promise<void> {
@@ -185,9 +243,46 @@ export async function upsertEquipoPrecio(equipmentId: string, precioDiario: numb
   if (!user) return;
 
   await supabase.from('user_equipment_precios').upsert(
-    { user_id: user.id, equipment_id: equipmentId, precio_diario: new Decimal(precioDiario).toDecimalPlaces(2).toNumber(), updated_at: new Date().toISOString() },
+    {
+      user_id: user.id,
+      equipment_id: equipmentId,
+      precio_diario: new Decimal(precioDiario).toDecimalPlaces(2).toNumber(),
+      activo: true,
+      updated_at: new Date().toISOString(),
+    },
     { onConflict: 'user_id,equipment_id' }
   );
+}
+
+export async function toggleEquipoActivo(
+  equipmentId: string
+): Promise<{ success: boolean; activo: boolean }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, activo: true };
+
+  const { data: existing } = await supabase
+    .from('user_equipment_precios')
+    .select('activo')
+    .eq('user_id', user.id)
+    .eq('equipment_id', equipmentId)
+    .maybeSingle();
+
+  const newActivo = existing ? !(existing.activo ?? true) : false;
+
+  if (existing) {
+    await supabase
+      .from('user_equipment_precios')
+      .update({ activo: newActivo })
+      .eq('user_id', user.id)
+      .eq('equipment_id', equipmentId);
+  } else {
+    await supabase
+      .from('user_equipment_precios')
+      .insert({ user_id: user.id, equipment_id: equipmentId, precio_diario: null, activo: false });
+  }
+
+  return { success: true, activo: newActivo };
 }
 
 export async function resetEquipoPrecio(equipmentId: string): Promise<void> {
@@ -208,27 +303,34 @@ export async function searchInsumos(query: string, type?: string) {
 
   if (!type || type === 'material') {
     const { data } = await supabase.from('materials').select('*').ilike('nombre', `%${query}%`).limit(15);
-    let overrideMap = new Map<string, number>();
+    type MatOv = { precio: number | null; activo: boolean };
+    let overrideMap = new Map<string, MatOv>();
     if (user && data && data.length > 0) {
       const ids = data.map((d: any) => d.id);
       const { data: ov } = await supabase
         .from('user_material_precios')
-        .select('material_id, precio_unitario')
+        .select('material_id, precio_unitario, activo')
         .eq('user_id', user.id)
         .in('material_id', ids);
-      overrideMap = new Map((ov || []).map((o: any) => [o.material_id, Number(o.precio_unitario)]));
+      overrideMap = new Map((ov || []).map((o: any) => [
+        o.material_id,
+        { precio: o.precio_unitario != null ? Number(o.precio_unitario) : null, activo: o.activo ?? true },
+      ]));
     }
-    results.push(...(data || []).map((d: any) => {
-      const tienePrecioPropio = overrideMap.has(d.id);
-      return {
-        id:              d.id,
-        nombre:          d.nombre,
-        unidad:          d.unidad,
-        categoria:       d.categoria,
-        source:          tienePrecioPropio ? 'propio' : 'referencia',
-        precio_unitario: tienePrecioPropio ? overrideMap.get(d.id)! : Number(d.precio_referencia ?? 0),
-      };
-    }));
+    results.push(...(data || [])
+      .filter((d: any) => { const ov = overrideMap.get(d.id); return !ov || ov.activo !== false; })
+      .map((d: any) => {
+        const ov = overrideMap.get(d.id);
+        const tienePrecioPropio = ov?.precio != null;
+        return {
+          id:              d.id,
+          nombre:          d.nombre,
+          unidad:          d.unidad,
+          categoria:       d.categoria,
+          source:          tienePrecioPropio ? 'propio' : 'referencia',
+          precio_unitario: tienePrecioPropio ? ov!.precio! : Number(d.precio_referencia ?? 0),
+        };
+      }));
   }
   if (!type || type === 'mano_obra') {
     const { data } = await supabase
@@ -248,27 +350,34 @@ export async function searchInsumos(query: string, type?: string) {
   }
   if (!type || type === 'equipo') {
     const { data } = await supabase.from('equipment').select('*').ilike('nombre', `%${query}%`).limit(10);
-    let overrideMap = new Map<string, number>();
+    type EqOv = { precio: number | null; activo: boolean };
+    let overrideMap = new Map<string, EqOv>();
     if (user && data && data.length > 0) {
       const ids = data.map((d: any) => d.id);
       const { data: ov } = await supabase
         .from('user_equipment_precios')
-        .select('equipment_id, precio_diario')
+        .select('equipment_id, precio_diario, activo')
         .eq('user_id', user.id)
         .in('equipment_id', ids);
-      overrideMap = new Map((ov || []).map((o: any) => [o.equipment_id, Number(o.precio_diario)]));
+      overrideMap = new Map((ov || []).map((o: any) => [
+        o.equipment_id,
+        { precio: o.precio_diario != null ? Number(o.precio_diario) : null, activo: o.activo ?? true },
+      ]));
     }
-    results.push(...(data || []).map((d: any) => {
-      const tienePrecioPropio = overrideMap.has(d.id);
-      return {
-        id:              d.id,
-        nombre:          d.nombre,
-        unidad:          d.unidad || 'día',
-        tipo:            d.tipo,
-        source:          tienePrecioPropio ? 'propio' : 'referencia',
-        precio_unitario: tienePrecioPropio ? overrideMap.get(d.id)! : Number(d.precio_diario ?? 0),
-      };
-    }));
+    results.push(...(data || [])
+      .filter((d: any) => { const ov = overrideMap.get(d.id); return !ov || ov.activo !== false; })
+      .map((d: any) => {
+        const ov = overrideMap.get(d.id);
+        const tienePrecioPropio = ov?.precio != null;
+        return {
+          id:              d.id,
+          nombre:          d.nombre,
+          unidad:          d.unidad || 'día',
+          tipo:            d.tipo,
+          source:          tienePrecioPropio ? 'propio' : 'referencia',
+          precio_unitario: tienePrecioPropio ? ov!.precio! : Number(d.precio_diario ?? 0),
+        };
+      }));
   }
 
   if (user) {

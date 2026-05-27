@@ -42,7 +42,7 @@ const ESTADO_BADGE: Record<string, { label: string; bg: string; text: string; bo
   borrador:    { label: 'Borrador',    bg: '#F4F2EE', text: '#5A5248', border: '#D0CCC6' },
   en_progreso: { label: 'En progreso', bg: '#FAF0EB', text: '#A83A14', border: '#E8956A' },
   finalizado:  { label: 'Finalizado',  bg: '#E8F4E8', text: '#1A5C2A', border: '#B8D9B8' },
-  archivado:   { label: 'Archivado',   bg: '#F4F2EE', text: '#7A7265', border: '#C8C0B5' },
+  archivado:   { label: 'Archivado',   bg: '#ECECEC', text: '#9CA3AF', border: '#D1D5DB' },
 };
 
 const TIPO_OBRA_CONFIG: Record<string, { Icon: React.ElementType; bg: string; fg: string }> = {
@@ -311,7 +311,10 @@ export function ProyectosGrid({ projects }: ProyectosGridProps) {
                   <tr
                     key={p.id}
                     onClick={() => router.push(`/proyectos/${p.id}`)}
-                    className="hover:bg-[#FAF8F6] cursor-pointer transition-colors duration-100 group"
+                    className={cn(
+                      'hover:bg-[#FAF8F6] cursor-pointer transition-colors duration-100 group',
+                      p.estado === 'archivado' && 'opacity-50 hover:opacity-70'
+                    )}
                   >
                     <td className="px-5 py-3 max-w-[260px]">
                       <div className="flex items-center gap-3 min-w-0">
@@ -478,7 +481,10 @@ export function ProyectosGrid({ projects }: ProyectosGridProps) {
                 <div
                   key={p.id}
                   onClick={() => router.push(`/proyectos/${p.id}`)}
-                  className="relative bg-white border border-[#E8E4DE] p-4 cursor-pointer transition-all duration-150 group hover:border-[#C84B1A]/40 hover:bg-[#FDFCFB] shadow-[0_1px_2px_0_rgba(28,24,20,0.04)]"
+                  className={cn(
+                    'relative bg-white border border-[#E8E4DE] p-4 cursor-pointer transition-all duration-150 group hover:border-[#C84B1A]/40 hover:bg-[#FDFCFB] shadow-[0_1px_2px_0_rgba(28,24,20,0.04)]',
+                    p.estado === 'archivado' && 'opacity-50 hover:opacity-70 grayscale-[0.4]'
+                  )}
                   style={{ clipPath: 'polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%)' }}
                 >
                   <div className="absolute top-0 right-0 pointer-events-none" aria-hidden>

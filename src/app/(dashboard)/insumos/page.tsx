@@ -6,7 +6,7 @@ import {
 import {
   Package, Drill, ShieldCheck,
   Search, ChevronUp, ChevronDown, ChevronsUpDown,
-  RotateCcw, Plus, Trash2, Edit2,
+  Plus, Trash2, Edit2, Power, PowerOff,
   Loader2, Info, X, Save, UserPlus, Minus, ArrowRight,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -17,8 +17,10 @@ import { SkeletonTable } from '@/components/shared/Skeleton';
 import { formatearCOP } from '@/lib/utils/formato-cop';
 import {
   getMaterialesConPrecio, upsertMaterialPrecio, resetMaterialPrecio,
+  toggleMaterialActivo,
   getEquiposConPrecio, upsertEquipoPrecio, resetEquipoPrecio,
-  getLabor,
+  toggleEquipoActivo,
+  getLabor, getUserMaterials, createUserMaterial, updateUserMaterial, deleteUserMaterial,
 } from '@/actions/insumos';
 import {
   getCuadrillas, getTrabajadores, crearCuadrillaPersonalizada, deleteCuadrilla,
@@ -33,8 +35,35 @@ import { cn } from '@/lib/utils';
 
 type TabId = 'material' | 'equipment' | 'crews';
 type SortDir = 'asc' | 'desc';
-type MatColKey = 'nombre' | 'categoria' | 'unidad' | 'precio_usuario';
-type EqColKey = 'nombre' | 'tipo' | 'precio_semanal' | 'precio_mensual' | 'precio_usuario';
+type MatColKey = 'nombre' | 'categoria' | 'unidad' | 'precio';
+type EqColKey  = 'nombre' | 'tipo' | 'precio';
+
+// Tipo unificado para filas de la tabla (catálogo + user_materials)
+interface MatItem {
+  id: string;
+  nombre: string;
+  categoria: string;
+  unidad: string;
+  precio: number;
+  precioRef: number | null;
+  esPropio: boolean;
+  esUserMaterial: boolean;
+  activo: boolean;
+}
+
+interface EqItem {
+  id: string;
+  nombre: string;
+  tipo: string;
+  unidad: string;
+  precio: number;
+  precioSemanal: number;
+  precioMensual: number;
+  precioRef: number | null;
+  esPropio: boolean;
+  esUserMaterial: boolean;
+  activo: boolean;
+}
 
 interface TrabajadorSeleccionado {
   id: string;
@@ -54,34 +83,55 @@ function SortIcon<T extends string>({ col, sortCol, sortDir }: { col: T; sortCol
     : <ChevronDown className="h-3.5 w-3.5 text-[#E8956A]" />;
 }
 
-function toggleSort<T>(col: T, current: T, dir: SortDir, set: (c: T, d: SortDir) => void) {
-  if (col === current) set(col, dir === 'asc' ? 'desc' : 'asc');
-  else set(col, 'asc');
-}
-
 // ── Componente principal ───────────────────────────────────────────────────────
 
 export default function InsumosPage() {
   const [tab, setTab] = useState<TabId>('material');
 
-  // Materiales
+  // ── Materiales ─────────────────────────────────────────────────────────────
   const [materiales, setMateriales] = useState<MaterialConPrecio[]>([]);
+  const [userMateriales, setUserMateriales] = useState<any[]>([]);
   const [loadingMat, setLoadingMat] = useState(true);
   const [searchMat, setSearchMat] = useState('');
   const [sortMatCol, setSortMatCol] = useState<MatColKey>('nombre');
   const [sortMatDir, setSortMatDir] = useState<SortDir>('asc');
   const [categoriaMat, setCategoriaMat] = useState<string | null>(null);
+  const [mostrarInactivosMat, setMostrarInactivosMat] = useState(true);
+  const [togglingMatId, setTogglingMatId] = useState<string | null>(null);
+  const [eliminandoMatId, setEliminandoMatId] = useState<string | null>(null);
+  const [editingMatId, setEditingMatId] = useState<string | null>(null);
+  const [matEditPrice, setMatEditPrice] = useState('');
+  const [savingMatEdit, setSavingMatEdit] = useState(false);
+  const [showCreateMat, setShowCreateMat] = useState(false);
+  const [createMatNombre, setCreateMatNombre] = useState('');
+  const [createMatUnidad, setCreateMatUnidad] = useState('');
+  const [createMatPrecio, setCreateMatPrecio] = useState('');
+  const [createMatError, setCreateMatError] = useState('');
+  const [savingCreateMat, setSavingCreateMat] = useState(false);
   const [, startMatTransition] = useTransition();
 
-  // Equipos
+  // ── Equipos ────────────────────────────────────────────────────────────────
   const [equipos, setEquipos] = useState<EquipoConPrecio[]>([]);
+  const [userEquipos, setUserEquipos] = useState<any[]>([]);
   const [loadingEq, setLoadingEq] = useState(true);
   const [searchEq, setSearchEq] = useState('');
   const [sortEqCol, setSortEqCol] = useState<EqColKey>('nombre');
   const [sortEqDir, setSortEqDir] = useState<SortDir>('asc');
+  const [mostrarInactivosEq, setMostrarInactivosEq] = useState(true);
+  const [togglingEqId, setTogglingEqId] = useState<string | null>(null);
+  const [eliminandoEqId, setEliminandoEqId] = useState<string | null>(null);
+  const [editingEqId, setEditingEqId] = useState<string | null>(null);
+  const [eqEditPrice, setEqEditPrice] = useState('');
+  const [savingEqEdit, setSavingEqEdit] = useState(false);
+  const [showCreateEq, setShowCreateEq] = useState(false);
+  const [createEqNombre, setCreateEqNombre] = useState('');
+  const [createEqUnidad, setCreateEqUnidad] = useState('día');
+  const [createEqPrecio, setCreateEqPrecio] = useState('');
+  const [createEqError, setCreateEqError] = useState('');
+  const [savingCreateEq, setSavingCreateEq] = useState(false);
   const [, startEqTransition] = useTransition();
 
-  // Cuadrillas
+  // ── Cuadrillas (sin cambios) ───────────────────────────────────────────────
   const [cuadrillas, setCuadrillas] = useState<any[]>([]);
   const [loadingCrews, setLoadingCrews] = useState(true);
   const [searchCrews, setSearchCrews] = useState('');
@@ -116,11 +166,19 @@ export default function InsumosPage() {
   useEffect(() => {
     if (tab === 'material' && materiales.length === 0) {
       setLoadingMat(true);
-      getMaterialesConPrecio().then((d) => { setMateriales(d); setLoadingMat(false); });
+      Promise.all([getMaterialesConPrecio(), getUserMaterials()]).then(([catalog, userMats]) => {
+        setMateriales(catalog);
+        setUserMateriales((userMats as any[]).filter((u) => u.tipo === 'material'));
+        setLoadingMat(false);
+      });
     }
     if (tab === 'equipment' && equipos.length === 0) {
       setLoadingEq(true);
-      getEquiposConPrecio().then((d) => { setEquipos(d); setLoadingEq(false); });
+      Promise.all([getEquiposConPrecio(), getUserMaterials()]).then(([catalog, userMats]) => {
+        setEquipos(catalog);
+        setUserEquipos((userMats as any[]).filter((u) => u.tipo === 'equipo'));
+        setLoadingEq(false);
+      });
     }
     if (tab === 'crews') {
       setLoadingCrews(true);
@@ -135,109 +193,266 @@ export default function InsumosPage() {
     [materiales]
   );
 
-  const matPersonalizados = useMemo(() => materiales.filter((m) => m.precio_usuario !== null).length, [materiales]);
-  const eqPersonalizados  = useMemo(() => equipos.filter((e) => e.precio_usuario !== null).length, [equipos]);
+  // ── Filas combinadas: Materiales ───────────────────────────────────────────
 
-  // ── Filas filtradas/ordenadas: Materiales ─────────────────────────────────
+  const filasMat = useMemo((): MatItem[] => {
+    const q = searchMat.trim().toLowerCase();
 
-  const filasMat = useMemo(() => {
-    let list = materiales;
-    if (categoriaMat) list = list.filter((m) => m.categoria === categoriaMat);
-    if (searchMat.trim()) {
-      const q = searchMat.toLowerCase();
-      list = list.filter((m) => m.nombre.toLowerCase().includes(q) || m.categoria.toLowerCase().includes(q));
-    }
-    return [...list].sort((a, b) => {
+    const catalogItems: MatItem[] = materiales
+      .filter((m) => mostrarInactivosMat || m.activo)
+      .filter((m) => !categoriaMat || m.categoria === categoriaMat)
+      .filter((m) => !q || m.nombre.toLowerCase().includes(q) || m.categoria.toLowerCase().includes(q))
+      .map((m) => ({
+        id: m.id,
+        nombre: m.nombre,
+        categoria: m.categoria,
+        unidad: m.unidad,
+        precio: m.precio_usuario ?? m.precio_referencia,
+        precioRef: m.precio_referencia,
+        esPropio: m.precio_usuario !== null,
+        esUserMaterial: false,
+        activo: m.activo,
+      }));
+
+    const userItems: MatItem[] = userMateriales
+      .filter((u) => !q || u.nombre.toLowerCase().includes(q))
+      .map((u) => ({
+        id: u.id,
+        nombre: u.nombre,
+        categoria: u.descripcion || '—',
+        unidad: u.unidad,
+        precio: Number(u.precio_unitario ?? 0),
+        precioRef: null,
+        esPropio: true,
+        esUserMaterial: true,
+        activo: true,
+      }));
+
+    const sortedCatalog = [...catalogItems].sort((a, b) => {
       let va: string | number, vb: string | number;
-      if (sortMatCol === 'precio_usuario') {
-        va = a.precio_usuario ?? a.precio_referencia;
-        vb = b.precio_usuario ?? b.precio_referencia;
-      } else {
-        va = a[sortMatCol as keyof MaterialConPrecio] as string | number;
-        vb = b[sortMatCol as keyof MaterialConPrecio] as string | number;
-      }
+      if (sortMatCol === 'precio') { va = a.precio; vb = b.precio; }
+      else { va = a[sortMatCol as 'nombre' | 'categoria' | 'unidad']; vb = b[sortMatCol as 'nombre' | 'categoria' | 'unidad']; }
       const cmp = typeof va === 'string' ? va.localeCompare(vb as string, 'es-CO') : (va as number) - (vb as number);
       return sortMatDir === 'asc' ? cmp : -cmp;
     });
-  }, [materiales, searchMat, categoriaMat, sortMatCol, sortMatDir]);
 
-  // ── Filas filtradas/ordenadas: Equipos ───────────────────────────────────
+    return [...userItems, ...sortedCatalog];
+  }, [materiales, userMateriales, searchMat, categoriaMat, mostrarInactivosMat, sortMatCol, sortMatDir]);
 
-  const filasEq = useMemo(() => {
-    let list = equipos;
-    if (searchEq.trim()) {
-      const q = searchEq.toLowerCase();
-      list = list.filter((e) => e.nombre.toLowerCase().includes(q) || e.tipo.toLowerCase().includes(q));
-    }
-    return [...list].sort((a, b) => {
+  // ── Filas combinadas: Equipos ──────────────────────────────────────────────
+
+  const filasEq = useMemo((): EqItem[] => {
+    const q = searchEq.trim().toLowerCase();
+
+    const catalogItems: EqItem[] = equipos
+      .filter((e) => mostrarInactivosEq || e.activo)
+      .filter((e) => !q || e.nombre.toLowerCase().includes(q) || e.tipo.toLowerCase().includes(q))
+      .map((e) => ({
+        id: e.id,
+        nombre: e.nombre,
+        tipo: e.tipo,
+        unidad: 'día',
+        precio: e.precio_usuario ?? e.precio_diario,
+        precioSemanal: e.precio_semanal,
+        precioMensual: e.precio_mensual,
+        precioRef: e.precio_diario,
+        esPropio: e.precio_usuario !== null,
+        esUserMaterial: false,
+        activo: e.activo,
+      }));
+
+    const userItems: EqItem[] = userEquipos
+      .filter((u) => !q || u.nombre.toLowerCase().includes(q))
+      .map((u) => ({
+        id: u.id,
+        nombre: u.nombre,
+        tipo: 'Propio',
+        unidad: u.unidad || 'día',
+        precio: Number(u.precio_unitario ?? 0),
+        precioSemanal: 0,
+        precioMensual: 0,
+        precioRef: null,
+        esPropio: true,
+        esUserMaterial: true,
+        activo: true,
+      }));
+
+    const sortedCatalog = [...catalogItems].sort((a, b) => {
       let va: string | number, vb: string | number;
-      if (sortEqCol === 'precio_usuario') {
-        va = a.precio_usuario ?? a.precio_diario;
-        vb = b.precio_usuario ?? b.precio_diario;
-      } else {
-        va = a[sortEqCol as keyof EquipoConPrecio] as string | number;
-        vb = b[sortEqCol as keyof EquipoConPrecio] as string | number;
-      }
+      if (sortEqCol === 'precio') { va = a.precio; vb = b.precio; }
+      else { va = a[sortEqCol as 'nombre' | 'tipo']; vb = b[sortEqCol as 'nombre' | 'tipo']; }
       const cmp = typeof va === 'string' ? va.localeCompare(vb as string, 'es-CO') : (va as number) - (vb as number);
       return sortEqDir === 'asc' ? cmp : -cmp;
     });
-  }, [equipos, searchEq, sortEqCol, sortEqDir]);
 
-  // ── Handlers: precios de Materiales ──────────────────────────────────────
+    return [...userItems, ...sortedCatalog];
+  }, [equipos, userEquipos, searchEq, mostrarInactivosEq, sortEqCol, sortEqDir]);
 
-  const handleMatBlur = useCallback((mat: MaterialConPrecio, rawValue: string) => {
-    const num = parseFloat(rawValue);
-    if (rawValue === '' || isNaN(num)) {
-      if (mat.precio_usuario !== null) {
-        startMatTransition(async () => {
-          await resetMaterialPrecio(mat.id);
-          setMateriales((prev) => prev.map((m) => m.id === mat.id ? { ...m, precio_usuario: null } : m));
-        });
-      }
-      return;
+  // ── Badges de pestañas ─────────────────────────────────────────────────────
+
+  const matPropios = useMemo(
+    () => materiales.filter((m) => m.precio_usuario !== null).length + userMateriales.length,
+    [materiales, userMateriales]
+  );
+  const eqPropios = useMemo(
+    () => equipos.filter((e) => e.precio_usuario !== null).length + userEquipos.length,
+    [equipos, userEquipos]
+  );
+
+  // ── Handlers: Materiales ───────────────────────────────────────────────────
+
+  const handleToggleMat = useCallback(async (item: MatItem) => {
+    if (item.esUserMaterial) return; // user_materials siempre activos en esta versión
+    setTogglingMatId(item.id);
+    const res = await toggleMaterialActivo(item.id);
+    setTogglingMatId(null);
+    if (res.success) {
+      setMateriales((prev) => prev.map((m) => m.id === item.id ? { ...m, activo: res.activo } : m));
     }
-    if (num === mat.precio_usuario) return;
-    startMatTransition(async () => {
-      await upsertMaterialPrecio(mat.id, num);
-      setMateriales((prev) => prev.map((m) => m.id === mat.id ? { ...m, precio_usuario: num } : m));
-    });
+  }, []);
+
+  const handleEditMat = useCallback((item: MatItem) => {
+    setEditingMatId(item.id);
+    setMatEditPrice(String(item.precio));
+  }, []);
+
+  const handleSaveMatEdit = useCallback(async () => {
+    if (!editingMatId) return;
+    const precio = parseFloat(matEditPrice);
+    if (isNaN(precio) || precio < 0) return;
+    setSavingMatEdit(true);
+    const userItem = userMateriales.find((u) => u.id === editingMatId);
+    if (userItem) {
+      const fd = new FormData();
+      fd.set('nombre', userItem.nombre);
+      fd.set('tipo', 'material');
+      fd.set('unidad', userItem.unidad);
+      fd.set('precio_unitario', String(precio));
+      if (userItem.descripcion) fd.set('descripcion', userItem.descripcion);
+      await updateUserMaterial(editingMatId, fd);
+      setUserMateriales((prev) => prev.map((u) => u.id === editingMatId ? { ...u, precio_unitario: precio } : u));
+    } else {
+      await upsertMaterialPrecio(editingMatId, precio);
+      setMateriales((prev) => prev.map((m) => m.id === editingMatId ? { ...m, precio_usuario: precio, activo: true } : m));
+    }
+    setSavingMatEdit(false);
+    setEditingMatId(null);
+  }, [editingMatId, matEditPrice, userMateriales]);
+
+  const handleResetMat = useCallback(async (item: MatItem) => {
+    if (item.esUserMaterial) {
+      if (!confirm(`¿Eliminar "${item.nombre}"? Esta acción no se puede deshacer.`)) return;
+      setEliminandoMatId(item.id);
+      await deleteUserMaterial(item.id);
+      setUserMateriales((prev) => prev.filter((u) => u.id !== item.id));
+      setEliminandoMatId(null);
+    } else {
+      setEliminandoMatId(item.id);
+      startMatTransition(async () => {
+        await resetMaterialPrecio(item.id);
+        setMateriales((prev) => prev.map((m) => m.id === item.id ? { ...m, precio_usuario: null, activo: true } : m));
+        setEliminandoMatId(null);
+      });
+    }
   }, [startMatTransition]);
 
-  const handleMatReset = useCallback((mat: MaterialConPrecio) => {
-    startMatTransition(async () => {
-      await resetMaterialPrecio(mat.id);
-      setMateriales((prev) => prev.map((m) => m.id === mat.id ? { ...m, precio_usuario: null } : m));
-    });
-  }, [startMatTransition]);
-
-  // ── Handlers: precios de Equipos ─────────────────────────────────────────
-
-  const handleEqBlur = useCallback((eq: EquipoConPrecio, rawValue: string) => {
-    const num = parseFloat(rawValue);
-    if (rawValue === '' || isNaN(num)) {
-      if (eq.precio_usuario !== null) {
-        startEqTransition(async () => {
-          await resetEquipoPrecio(eq.id);
-          setEquipos((prev) => prev.map((e) => e.id === eq.id ? { ...e, precio_usuario: null } : e));
-        });
-      }
+  const handleCreateMat = useCallback(async () => {
+    if (!createMatNombre.trim() || !createMatUnidad.trim()) {
+      setCreateMatError('Nombre y unidad son obligatorios');
       return;
     }
-    if (num === eq.precio_usuario) return;
-    startEqTransition(async () => {
-      await upsertEquipoPrecio(eq.id, num);
-      setEquipos((prev) => prev.map((e) => e.id === eq.id ? { ...e, precio_usuario: num } : e));
-    });
+    setSavingCreateMat(true);
+    setCreateMatError('');
+    const fd = new FormData();
+    fd.set('nombre', createMatNombre.trim());
+    fd.set('tipo', 'material');
+    fd.set('unidad', createMatUnidad.trim());
+    fd.set('precio_unitario', createMatPrecio || '0');
+    const res = await createUserMaterial(fd);
+    setSavingCreateMat(false);
+    if (!res.success) { setCreateMatError(res.error || 'Error al crear'); return; }
+    const uMats = await getUserMaterials();
+    setUserMateriales((uMats as any[]).filter((u) => u.tipo === 'material'));
+    setShowCreateMat(false);
+    setCreateMatNombre(''); setCreateMatUnidad(''); setCreateMatPrecio('');
+  }, [createMatNombre, createMatUnidad, createMatPrecio]);
+
+  // ── Handlers: Equipos ──────────────────────────────────────────────────────
+
+  const handleToggleEq = useCallback(async (item: EqItem) => {
+    if (item.esUserMaterial) return;
+    setTogglingEqId(item.id);
+    const res = await toggleEquipoActivo(item.id);
+    setTogglingEqId(null);
+    if (res.success) {
+      setEquipos((prev) => prev.map((e) => e.id === item.id ? { ...e, activo: res.activo } : e));
+    }
+  }, []);
+
+  const handleEditEq = useCallback((item: EqItem) => {
+    setEditingEqId(item.id);
+    setEqEditPrice(String(item.precio));
+  }, []);
+
+  const handleSaveEqEdit = useCallback(async () => {
+    if (!editingEqId) return;
+    const precio = parseFloat(eqEditPrice);
+    if (isNaN(precio) || precio < 0) return;
+    setSavingEqEdit(true);
+    const userItem = userEquipos.find((u) => u.id === editingEqId);
+    if (userItem) {
+      const fd = new FormData();
+      fd.set('nombre', userItem.nombre);
+      fd.set('tipo', 'equipo');
+      fd.set('unidad', userItem.unidad || 'día');
+      fd.set('precio_unitario', String(precio));
+      if (userItem.descripcion) fd.set('descripcion', userItem.descripcion);
+      await updateUserMaterial(editingEqId, fd);
+      setUserEquipos((prev) => prev.map((u) => u.id === editingEqId ? { ...u, precio_unitario: precio } : u));
+    } else {
+      await upsertEquipoPrecio(editingEqId, precio);
+      setEquipos((prev) => prev.map((e) => e.id === editingEqId ? { ...e, precio_usuario: precio, activo: true } : e));
+    }
+    setSavingEqEdit(false);
+    setEditingEqId(null);
+  }, [editingEqId, eqEditPrice, userEquipos]);
+
+  const handleResetEq = useCallback(async (item: EqItem) => {
+    if (item.esUserMaterial) {
+      if (!confirm(`¿Eliminar "${item.nombre}"?`)) return;
+      setEliminandoEqId(item.id);
+      await deleteUserMaterial(item.id);
+      setUserEquipos((prev) => prev.filter((u) => u.id !== item.id));
+      setEliminandoEqId(null);
+    } else {
+      setEliminandoEqId(item.id);
+      startEqTransition(async () => {
+        await resetEquipoPrecio(item.id);
+        setEquipos((prev) => prev.map((e) => e.id === item.id ? { ...e, precio_usuario: null, activo: true } : e));
+        setEliminandoEqId(null);
+      });
+    }
   }, [startEqTransition]);
 
-  const handleEqReset = useCallback((eq: EquipoConPrecio) => {
-    startEqTransition(async () => {
-      await resetEquipoPrecio(eq.id);
-      setEquipos((prev) => prev.map((e) => e.id === eq.id ? { ...e, precio_usuario: null } : e));
-    });
-  }, [startEqTransition]);
+  const handleCreateEq = useCallback(async () => {
+    if (!createEqNombre.trim()) { setCreateEqError('El nombre es obligatorio'); return; }
+    setSavingCreateEq(true);
+    setCreateEqError('');
+    const fd = new FormData();
+    fd.set('nombre', createEqNombre.trim());
+    fd.set('tipo', 'equipo');
+    fd.set('unidad', createEqUnidad || 'día');
+    fd.set('precio_unitario', createEqPrecio || '0');
+    const res = await createUserMaterial(fd);
+    setSavingCreateEq(false);
+    if (!res.success) { setCreateEqError(res.error || 'Error al crear'); return; }
+    const uMats = await getUserMaterials();
+    setUserEquipos((uMats as any[]).filter((u) => u.tipo === 'equipo'));
+    setShowCreateEq(false);
+    setCreateEqNombre(''); setCreateEqUnidad('día'); setCreateEqPrecio('');
+  }, [createEqNombre, createEqUnidad, createEqPrecio]);
 
-  // ── Handlers: Cuadrillas ──────────────────────────────────────────────────
+  // ── Handlers: Cuadrillas (sin cambios) ────────────────────────────────────
 
   async function loadTrabajadoresIfNeeded() {
     if (trabajadoresDisponibles.length === 0) {
@@ -399,6 +614,26 @@ export default function InsumosPage() {
     return cuadrillas.filter((c) => c.nombre.toLowerCase().includes(q));
   }, [cuadrillas, searchCrews]);
 
+  // ── Helpers para editar ────────────────────────────────────────────────────
+
+  const editingMatItem = useMemo(() => {
+    if (!editingMatId) return null;
+    const cat = materiales.find((m) => m.id === editingMatId);
+    if (cat) return { nombre: cat.nombre, precioRef: cat.precio_referencia };
+    const usr = userMateriales.find((u) => u.id === editingMatId);
+    if (usr) return { nombre: usr.nombre, precioRef: null };
+    return null;
+  }, [editingMatId, materiales, userMateriales]);
+
+  const editingEqItem = useMemo(() => {
+    if (!editingEqId) return null;
+    const cat = equipos.find((e) => e.id === editingEqId);
+    if (cat) return { nombre: cat.nombre, precioRef: cat.precio_diario };
+    const usr = userEquipos.find((u) => u.id === editingEqId);
+    if (usr) return { nombre: usr.nombre, precioRef: null };
+    return null;
+  }, [editingEqId, equipos, userEquipos]);
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -416,18 +651,56 @@ export default function InsumosPage() {
             </p>
           </div>
         </div>
-        {tab === 'crews' && (
-          <Button size="sm" icon={<Plus className="h-4 w-4" />} onClick={openCreateCuadrilla}>
-            Nueva cuadrilla
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {tab === 'material' && (
+            <>
+              <button
+                onClick={() => setMostrarInactivosMat((v) => !v)}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border',
+                  mostrarInactivosMat
+                    ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
+                    : 'bg-sand text-steel-mid border-concrete hover:bg-concrete/60'
+                )}
+              >
+                {mostrarInactivosMat ? 'Ocultar inactivos' : 'Mostrar inactivos'}
+              </button>
+              <Button size="sm" icon={<Plus className="h-4 w-4" />} onClick={() => { setShowCreateMat(true); setCreateMatError(''); }}>
+                Agregar material
+              </Button>
+            </>
+          )}
+          {tab === 'equipment' && (
+            <>
+              <button
+                onClick={() => setMostrarInactivosEq((v) => !v)}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border',
+                  mostrarInactivosEq
+                    ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
+                    : 'bg-sand text-steel-mid border-concrete hover:bg-concrete/60'
+                )}
+              >
+                {mostrarInactivosEq ? 'Ocultar inactivos' : 'Mostrar inactivos'}
+              </button>
+              <Button size="sm" icon={<Plus className="h-4 w-4" />} onClick={() => { setShowCreateEq(true); setCreateEqError(''); }}>
+                Agregar equipo
+              </Button>
+            </>
+          )}
+          {tab === 'crews' && (
+            <Button size="sm" icon={<Plus className="h-4 w-4" />} onClick={openCreateCuadrilla}>
+              Nueva cuadrilla
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}
       <div className="flex items-center gap-1 border-b border-concrete overflow-x-auto">
         {([
-          { id: 'material',  label: 'Materiales', icon: Package,     badge: matPersonalizados > 0 ? `${matPersonalizados} propios` : null },
-          { id: 'equipment', label: 'Equipos',     icon: Drill,       badge: eqPersonalizados > 0 ? `${eqPersonalizados} propios` : null },
+          { id: 'material',  label: 'Materiales', icon: Package,     badge: matPropios > 0 ? `${matPropios} propios` : null },
+          { id: 'equipment', label: 'Equipos',     icon: Drill,       badge: eqPropios > 0 ? `${eqPropios} propios` : null },
           { id: 'crews',     label: 'Cuadrillas',  icon: ShieldCheck, badge: null },
         ] as const).map((t) => (
           <button
@@ -469,11 +742,10 @@ export default function InsumosPage() {
       {/* ── PESTAÑA MATERIALES ── */}
       {tab === 'material' && (
         <Card>
-          {/* Nota informativa */}
           <div className="px-4 py-3 bg-amber-50 border-b border-amber-100 flex items-start gap-2">
             <Info className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
             <p className="text-xs text-amber-700">
-              Edita el precio de cualquier material para marcarlo como <strong>Propio</strong>. El Panel APU usará tu precio en lugar del de referencia.
+              Haz clic en el lápiz para personalizar el precio de un material del catálogo. Usa <strong>Agregar material</strong> para crear uno propio que no está en el catálogo.
             </p>
           </div>
 
@@ -481,91 +753,70 @@ export default function InsumosPage() {
           <div className="p-4 border-b border-concrete space-y-3">
             <div className="relative max-w-xs">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-steel-mid pointer-events-none" />
-              <Input
-                placeholder="Buscar por nombre o categoría…"
-                value={searchMat}
-                onChange={(e) => setSearchMat(e.target.value)}
-                className="pl-9"
-              />
+              <Input placeholder="Buscar por nombre o categoría…" value={searchMat} onChange={(e) => setSearchMat(e.target.value)} className="pl-9" />
             </div>
             {categoriasMat.length > 0 && (
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs text-steel-mid font-medium shrink-0">Categoría:</span>
-                <button
-                  onClick={() => setCategoriaMat(null)}
-                  className={cn(
-                    'px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer',
-                    categoriaMat === null ? 'bg-burn-orange text-white' : 'bg-sand text-steel-mid hover:bg-concrete/60 hover:text-charcoal'
-                  )}
-                >
-                  Todas
-                </button>
+                <button onClick={() => setCategoriaMat(null)} className={cn('px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer', categoriaMat === null ? 'bg-burn-orange text-white' : 'bg-sand text-steel-mid hover:bg-concrete/60 hover:text-charcoal')}>Todas</button>
                 {categoriasMat.map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => setCategoriaMat((prev) => prev === cat ? null : cat)}
-                    className={cn(
-                      'px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer',
-                      categoriaMat === cat ? 'bg-burn-orange text-white' : 'bg-sand text-steel-mid hover:bg-concrete/60 hover:text-charcoal'
-                    )}
-                  >
-                    {cat}
-                  </button>
+                  <button key={cat} onClick={() => setCategoriaMat((prev) => prev === cat ? null : cat)} className={cn('px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer', categoriaMat === cat ? 'bg-burn-orange text-white' : 'bg-sand text-steel-mid hover:bg-concrete/60 hover:text-charcoal')}>{cat}</button>
                 ))}
               </div>
             )}
           </div>
 
           {loadingMat ? (
-            <div className="p-4"><SkeletonTable rows={8} cols={6} /></div>
+            <div className="p-4"><SkeletonTable rows={8} cols={5} /></div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-[#1A2535] border-b border-[#2A3B50]">
                     {([
-                      { key: 'nombre',       label: 'Nombre',    align: 'left'  },
-                      { key: 'categoria',    label: 'Categoría', align: 'left'  },
-                      { key: 'unidad',       label: 'Unidad',    align: 'left'  },
-                      { key: 'precio_usuario', label: 'Precio',  align: 'right' },
+                      { key: 'nombre',    label: 'Nombre',    align: 'left'  },
+                      { key: 'categoria', label: 'Categoría', align: 'left'  },
+                      { key: 'unidad',    label: 'Unidad',    align: 'left'  },
+                      { key: 'precio',    label: 'Precio',    align: 'right' },
                     ] as const).map((col) => (
                       <th
                         key={col.key}
-                        onClick={() => toggleSort(col.key as MatColKey, sortMatCol, sortMatDir, (c, d) => { setSortMatCol(c); setSortMatDir(d); })}
-                        className={cn(
-                          'px-4 py-3 font-medium text-white/60 cursor-pointer select-none hover:text-white transition-colors whitespace-nowrap',
-                          col.align === 'right' ? 'text-right' : 'text-left'
-                        )}
+                        onClick={() => {
+                          if (sortMatCol === col.key) setSortMatDir((d) => d === 'asc' ? 'desc' : 'asc');
+                          else { setSortMatCol(col.key); setSortMatDir('asc'); }
+                        }}
+                        className={cn('px-4 py-3 font-medium text-white/60 cursor-pointer select-none hover:text-white transition-colors whitespace-nowrap', col.align === 'right' ? 'text-right' : 'text-left')}
                       >
                         <span className="inline-flex items-center gap-1.5">
-                          {col.align === 'right' && <SortIcon col={col.key as MatColKey} sortCol={sortMatCol} sortDir={sortMatDir} />}
+                          {col.align === 'right' && <SortIcon col={col.key} sortCol={sortMatCol} sortDir={sortMatDir} />}
                           {col.label}
-                          {col.align === 'left' && <SortIcon col={col.key as MatColKey} sortCol={sortMatCol} sortDir={sortMatDir} />}
+                          {col.align === 'left' && <SortIcon col={col.key} sortCol={sortMatCol} sortDir={sortMatDir} />}
                         </span>
                       </th>
                     ))}
-                    <th className="px-4 py-3 w-10 bg-[#1A2535]" />
+                    <th className="px-4 py-3 w-32 bg-[#1A2535]" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-concrete/50">
-                  {filasMat.map((mat) => (
+                  {filasMat.map((item) => (
                     <MatRow
-                      key={mat.id}
-                      mat={mat}
-                      onBlur={handleMatBlur}
-                      onReset={handleMatReset}
+                      key={item.id}
+                      item={item}
+                      onEdit={handleEditMat}
+                      onToggle={handleToggleMat}
+                      onReset={handleResetMat}
+                      toggling={togglingMatId === item.id}
+                      eliminando={eliminandoMatId === item.id}
                     />
                   ))}
                 </tbody>
               </table>
               {filasMat.length === 0 && (
-                <div className="py-16 text-center text-sm text-steel-mid">
-                  No hay materiales que coincidan con los filtros.
-                </div>
+                <div className="py-16 text-center text-sm text-steel-mid">No hay materiales que coincidan con los filtros.</div>
               )}
               <div className="px-4 py-2.5 border-t border-concrete bg-sand/20 text-xs text-steel-mid flex justify-between">
                 <span>{filasMat.length} materiales</span>
-                <span>{matPersonalizados} con precio personalizado</span>
+                <span>{matPropios} propios · {materiales.filter((m) => !m.activo).length} inactivos</span>
               </div>
             </div>
           )}
@@ -575,11 +826,10 @@ export default function InsumosPage() {
       {/* ── PESTAÑA EQUIPOS ── */}
       {tab === 'equipment' && (
         <Card>
-          {/* Nota informativa */}
           <div className="px-4 py-3 bg-amber-50 border-b border-amber-100 flex items-start gap-2">
             <Info className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
             <p className="text-xs text-amber-700">
-              Edita el <strong>Precio diario</strong> para marcarlo como <strong>Propio</strong>. Los precios semanal y mensual son solo informativos.
+              El <strong>precio diario</strong> es el que usa el Panel APU. Los precios semanal y mensual son solo informativos del catálogo de referencia.
             </p>
           </div>
 
@@ -587,66 +837,62 @@ export default function InsumosPage() {
           <div className="p-4 border-b border-concrete">
             <div className="relative max-w-xs">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-steel-mid pointer-events-none" />
-              <Input
-                placeholder="Buscar por nombre o tipo…"
-                value={searchEq}
-                onChange={(e) => setSearchEq(e.target.value)}
-                className="pl-9"
-              />
+              <Input placeholder="Buscar por nombre o tipo…" value={searchEq} onChange={(e) => setSearchEq(e.target.value)} className="pl-9" />
             </div>
           </div>
 
           {loadingEq ? (
-            <div className="p-4"><SkeletonTable rows={8} cols={7} /></div>
+            <div className="p-4"><SkeletonTable rows={8} cols={5} /></div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-[#1A2535] border-b border-[#2A3B50]">
                     {([
-                      { key: 'nombre',         label: 'Nombre',       align: 'left'  },
-                      { key: 'tipo',           label: 'Tipo',         align: 'left'  },
-                      { key: 'precio_usuario', label: 'Precio diario',align: 'right' },
-                      { key: 'precio_semanal', label: 'Ref. semanal', align: 'right' },
-                      { key: 'precio_mensual', label: 'Ref. mensual', align: 'right' },
+                      { key: 'nombre', label: 'Nombre',        align: 'left'  },
+                      { key: 'tipo',   label: 'Tipo',          align: 'left'  },
+                      { key: 'precio', label: 'Precio diario', align: 'right' },
                     ] as const).map((col) => (
                       <th
                         key={col.key}
-                        onClick={() => toggleSort(col.key as EqColKey, sortEqCol, sortEqDir, (c, d) => { setSortEqCol(c); setSortEqDir(d); })}
-                        className={cn(
-                          'px-4 py-3 font-medium text-white/60 cursor-pointer select-none hover:text-white transition-colors whitespace-nowrap',
-                          col.align === 'right' ? 'text-right' : 'text-left'
-                        )}
+                        onClick={() => {
+                          if (sortEqCol === col.key) setSortEqDir((d) => d === 'asc' ? 'desc' : 'asc');
+                          else { setSortEqCol(col.key); setSortEqDir('asc'); }
+                        }}
+                        className={cn('px-4 py-3 font-medium text-white/60 cursor-pointer select-none hover:text-white transition-colors whitespace-nowrap', col.align === 'right' ? 'text-right' : 'text-left')}
                       >
                         <span className="inline-flex items-center gap-1.5">
-                          {col.align === 'right' && <SortIcon col={col.key as EqColKey} sortCol={sortEqCol} sortDir={sortEqDir} />}
+                          {col.align === 'right' && <SortIcon col={col.key} sortCol={sortEqCol} sortDir={sortEqDir} />}
                           {col.label}
-                          {col.align === 'left' && <SortIcon col={col.key as EqColKey} sortCol={sortEqCol} sortDir={sortEqDir} />}
+                          {col.align === 'left' && <SortIcon col={col.key} sortCol={sortEqCol} sortDir={sortEqDir} />}
                         </span>
                       </th>
                     ))}
-                    <th className="px-4 py-3 w-10 bg-[#1A2535]" />
+                    <th className="px-4 py-3 text-right font-medium text-white/60 whitespace-nowrap">Ref. semanal</th>
+                    <th className="px-4 py-3 text-right font-medium text-white/60 whitespace-nowrap">Ref. mensual</th>
+                    <th className="px-4 py-3 w-32 bg-[#1A2535]" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-concrete/50">
-                  {filasEq.map((eq) => (
+                  {filasEq.map((item) => (
                     <EqRow
-                      key={eq.id}
-                      eq={eq}
-                      onBlur={handleEqBlur}
-                      onReset={handleEqReset}
+                      key={item.id}
+                      item={item}
+                      onEdit={handleEditEq}
+                      onToggle={handleToggleEq}
+                      onReset={handleResetEq}
+                      toggling={togglingEqId === item.id}
+                      eliminando={eliminandoEqId === item.id}
                     />
                   ))}
                 </tbody>
               </table>
               {filasEq.length === 0 && (
-                <div className="py-16 text-center text-sm text-steel-mid">
-                  No hay equipos que coincidan con la búsqueda.
-                </div>
+                <div className="py-16 text-center text-sm text-steel-mid">No hay equipos que coincidan con la búsqueda.</div>
               )}
               <div className="px-4 py-2.5 border-t border-concrete bg-sand/20 text-xs text-steel-mid flex justify-between">
                 <span>{filasEq.length} equipos</span>
-                <span>{eqPersonalizados} con precio personalizado</span>
+                <span>{eqPropios} propios · {equipos.filter((e) => !e.activo).length} inactivos</span>
               </div>
             </div>
           )}
@@ -659,12 +905,7 @@ export default function InsumosPage() {
           <div className="p-4 border-b border-concrete">
             <div className="relative max-w-xs">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-steel-mid pointer-events-none" />
-              <Input
-                placeholder="Buscar cuadrilla…"
-                value={searchCrews}
-                onChange={(e) => setSearchCrews(e.target.value)}
-                className="pl-9"
-              />
+              <Input placeholder="Buscar cuadrilla…" value={searchCrews} onChange={(e) => setSearchCrews(e.target.value)} className="pl-9" />
             </div>
           </div>
 
@@ -673,9 +914,7 @@ export default function InsumosPage() {
           ) : filteredCrews.length === 0 ? (
             <div className="py-16 flex flex-col items-center gap-3 text-center">
               <ShieldCheck className="h-10 w-10 text-concrete" />
-              <p className="text-sm font-medium text-charcoal">
-                {searchCrews ? 'Sin resultados' : 'No hay cuadrillas disponibles'}
-              </p>
+              <p className="text-sm font-medium text-charcoal">{searchCrews ? 'Sin resultados' : 'No hay cuadrillas disponibles'}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -694,9 +933,7 @@ export default function InsumosPage() {
                     <tr key={item.id} className="hover:bg-sand/20 transition-colors group">
                       <td className="px-4 py-3">
                         <p className="font-medium text-charcoal">{item.nombre}</p>
-                        <p className="text-xs text-steel-mid">
-                          {item.categoria_actividad || 'Sin categoría'} · {item.es_sistema ? 'Sistema' : 'Personalizada'}
-                        </p>
+                        <p className="text-xs text-steel-mid">{item.categoria_actividad || 'Sin categoría'} · {item.es_sistema ? 'Sistema' : 'Personalizada'}</p>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1">
@@ -705,21 +942,12 @@ export default function InsumosPage() {
                               {t.cantidad > 1 ? `${t.cantidad}×` : ''}{t.especialidad}
                             </span>
                           ))}
-                          {(item.trabajadores || []).length > 3 && (
-                            <span className="text-[10px] text-steel-mid bg-sand px-2 py-0.5 rounded">
-                              +{item.trabajadores.length - 3} más
-                            </span>
-                          )}
-                          {(item.trabajadores || []).length === 0 && (
-                            <span className="text-xs text-steel-mid">Sin trabajadores</span>
-                          )}
+                          {(item.trabajadores || []).length > 3 && <span className="text-[10px] text-steel-mid bg-sand px-2 py-0.5 rounded">+{item.trabajadores.length - 3} más</span>}
+                          {(item.trabajadores || []).length === 0 && <span className="text-xs text-steel-mid">Sin trabajadores</span>}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-steel-mid text-xs">
-                        {item.rendimientos?.length > 0
-                          ? `${item.rendimientos[0].rendimiento_normal} ${item.rendimientos[0].unidad}/día`
-                          : '—'
-                        }
+                        {item.rendimientos?.length > 0 ? `${item.rendimientos[0].rendimiento_normal} ${item.rendimientos[0].unidad}/día` : '—'}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums font-semibold text-burn-orange" style={{ fontFamily: 'var(--font-mono)' }}>
                         {formatearCOP(costoJornadaCuadrilla(item))}
@@ -727,12 +955,8 @@ export default function InsumosPage() {
                       <td className="px-4 py-3 text-right">
                         {!item.es_sistema ? (
                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => openQuickAdd(item)} className="inline-flex items-center justify-center h-7 w-7 rounded-md text-steel-mid hover:text-burn-orange hover:bg-burn-orange/10 transition-colors cursor-pointer" title="Agregar trabajador">
-                              <UserPlus className="h-3.5 w-3.5" />
-                            </button>
-                            <button onClick={() => openEditCuadrilla(item)} className="inline-flex items-center justify-center h-7 w-7 rounded-md text-steel-mid hover:text-charcoal hover:bg-sand transition-colors cursor-pointer" title="Editar">
-                              <Edit2 className="h-3.5 w-3.5" />
-                            </button>
+                            <button onClick={() => openQuickAdd(item)} className="inline-flex items-center justify-center h-7 w-7 rounded-md text-steel-mid hover:text-burn-orange hover:bg-burn-orange/10 transition-colors cursor-pointer" title="Agregar trabajador"><UserPlus className="h-3.5 w-3.5" /></button>
+                            <button onClick={() => openEditCuadrilla(item)} className="inline-flex items-center justify-center h-7 w-7 rounded-md text-steel-mid hover:text-charcoal hover:bg-sand transition-colors cursor-pointer" title="Editar"><Edit2 className="h-3.5 w-3.5" /></button>
                             <button onClick={() => handleDeleteCuadrilla(item.id)} disabled={deletingCuadrillaId === item.id} className="inline-flex items-center justify-center h-7 w-7 rounded-md text-steel-mid hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-40" title="Eliminar">
                               {deletingCuadrillaId === item.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                             </button>
@@ -748,6 +972,152 @@ export default function InsumosPage() {
             </div>
           )}
         </Card>
+      )}
+
+      {/* ── MODAL: Editar precio Material ── */}
+      {editingMatId && editingMatItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setEditingMatId(null)} />
+          <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-concrete bg-sand">
+              <div>
+                <h2 className="text-sm font-bold text-charcoal">Editar precio</h2>
+                <p className="text-xs text-steel-mid mt-0.5 truncate max-w-[200px]">{editingMatItem.nombre}</p>
+              </div>
+              <button onClick={() => setEditingMatId(null)} className="p-1.5 hover:bg-concrete/40 rounded-lg transition-colors"><X className="h-4 w-4 text-steel-mid" /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-steel-mid uppercase tracking-wider mb-1.5">Precio unitario (COP)</label>
+                <input
+                  type="number" min={0} step="0.01" autoFocus
+                  value={matEditPrice} onChange={(e) => setMatEditPrice(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSaveMatEdit()}
+                  className="w-full px-3 py-2.5 border border-concrete rounded-lg text-sm focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20 outline-none transition-all"
+                />
+                {editingMatItem.precioRef != null && (
+                  <p className="text-xs text-steel-mid mt-1">Precio de referencia: {formatearCOP(editingMatItem.precioRef)}</p>
+                )}
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => setEditingMatId(null)} className="flex-1 px-4 py-2.5 border border-concrete rounded-lg text-sm font-semibold text-steel-mid hover:bg-sand transition-colors">Cancelar</button>
+                <button onClick={handleSaveMatEdit} disabled={savingMatEdit} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-burn-orange text-white rounded-lg text-sm font-semibold hover:bg-burn-orange/90 disabled:opacity-60 transition-colors">
+                  {savingMatEdit ? <><Loader2 className="h-4 w-4 animate-spin" /> Guardando…</> : <><Save className="h-4 w-4" /> Guardar</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: Crear Material propio ── */}
+      {showCreateMat && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowCreateMat(false)} />
+          <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-concrete bg-sand">
+              <h2 className="text-sm font-bold text-charcoal">Nuevo material propio</h2>
+              <button onClick={() => setShowCreateMat(false)} className="p-1.5 hover:bg-concrete/40 rounded-lg transition-colors"><X className="h-4 w-4 text-steel-mid" /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-steel-mid uppercase tracking-wider mb-1.5">Nombre *</label>
+                <input autoFocus value={createMatNombre} onChange={(e) => setCreateMatNombre(e.target.value)} maxLength={200} placeholder="Ej: Cemento especial tipo III" className="w-full px-3 py-2.5 border border-concrete rounded-lg text-sm focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20 outline-none transition-all" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-steel-mid uppercase tracking-wider mb-1.5">Unidad *</label>
+                  <input value={createMatUnidad} onChange={(e) => setCreateMatUnidad(e.target.value)} placeholder="kg, m², gl…" className="w-full px-3 py-2.5 border border-concrete rounded-lg text-sm focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20 outline-none transition-all" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-steel-mid uppercase tracking-wider mb-1.5">Precio (COP)</label>
+                  <input type="number" min={0} value={createMatPrecio} onChange={(e) => setCreateMatPrecio(e.target.value)} placeholder="0" className="w-full px-3 py-2.5 border border-concrete rounded-lg text-sm focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20 outline-none transition-all" />
+                </div>
+              </div>
+              {createMatError && <p className="text-xs text-red-700 bg-red-50 px-3 py-2 rounded-lg border border-red-200">{createMatError}</p>}
+              <div className="flex gap-3">
+                <button onClick={() => setShowCreateMat(false)} className="flex-1 px-4 py-2.5 border border-concrete rounded-lg text-sm font-semibold text-steel-mid hover:bg-sand transition-colors">Cancelar</button>
+                <button onClick={handleCreateMat} disabled={savingCreateMat} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-burn-orange text-white rounded-lg text-sm font-semibold hover:bg-burn-orange/90 disabled:opacity-60 transition-colors">
+                  {savingCreateMat ? <><Loader2 className="h-4 w-4 animate-spin" /> Creando…</> : <><Plus className="h-4 w-4" /> Crear material</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: Editar precio Equipo ── */}
+      {editingEqId && editingEqItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setEditingEqId(null)} />
+          <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-concrete bg-sand">
+              <div>
+                <h2 className="text-sm font-bold text-charcoal">Editar precio diario</h2>
+                <p className="text-xs text-steel-mid mt-0.5 truncate max-w-[200px]">{editingEqItem.nombre}</p>
+              </div>
+              <button onClick={() => setEditingEqId(null)} className="p-1.5 hover:bg-concrete/40 rounded-lg transition-colors"><X className="h-4 w-4 text-steel-mid" /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-steel-mid uppercase tracking-wider mb-1.5">Precio diario (COP)</label>
+                <input
+                  type="number" min={0} step="0.01" autoFocus
+                  value={eqEditPrice} onChange={(e) => setEqEditPrice(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSaveEqEdit()}
+                  className="w-full px-3 py-2.5 border border-concrete rounded-lg text-sm focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20 outline-none transition-all"
+                />
+                {editingEqItem.precioRef != null && (
+                  <p className="text-xs text-steel-mid mt-1">Referencia catálogo: {formatearCOP(editingEqItem.precioRef)}/día</p>
+                )}
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => setEditingEqId(null)} className="flex-1 px-4 py-2.5 border border-concrete rounded-lg text-sm font-semibold text-steel-mid hover:bg-sand transition-colors">Cancelar</button>
+                <button onClick={handleSaveEqEdit} disabled={savingEqEdit} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-burn-orange text-white rounded-lg text-sm font-semibold hover:bg-burn-orange/90 disabled:opacity-60 transition-colors">
+                  {savingEqEdit ? <><Loader2 className="h-4 w-4 animate-spin" /> Guardando…</> : <><Save className="h-4 w-4" /> Guardar</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: Crear Equipo propio ── */}
+      {showCreateEq && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowCreateEq(false)} />
+          <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-concrete bg-sand">
+              <h2 className="text-sm font-bold text-charcoal">Nuevo equipo propio</h2>
+              <button onClick={() => setShowCreateEq(false)} className="p-1.5 hover:bg-concrete/40 rounded-lg transition-colors"><X className="h-4 w-4 text-steel-mid" /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-steel-mid uppercase tracking-wider mb-1.5">Nombre *</label>
+                <input autoFocus value={createEqNombre} onChange={(e) => setCreateEqNombre(e.target.value)} maxLength={200} placeholder="Ej: Retroexcavadora CAT 320" className="w-full px-3 py-2.5 border border-concrete rounded-lg text-sm focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20 outline-none transition-all" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-steel-mid uppercase tracking-wider mb-1.5">Unidad</label>
+                  <select value={createEqUnidad} onChange={(e) => setCreateEqUnidad(e.target.value)} className="w-full px-3 py-2.5 border border-concrete rounded-lg text-sm focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20 outline-none bg-white">
+                    {['día', 'hr', 'mes', 'semana', 'un'].map((u) => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-steel-mid uppercase tracking-wider mb-1.5">Precio (COP)</label>
+                  <input type="number" min={0} value={createEqPrecio} onChange={(e) => setCreateEqPrecio(e.target.value)} placeholder="0" className="w-full px-3 py-2.5 border border-concrete rounded-lg text-sm focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20 outline-none transition-all" />
+                </div>
+              </div>
+              {createEqError && <p className="text-xs text-red-700 bg-red-50 px-3 py-2 rounded-lg border border-red-200">{createEqError}</p>}
+              <div className="flex gap-3">
+                <button onClick={() => setShowCreateEq(false)} className="flex-1 px-4 py-2.5 border border-concrete rounded-lg text-sm font-semibold text-steel-mid hover:bg-sand transition-colors">Cancelar</button>
+                <button onClick={handleCreateEq} disabled={savingCreateEq} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-burn-orange text-white rounded-lg text-sm font-semibold hover:bg-burn-orange/90 disabled:opacity-60 transition-colors">
+                  {savingCreateEq ? <><Loader2 className="h-4 w-4 animate-spin" /> Creando…</> : <><Plus className="h-4 w-4" /> Crear equipo</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── MODAL: Quick-add trabajador ── */}
@@ -785,7 +1155,7 @@ export default function InsumosPage() {
               {quickError && <p className="text-xs text-red-700 bg-red-50 px-3 py-2 rounded-lg border border-red-200">{quickError}</p>}
               <div className="flex gap-3 pt-1">
                 <button type="button" onClick={() => setQuickAdd(null)} className="flex-1 px-4 py-2.5 border border-concrete rounded-lg text-sm font-semibold text-steel-mid hover:bg-sand transition-colors">Cancelar</button>
-                <button type="button" onClick={handleQuickAdd} disabled={!quickWorkerId || quickLoading} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-burn-orange text-white rounded-lg text-sm font-semibold hover:bg-burn-orange/90 transition-colors disabled:opacity-60">
+                <button type="button" onClick={handleQuickAdd} disabled={!quickWorkerId || quickLoading} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-burn-orange text-white rounded-lg text-sm font-semibold hover:bg-burn-orange/90 disabled:opacity-60 transition-colors">
                   {quickLoading ? <><Loader2 className="h-4 w-4 animate-spin" /> Agregando…</> : <><UserPlus className="h-4 w-4" /> Agregar</>}
                 </button>
               </div>
@@ -911,7 +1281,7 @@ export default function InsumosPage() {
 
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={closeCuadrillaModal} className="flex-1 px-4 py-2.5 border border-concrete rounded-lg text-sm font-semibold text-steel-mid hover:bg-sand transition-colors">Cancelar</button>
-                <button type="submit" disabled={savingCuadrilla} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-burn-orange text-white rounded-lg text-sm font-semibold hover:bg-burn-orange/90 transition-colors disabled:opacity-60">
+                <button type="submit" disabled={savingCuadrilla} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-burn-orange text-white rounded-lg text-sm font-semibold hover:bg-burn-orange/90 disabled:opacity-60 transition-colors">
                   {savingCuadrilla ? <><Loader2 className="h-4 w-4 animate-spin" /> {editCuadrilla ? 'Guardando…' : 'Creando…'}</> : <><Save className="h-4 w-4" /> {editCuadrilla ? 'Guardar cambios' : 'Crear cuadrilla'}</>}
                 </button>
               </div>
@@ -927,146 +1297,166 @@ export default function InsumosPage() {
   );
 }
 
-// ── Subcomponentes de fila para evitar re-renders masivos ─────────────────────
+// ── Subcomponente MatRow ───────────────────────────────────────────────────────
 
 function MatRow({
-  mat, onBlur, onReset,
+  item, onEdit, onToggle, onReset, toggling, eliminando,
 }: {
-  mat: MaterialConPrecio;
-  onBlur: (mat: MaterialConPrecio, raw: string) => void;
-  onReset: (mat: MaterialConPrecio) => void;
+  item: MatItem;
+  onEdit: (item: MatItem) => void;
+  onToggle: (item: MatItem) => void;
+  onReset: (item: MatItem) => void;
+  toggling: boolean;
+  eliminando: boolean;
 }) {
-  const personalizado = mat.precio_usuario !== null;
-  const [localVal, setLocalVal] = useState(
-    personalizado ? String(mat.precio_usuario) : String(mat.precio_referencia)
-  );
-
-  useEffect(() => {
-    setLocalVal(mat.precio_usuario !== null ? String(mat.precio_usuario) : String(mat.precio_referencia));
-  }, [mat.precio_usuario, mat.precio_referencia]);
-
   return (
-    <tr className="hover:bg-sand/20 transition-colors group">
-      <td className="px-4 py-3 font-medium text-charcoal">{mat.nombre}</td>
-      <td className="px-4 py-3">
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-sand text-steel-mid">
-          {mat.categoria}
+    <tr className={cn('hover:bg-sand/20 transition-colors group', !item.activo && 'opacity-50')}>
+      <td className="px-4 py-3 font-medium text-charcoal">
+        <span className="flex items-center gap-2 flex-wrap">
+          {item.nombre}
+          {item.esPropio ? (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700 uppercase tracking-wide">Propio</span>
+          ) : (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#F3F4F6] text-[#6B7280] uppercase tracking-wide">Referencia</span>
+          )}
+          {!item.activo && (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-700 uppercase tracking-wide">Inactivo</span>
+          )}
         </span>
       </td>
-      <td className="px-4 py-3 text-steel-mid text-xs">{mat.unidad}</td>
-      <td className="px-4 py-3 text-right">
-        <div className="flex flex-col items-end gap-1">
-          {personalizado ? (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700 uppercase tracking-wide">
-              Propio
-            </span>
-          ) : (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#F3F4F6] text-[#6B7280] uppercase tracking-wide">
-              Referencia
-            </span>
-          )}
-          <input
-            type="number"
-            min={0}
-            step="0.01"
-            value={localVal}
-            onChange={(e) => setLocalVal(e.target.value)}
-            onBlur={(e) => onBlur(mat, e.target.value)}
-            className={cn(
-              'w-36 px-2 py-1 rounded-lg text-sm text-right tabular-nums outline-none transition-all',
-              'bg-transparent border focus:bg-white',
-              personalizado
-                ? 'border-blue-300 text-blue-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
-                : 'border-concrete/60 text-steel-mid focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20'
-            )}
-            style={{ fontFamily: 'var(--font-mono)' }}
-          />
-        </div>
+      <td className="px-4 py-3">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-sand text-steel-mid">{item.categoria}</span>
       </td>
-      <td className="px-4 py-3 text-right w-10">
-        {personalizado && (
+      <td className="px-4 py-3 text-steel-mid text-xs">{item.unidad}</td>
+      <td className="px-4 py-3 text-right tabular-nums font-semibold text-charcoal" style={{ fontFamily: 'var(--font-mono)' }}>
+        {formatearCOP(item.precio)}
+      </td>
+      <td className="px-4 py-3 text-right">
+        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {/* Toggle activo/inactivo — solo ítems del catálogo */}
+          {!item.esUserMaterial && (
+            <button
+              onClick={() => onToggle(item)}
+              disabled={toggling}
+              title={item.activo ? 'Inactivar' : 'Activar'}
+              className={cn(
+                'inline-flex items-center justify-center h-7 w-7 rounded-md transition-colors cursor-pointer disabled:opacity-40',
+                item.activo ? 'text-steel-mid hover:text-red-600 hover:bg-red-50' : 'text-red-500 hover:text-green-600 hover:bg-green-50'
+              )}
+            >
+              {toggling ? <Loader2 className="h-4 w-4 animate-spin" /> : item.activo ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+            </button>
+          )}
+          {/* Editar */}
           <button
-            onClick={() => onReset(mat)}
-            title="Restablecer precio de referencia"
-            className="inline-flex items-center justify-center h-7 w-7 rounded-md text-steel-mid hover:text-burn-orange hover:bg-burn-orange/10 transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
+            onClick={() => onEdit(item)}
+            title="Editar precio"
+            className="inline-flex items-center justify-center h-7 w-7 rounded-md text-steel-mid hover:text-charcoal hover:bg-sand transition-colors cursor-pointer"
           >
-            <RotateCcw className="h-3.5 w-3.5" />
+            <Edit2 className="h-4 w-4" />
           </button>
-        )}
+          {/* Agregar a APU */}
+          <button
+            title="Disponible en el Panel APU del editor de presupuesto"
+            className="inline-flex items-center justify-center h-7 w-7 rounded-md text-steel-mid hover:text-burn-orange hover:bg-burn-orange/10 transition-colors cursor-pointer"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+          {/* Eliminar (solo PROPIO) */}
+          {item.esPropio && (
+            <button
+              onClick={() => onReset(item)}
+              disabled={eliminando}
+              title={item.esUserMaterial ? 'Eliminar material propio' : 'Restablecer precio de referencia'}
+              className="inline-flex items-center justify-center h-7 w-7 rounded-md text-steel-mid hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-40"
+            >
+              {eliminando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+            </button>
+          )}
+        </div>
       </td>
     </tr>
   );
 }
 
+// ── Subcomponente EqRow ────────────────────────────────────────────────────────
+
 function EqRow({
-  eq, onBlur, onReset,
+  item, onEdit, onToggle, onReset, toggling, eliminando,
 }: {
-  eq: EquipoConPrecio;
-  onBlur: (eq: EquipoConPrecio, raw: string) => void;
-  onReset: (eq: EquipoConPrecio) => void;
+  item: EqItem;
+  onEdit: (item: EqItem) => void;
+  onToggle: (item: EqItem) => void;
+  onReset: (item: EqItem) => void;
+  toggling: boolean;
+  eliminando: boolean;
 }) {
-  const personalizado = eq.precio_usuario !== null;
-  const [localVal, setLocalVal] = useState(
-    personalizado ? String(eq.precio_usuario) : String(eq.precio_diario)
-  );
-
-  useEffect(() => {
-    setLocalVal(eq.precio_usuario !== null ? String(eq.precio_usuario) : String(eq.precio_diario));
-  }, [eq.precio_usuario, eq.precio_diario]);
-
   return (
-    <tr className="hover:bg-sand/20 transition-colors group">
-      <td className="px-4 py-3 font-medium text-charcoal">{eq.nombre}</td>
-      <td className="px-4 py-3">
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-sand text-steel-mid">
-          {eq.tipo}
+    <tr className={cn('hover:bg-sand/20 transition-colors group', !item.activo && 'opacity-50')}>
+      <td className="px-4 py-3 font-medium text-charcoal">
+        <span className="flex items-center gap-2 flex-wrap">
+          {item.nombre}
+          {item.esPropio ? (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700 uppercase tracking-wide">Propio</span>
+          ) : (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#F3F4F6] text-[#6B7280] uppercase tracking-wide">Referencia</span>
+          )}
+          {!item.activo && (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-700 uppercase tracking-wide">Inactivo</span>
+          )}
         </span>
       </td>
+      <td className="px-4 py-3">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-sand text-steel-mid">{item.tipo}</span>
+      </td>
+      <td className="px-4 py-3 text-right tabular-nums font-semibold text-charcoal" style={{ fontFamily: 'var(--font-mono)' }}>
+        {formatearCOP(item.precio)}
+      </td>
+      <td className="px-4 py-3 text-right tabular-nums text-steel-mid/70 text-xs" style={{ fontFamily: 'var(--font-mono)' }}>
+        {item.precioSemanal > 0 ? formatearCOP(item.precioSemanal) : '—'}
+      </td>
+      <td className="px-4 py-3 text-right tabular-nums text-steel-mid/70 text-xs" style={{ fontFamily: 'var(--font-mono)' }}>
+        {item.precioMensual > 0 ? formatearCOP(item.precioMensual) : '—'}
+      </td>
       <td className="px-4 py-3 text-right">
-        <div className="flex flex-col items-end gap-1">
-          {personalizado ? (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700 uppercase tracking-wide">
-              Propio
-            </span>
-          ) : (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#F3F4F6] text-[#6B7280] uppercase tracking-wide">
-              Referencia
-            </span>
+        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {!item.esUserMaterial && (
+            <button
+              onClick={() => onToggle(item)}
+              disabled={toggling}
+              title={item.activo ? 'Inactivar' : 'Activar'}
+              className={cn(
+                'inline-flex items-center justify-center h-7 w-7 rounded-md transition-colors cursor-pointer disabled:opacity-40',
+                item.activo ? 'text-steel-mid hover:text-red-600 hover:bg-red-50' : 'text-red-500 hover:text-green-600 hover:bg-green-50'
+              )}
+            >
+              {toggling ? <Loader2 className="h-4 w-4 animate-spin" /> : item.activo ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+            </button>
           )}
-          <input
-            type="number"
-            min={0}
-            step="0.01"
-            value={localVal}
-            onChange={(e) => setLocalVal(e.target.value)}
-            onBlur={(e) => onBlur(eq, e.target.value)}
-            className={cn(
-              'w-36 px-2 py-1 rounded-lg text-sm text-right tabular-nums outline-none transition-all',
-              'bg-transparent border focus:bg-white',
-              personalizado
-                ? 'border-blue-300 text-blue-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
-                : 'border-concrete/60 text-steel-mid focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20'
-            )}
-            style={{ fontFamily: 'var(--font-mono)' }}
-          />
-        </div>
-      </td>
-      <td className="px-4 py-3 text-right tabular-nums text-steel-mid/70 text-xs" style={{ fontFamily: 'var(--font-mono)' }}>
-        {formatearCOP(eq.precio_semanal)}
-      </td>
-      <td className="px-4 py-3 text-right tabular-nums text-steel-mid/70 text-xs" style={{ fontFamily: 'var(--font-mono)' }}>
-        {formatearCOP(eq.precio_mensual)}
-      </td>
-      <td className="px-4 py-3 text-right w-10">
-        {personalizado && (
           <button
-            onClick={() => onReset(eq)}
-            title="Restablecer precio de referencia"
-            className="inline-flex items-center justify-center h-7 w-7 rounded-md text-steel-mid hover:text-burn-orange hover:bg-burn-orange/10 transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
+            onClick={() => onEdit(item)}
+            title="Editar precio diario"
+            className="inline-flex items-center justify-center h-7 w-7 rounded-md text-steel-mid hover:text-charcoal hover:bg-sand transition-colors cursor-pointer"
           >
-            <RotateCcw className="h-3.5 w-3.5" />
+            <Edit2 className="h-4 w-4" />
           </button>
-        )}
+          <button
+            title="Disponible en el Panel APU del editor de presupuesto"
+            className="inline-flex items-center justify-center h-7 w-7 rounded-md text-steel-mid hover:text-burn-orange hover:bg-burn-orange/10 transition-colors cursor-pointer"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+          {item.esPropio && (
+            <button
+              onClick={() => onReset(item)}
+              disabled={eliminando}
+              title={item.esUserMaterial ? 'Eliminar equipo propio' : 'Restablecer precio de referencia'}
+              className="inline-flex items-center justify-center h-7 w-7 rounded-md text-steel-mid hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-40"
+            >
+              {eliminando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+            </button>
+          )}
+        </div>
       </td>
     </tr>
   );

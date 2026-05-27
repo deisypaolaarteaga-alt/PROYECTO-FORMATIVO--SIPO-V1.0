@@ -375,6 +375,28 @@ export async function agregarTrabajadorACuadrilla(
 }
 
 /**
+ * Activa o inactiva un trabajador del catálogo.
+ * Usa admin client porque `trabajadores` es catálogo compartido sin UPDATE policy de usuario.
+ */
+export async function toggleTrabajador(
+  id: string,
+  activo: boolean
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: 'No autorizado' };
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from('trabajadores')
+    .update({ activo })
+    .eq('id', id);
+
+  if (error) return { success: false, error: 'No se pudo actualizar el trabajador' };
+  return { success: true };
+}
+
+/**
  * Importa un ítem del catálogo `labor` (Mano de Obra) como trabajador en la tabla
  * `trabajadores`, haciéndolo disponible para armar cuadrillas.
  * Si ya existe un trabajador con el mismo nombre, devuelve el existente sin duplicar.

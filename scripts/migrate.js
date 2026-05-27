@@ -87,6 +87,9 @@ const migrationFiles = [
   'supabase/migrations/20260519110000_fix_cuadrillas_trabajadores.sql',
   'supabase/migrations/20260520100000_security_rls_audit.sql',
   'supabase/migrations/20260521100000_fn_duplicar_presupuesto.sql',
+  'supabase/migrations/20260522100000_seed_municipios_completo.sql',
+  'supabase/migrations/20260526100000_trabajadores_usuario.sql',
+  'supabase/migrations/20260527100000_user_precios_insumos.sql',
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

@@ -13,16 +13,7 @@ import { Button } from '@/components/shared/Button';
 import { ClienteSelector } from '@/components/clientes/ClienteSelector';
 import { MunicipioCombobox } from '@/components/clientes/MunicipioCombobox';
 import { actualizarProyecto } from '@/actions/proyectos';
-
-const TIPOS_OBRA = [
-  { value: 'residencial',    label: 'Residencial' },
-  { value: 'comercial',      label: 'Comercial' },
-  { value: 'industrial',     label: 'Industrial' },
-  { value: 'infraestructura',label: 'Infraestructura' },
-  { value: 'institucional',  label: 'Institucional' },
-  { value: 'hotelero',       label: 'Hotelero' },
-  { value: 'otro',           label: 'Otro' },
-];
+import { SelectorTipoObra } from '@/components/shared/SelectorTipoObra';
 
 interface EditarProyectoModalProps {
   isOpen: boolean;
@@ -38,6 +29,8 @@ interface EditarProyectoModalProps {
   };
 }
 
+const REGEX_TIPO_B = /^(?=.*[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ])[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ0-9\s.,\-&()'"#/]+$/;
+
 export function EditarProyectoModal({ isOpen, onClose, proyecto }: EditarProyectoModalProps) {
   const router = useRouter();
   const [nombre,      setNombre]      = useState(proyecto.nombre);
@@ -47,6 +40,7 @@ export function EditarProyectoModal({ isOpen, onClose, proyecto }: EditarProyect
   const [clienteId,   setClienteId]   = useState<string | null>(proyecto.cliente_id ?? null);
   const [saving,      setSaving]      = useState(false);
   const [error,       setError]       = useState('');
+  const [nombreError, setNombreError] = useState('');
 
   async function handleSave() {
     if (!nombre.trim())   { setError('El nombre es obligatorio.');  return; }
@@ -84,10 +78,17 @@ export function EditarProyectoModal({ isOpen, onClose, proyecto }: EditarProyect
             <input
               type="text"
               value={nombre}
-              onChange={e => setNombre(e.target.value)}
+              onChange={e => { setNombre(e.target.value); if (nombreError) setNombreError(''); }}
+              onBlur={() => {
+                const v = nombre.trim();
+                if (!v) setNombreError('El nombre es obligatorio');
+                else if (!REGEX_TIPO_B.test(v)) setNombreError('Debe contener al menos una letra');
+                else setNombreError('');
+              }}
               className={fieldCls}
-              placeholder="Nombre del proyecto"
+              placeholder="Ej. Casa Lote 5 - Urbanización El Prado"
             />
+            {nombreError && <p className="mt-1 text-xs text-red-600">{nombreError}</p>}
           </div>
 
           <MunicipioCombobox
@@ -97,19 +98,11 @@ export function EditarProyectoModal({ isOpen, onClose, proyecto }: EditarProyect
             placeholder="Buscar municipio..."
           />
 
-          <div>
-            <label className="block text-xs font-medium text-neutral-600 mb-1">Tipo de obra</label>
-            <select
-              value={tipoObra}
-              onChange={e => setTipoObra(e.target.value)}
-              className={`${fieldCls} bg-white`}
-            >
-              <option value="">Sin especificar</option>
-              {TIPOS_OBRA.map(t => (
-                <option key={t.value} value={t.value}>{t.label}</option>
-              ))}
-            </select>
-          </div>
+          <SelectorTipoObra
+            value={tipoObra}
+            onChange={setTipoObra}
+            label="Tipo de obra"
+          />
 
           <div>
             <label className="block text-xs font-medium text-neutral-600 mb-1">Cliente</label>

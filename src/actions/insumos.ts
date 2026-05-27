@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { createUserMaterialSchema } from '@/lib/validations/schemas';
-import type { ActionResult, ExplosionInsumos, TipoAPUItem } from '@/types';
+import type { ActionResult, ExplosionInsumos, TipoAPUItem, MaterialConPrecio, EquipoConPrecio } from '@/types';
 import { revalidatePath } from 'next/cache';
 import Decimal from 'decimal.js';
 
@@ -93,6 +93,114 @@ export async function updateUserMaterial(id: string, formData: FormData): Promis
   return { success: true };
 }
 
+export async function getMaterialesConPrecio(): Promise<MaterialConPrecio[]> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: materiales } = await supabase
+    .from('materials')
+    .select('id, nombre, descripcion, unidad, precio_referencia, departamento, categoria')
+    .order('categoria')
+    .order('nombre');
+
+  if (!materiales) return [];
+
+  const { data: overrides } = await supabase
+    .from('user_material_precios')
+    .select('material_id, precio_unitario')
+    .eq('user_id', user.id);
+
+  const overrideMap = new Map((overrides || []).map((o) => [o.material_id, o.precio_unitario]));
+
+  return materiales.map((m) => ({
+    id:               m.id,
+    nombre:           m.nombre ?? '',
+    descripcion:      m.descripcion ?? '',
+    unidad:           m.unidad ?? '',
+    precio_referencia: Number(m.precio_referencia ?? 0),
+    departamento:     m.departamento ?? '',
+    categoria:        m.categoria ?? '',
+    precio_usuario:   overrideMap.has(m.id) ? Number(overrideMap.get(m.id)) : null,
+  }));
+}
+
+export async function upsertMaterialPrecio(materialId: string, precioUnitario: number): Promise<void> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  await supabase.from('user_material_precios').upsert(
+    { user_id: user.id, material_id: materialId, precio_unitario: new Decimal(precioUnitario).toDecimalPlaces(2).toNumber(), updated_at: new Date().toISOString() },
+    { onConflict: 'user_id,material_id' }
+  );
+}
+
+export async function resetMaterialPrecio(materialId: string): Promise<void> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  await supabase.from('user_material_precios')
+    .delete()
+    .eq('user_id', user.id)
+    .eq('material_id', materialId);
+}
+
+export async function getEquiposConPrecio(): Promise<EquipoConPrecio[]> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: equipos } = await supabase
+    .from('equipment')
+    .select('id, nombre, descripcion, tipo, precio_diario, precio_semanal, precio_mensual, departamento')
+    .order('nombre');
+
+  if (!equipos) return [];
+
+  const { data: overrides } = await supabase
+    .from('user_equipment_precios')
+    .select('equipment_id, precio_diario')
+    .eq('user_id', user.id);
+
+  const overrideMap = new Map((overrides || []).map((o) => [o.equipment_id, o.precio_diario]));
+
+  return equipos.map((e) => ({
+    id:            e.id,
+    nombre:        e.nombre ?? '',
+    descripcion:   e.descripcion ?? '',
+    tipo:          e.tipo ?? '',
+    precio_diario:   Number(e.precio_diario ?? 0),
+    precio_semanal:  Number(e.precio_semanal ?? 0),
+    precio_mensual:  Number(e.precio_mensual ?? 0),
+    departamento:    e.departamento ?? '',
+    precio_usuario:  overrideMap.has(e.id) ? Number(overrideMap.get(e.id)) : null,
+  }));
+}
+
+export async function upsertEquipoPrecio(equipmentId: string, precioDiario: number): Promise<void> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  await supabase.from('user_equipment_precios').upsert(
+    { user_id: user.id, equipment_id: equipmentId, precio_diario: new Decimal(precioDiario).toDecimalPlaces(2).toNumber(), updated_at: new Date().toISOString() },
+    { onConflict: 'user_id,equipment_id' }
+  );
+}
+
+export async function resetEquipoPrecio(equipmentId: string): Promise<void> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  await supabase.from('user_equipment_precios')
+    .delete()
+    .eq('user_id', user.id)
+    .eq('equipment_id', equipmentId);
+}
+
 export async function searchInsumos(query: string, type?: string) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -100,7 +208,27 @@ export async function searchInsumos(query: string, type?: string) {
 
   if (!type || type === 'material') {
     const { data } = await supabase.from('materials').select('*').ilike('nombre', `%${query}%`).limit(15);
-    results.push(...(data || []).map((d: any) => ({ ...d, source: 'materials' })));
+    let overrideMap = new Map<string, number>();
+    if (user && data && data.length > 0) {
+      const ids = data.map((d: any) => d.id);
+      const { data: ov } = await supabase
+        .from('user_material_precios')
+        .select('material_id, precio_unitario')
+        .eq('user_id', user.id)
+        .in('material_id', ids);
+      overrideMap = new Map((ov || []).map((o: any) => [o.material_id, Number(o.precio_unitario)]));
+    }
+    results.push(...(data || []).map((d: any) => {
+      const tienePrecioPropio = overrideMap.has(d.id);
+      return {
+        id:              d.id,
+        nombre:          d.nombre,
+        unidad:          d.unidad,
+        categoria:       d.categoria,
+        source:          tienePrecioPropio ? 'propio' : 'referencia',
+        precio_unitario: tienePrecioPropio ? overrideMap.get(d.id)! : Number(d.precio_referencia ?? 0),
+      };
+    }));
   }
   if (!type || type === 'mano_obra') {
     const { data } = await supabase
@@ -120,7 +248,27 @@ export async function searchInsumos(query: string, type?: string) {
   }
   if (!type || type === 'equipo') {
     const { data } = await supabase.from('equipment').select('*').ilike('nombre', `%${query}%`).limit(10);
-    results.push(...(data || []).map((d: any) => ({ ...d, source: 'equipo', unidad: d.unidad || 'día' })));
+    let overrideMap = new Map<string, number>();
+    if (user && data && data.length > 0) {
+      const ids = data.map((d: any) => d.id);
+      const { data: ov } = await supabase
+        .from('user_equipment_precios')
+        .select('equipment_id, precio_diario')
+        .eq('user_id', user.id)
+        .in('equipment_id', ids);
+      overrideMap = new Map((ov || []).map((o: any) => [o.equipment_id, Number(o.precio_diario)]));
+    }
+    results.push(...(data || []).map((d: any) => {
+      const tienePrecioPropio = overrideMap.has(d.id);
+      return {
+        id:              d.id,
+        nombre:          d.nombre,
+        unidad:          d.unidad || 'día',
+        tipo:            d.tipo,
+        source:          tienePrecioPropio ? 'propio' : 'referencia',
+        precio_unitario: tienePrecioPropio ? overrideMap.get(d.id)! : Number(d.precio_diario ?? 0),
+      };
+    }));
   }
 
   if (user) {

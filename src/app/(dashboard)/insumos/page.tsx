@@ -1,34 +1,40 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
 import {
-  Package, Drill, Star, HardHat,
-  Plus, Search, Trash2, Edit2,
-  ShieldCheck, Loader2, Info, X, Save, UserPlus, Minus, Copy
+  useState, useEffect, useMemo, useTransition, useCallback, useRef,
+} from 'react';
+import {
+  Package, Drill, ShieldCheck,
+  Search, ChevronUp, ChevronDown, ChevronsUpDown,
+  RotateCcw, Plus, Trash2, Edit2,
+  Loader2, Info, X, Save, UserPlus, Minus, ArrowRight,
 } from 'lucide-react';
+import Link from 'next/link';
 import { Card } from '@/components/shared/Card';
 import { Button } from '@/components/shared/Button';
+import { Input } from '@/components/shared/Input';
+import { SkeletonTable } from '@/components/shared/Skeleton';
 import { formatearCOP } from '@/lib/utils/formato-cop';
 import {
-  getMaterials, getLabor, getEquipment, getUserMaterials,
-  createUserMaterial, deleteUserMaterial, updateUserMaterial,
+  getMaterialesConPrecio, upsertMaterialPrecio, resetMaterialPrecio,
+  getEquiposConPrecio, upsertEquipoPrecio, resetEquipoPrecio,
+  getLabor,
 } from '@/actions/insumos';
 import {
   getCuadrillas, getTrabajadores, crearCuadrillaPersonalizada, deleteCuadrilla,
-  updateCuadrilla, importarLaborComoTrabajador,
+  updateCuadrilla, importarLaborComoTrabajador, agregarTrabajadorACuadrilla,
 } from '@/actions/cuadrillas';
+import { ModalTrabajador } from '@/components/mano-obra/ModalTrabajador';
+import type { TrabajadorReferencia } from '@/actions/mano-obra';
+import type { MaterialConPrecio, EquipoConPrecio } from '@/types';
 import { cn } from '@/lib/utils';
 
-type TabId = 'material' | 'equipment' | 'labor' | 'user' | 'crews';
+// ── Tipos ──────────────────────────────────────────────────────────────────────
 
-interface UserMaterial {
-  id: string;
-  nombre: string;
-  descripcion?: string;
-  tipo: string;
-  unidad: string;
-  precio_unitario: number;
-}
+type TabId = 'material' | 'equipment' | 'crews';
+type SortDir = 'asc' | 'desc';
+type MatColKey = 'nombre' | 'categoria' | 'unidad' | 'precio_usuario';
+type EqColKey = 'nombre' | 'tipo' | 'precio_semanal' | 'precio_mensual' | 'precio_usuario';
 
 interface TrabajadorSeleccionado {
   id: string;
@@ -39,19 +45,46 @@ interface TrabajadorSeleccionado {
   cantidad: number;
 }
 
+// ── Helpers de ordenamiento ───────────────────────────────────────────────────
+
+function SortIcon<T extends string>({ col, sortCol, sortDir }: { col: T; sortCol: T; sortDir: SortDir }) {
+  if (col !== sortCol) return <ChevronsUpDown className="h-3.5 w-3.5 text-white/40" />;
+  return sortDir === 'asc'
+    ? <ChevronUp className="h-3.5 w-3.5 text-[#E8956A]" />
+    : <ChevronDown className="h-3.5 w-3.5 text-[#E8956A]" />;
+}
+
+function toggleSort<T>(col: T, current: T, dir: SortDir, set: (c: T, d: SortDir) => void) {
+  if (col === current) set(col, dir === 'asc' ? 'desc' : 'asc');
+  else set(col, 'asc');
+}
+
+// ── Componente principal ───────────────────────────────────────────────────────
+
 export default function InsumosPage() {
   const [tab, setTab] = useState<TabId>('material');
-  const [data, setData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
 
-  const [showInsumoModal, setShowInsumoModal] = useState(false);
-  const [editItem, setEditItem] = useState<UserMaterial | null>(null);
-  const [prefillData, setPrefillData] = useState<Partial<UserMaterial> | null>(null);
-  const [savingInsumo, setSavingInsumo] = useState(false);
-  const [insumoError, setInsumoError] = useState('');
-  const [deletingInsumoId, setDeletingInsumoId] = useState<string | null>(null);
+  // Materiales
+  const [materiales, setMateriales] = useState<MaterialConPrecio[]>([]);
+  const [loadingMat, setLoadingMat] = useState(true);
+  const [searchMat, setSearchMat] = useState('');
+  const [sortMatCol, setSortMatCol] = useState<MatColKey>('nombre');
+  const [sortMatDir, setSortMatDir] = useState<SortDir>('asc');
+  const [categoriaMat, setCategoriaMat] = useState<string | null>(null);
+  const [, startMatTransition] = useTransition();
 
+  // Equipos
+  const [equipos, setEquipos] = useState<EquipoConPrecio[]>([]);
+  const [loadingEq, setLoadingEq] = useState(true);
+  const [searchEq, setSearchEq] = useState('');
+  const [sortEqCol, setSortEqCol] = useState<EqColKey>('nombre');
+  const [sortEqDir, setSortEqDir] = useState<SortDir>('asc');
+  const [, startEqTransition] = useTransition();
+
+  // Cuadrillas
+  const [cuadrillas, setCuadrillas] = useState<any[]>([]);
+  const [loadingCrews, setLoadingCrews] = useState(true);
+  const [searchCrews, setSearchCrews] = useState('');
   const [showCuadrillaModal, setShowCuadrillaModal] = useState(false);
   const [editCuadrilla, setEditCuadrilla] = useState<any | null>(null);
   const [cuadrillaModalKey, setCuadrillaModalKey] = useState(0);
@@ -63,85 +96,165 @@ export default function InsumosPage() {
   const [savingCuadrilla, setSavingCuadrilla] = useState(false);
   const [cuadrillaError, setCuadrillaError] = useState('');
   const [deletingCuadrillaId, setDeletingCuadrillaId] = useState<string | null>(null);
-  const cuadrillaFormRef = useRef<HTMLFormElement>(null);
+  const [rendimientoNormal, setRendimientoNormal] = useState('');
+  const [rendimientoUnidad, setRendimientoUnidad] = useState('m²');
+  const [rendimientoFuente, setRendimientoFuente] = useState('SIPO Colombia 2026');
+  const [showCrearTrabajador, setShowCrearTrabajador] = useState(false);
+  const [quickAdd, setQuickAdd] = useState<{ cuadrillaId: string; cuadrillaName: string; existingIds: string[] } | null>(null);
+  const [quickWorkerId, setQuickWorkerId] = useState('');
+  const [quickCantidad, setQuickCantidad] = useState(1);
+  const [quickLoading, setQuickLoading] = useState(false);
+  const [quickError, setQuickError] = useState('');
   const [laborCatalog, setLaborCatalog] = useState<any[]>([]);
   const [busquedaLabor, setBusquedaLabor] = useState('');
   const [showLaborImport, setShowLaborImport] = useState(false);
   const [importandoLaborId, setImportandoLaborId] = useState<string | null>(null);
+  const cuadrillaFormRef = useRef<HTMLFormElement>(null);
 
-  // FIX 5: estado rendimiento base
-  const [rendimientoNormal, setRendimientoNormal] = useState('');
-  const [rendimientoUnidad, setRendimientoUnidad] = useState('m²');
-  const [rendimientoFuente, setRendimientoFuente] = useState('SIPO Colombia 2026');
+  // ── Carga inicial por pestaña ──────────────────────────────────────────────
 
-  useEffect(() => { loadData(); }, [tab]);
-
-  async function loadData() {
-    setLoading(true);
-    try {
-      let res;
-      if (tab === 'material') res = await getMaterials();
-      else if (tab === 'equipment') res = await getEquipment();
-      else if (tab === 'labor') res = await getTrabajadores();
-      else if (tab === 'user') res = await getUserMaterials();
-      else if (tab === 'crews') res = await getCuadrillas();
-      setData(res || []);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (tab === 'material' && materiales.length === 0) {
+      setLoadingMat(true);
+      getMaterialesConPrecio().then((d) => { setMateriales(d); setLoadingMat(false); });
     }
-  }
+    if (tab === 'equipment' && equipos.length === 0) {
+      setLoadingEq(true);
+      getEquiposConPrecio().then((d) => { setEquipos(d); setLoadingEq(false); });
+    }
+    if (tab === 'crews') {
+      setLoadingCrews(true);
+      getCuadrillas().then((d) => { setCuadrillas(d || []); setLoadingCrews(false); });
+    }
+  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function openCreateInsumo() {
-    setEditItem(null);
-    setPrefillData(null);
-    setInsumoError('');
-    setShowInsumoModal(true);
-    if (tab !== 'user') setTab('user');
-  }
-  function openImportarACatalogo(item: any) {
-    setEditItem(null);
-    setInsumoError('');
-    const tipo = tab === 'equipment' ? 'equipo' : tab === 'labor' ? 'mano_obra' : 'material';
-    const precio = item.precio_referencia ?? item.precio_diario ?? item.jornal_con_prestaciones ?? 0;
-    const unidad = item.unidad || (tab === 'equipment' ? 'día' : tab === 'labor' ? 'jornal' : 'und');
-    const nombre = item.nombre ?? item.especialidad ?? '';
-    setPrefillData({ nombre, tipo, unidad, precio_unitario: precio });
-    setShowInsumoModal(true);
-  }
-  function openEditInsumo(item: UserMaterial) {
-    setEditItem(item);
-    setPrefillData(null);
-    setInsumoError('');
-    setShowInsumoModal(true);
-  }
-  function closeInsumoModal() {
-    setShowInsumoModal(false);
-    setEditItem(null);
-    setPrefillData(null);
-    setInsumoError('');
-  }
-  async function handleInsumoSubmit(e: { preventDefault(): void; currentTarget: HTMLFormElement }) {
-    e.preventDefault();
-    setSavingInsumo(true);
-    setInsumoError('');
-    const fd = new FormData(e.currentTarget);
-    const result = editItem
-      ? await updateUserMaterial(editItem.id, fd)
-      : await createUserMaterial(fd);
-    setSavingInsumo(false);
-    if (!result.success) { setInsumoError(result.error || 'Error al guardar'); return; }
-    closeInsumoModal();
-    loadData();
-  }
-  async function handleDeleteInsumo(id: string) {
-    if (!confirm('¿Eliminar este insumo personalizado?')) return;
-    setDeletingInsumoId(id);
-    const result = await deleteUserMaterial(id);
-    setDeletingInsumoId(null);
-    if (!result.success) { alert(result.error || 'Error al eliminar'); return; }
-    loadData();
+  // ── Categorías de materiales ───────────────────────────────────────────────
+
+  const categoriasMat = useMemo(
+    () => Array.from(new Set(materiales.map((m) => m.categoria).filter(Boolean))).sort(),
+    [materiales]
+  );
+
+  const matPersonalizados = useMemo(() => materiales.filter((m) => m.precio_usuario !== null).length, [materiales]);
+  const eqPersonalizados  = useMemo(() => equipos.filter((e) => e.precio_usuario !== null).length, [equipos]);
+
+  // ── Filas filtradas/ordenadas: Materiales ─────────────────────────────────
+
+  const filasMat = useMemo(() => {
+    let list = materiales;
+    if (categoriaMat) list = list.filter((m) => m.categoria === categoriaMat);
+    if (searchMat.trim()) {
+      const q = searchMat.toLowerCase();
+      list = list.filter((m) => m.nombre.toLowerCase().includes(q) || m.categoria.toLowerCase().includes(q));
+    }
+    return [...list].sort((a, b) => {
+      let va: string | number, vb: string | number;
+      if (sortMatCol === 'precio_usuario') {
+        va = a.precio_usuario ?? a.precio_referencia;
+        vb = b.precio_usuario ?? b.precio_referencia;
+      } else {
+        va = a[sortMatCol as keyof MaterialConPrecio] as string | number;
+        vb = b[sortMatCol as keyof MaterialConPrecio] as string | number;
+      }
+      const cmp = typeof va === 'string' ? va.localeCompare(vb as string, 'es-CO') : (va as number) - (vb as number);
+      return sortMatDir === 'asc' ? cmp : -cmp;
+    });
+  }, [materiales, searchMat, categoriaMat, sortMatCol, sortMatDir]);
+
+  // ── Filas filtradas/ordenadas: Equipos ───────────────────────────────────
+
+  const filasEq = useMemo(() => {
+    let list = equipos;
+    if (searchEq.trim()) {
+      const q = searchEq.toLowerCase();
+      list = list.filter((e) => e.nombre.toLowerCase().includes(q) || e.tipo.toLowerCase().includes(q));
+    }
+    return [...list].sort((a, b) => {
+      let va: string | number, vb: string | number;
+      if (sortEqCol === 'precio_usuario') {
+        va = a.precio_usuario ?? a.precio_diario;
+        vb = b.precio_usuario ?? b.precio_diario;
+      } else {
+        va = a[sortEqCol as keyof EquipoConPrecio] as string | number;
+        vb = b[sortEqCol as keyof EquipoConPrecio] as string | number;
+      }
+      const cmp = typeof va === 'string' ? va.localeCompare(vb as string, 'es-CO') : (va as number) - (vb as number);
+      return sortEqDir === 'asc' ? cmp : -cmp;
+    });
+  }, [equipos, searchEq, sortEqCol, sortEqDir]);
+
+  // ── Handlers: precios de Materiales ──────────────────────────────────────
+
+  const handleMatBlur = useCallback((mat: MaterialConPrecio, rawValue: string) => {
+    const num = parseFloat(rawValue);
+    if (rawValue === '' || isNaN(num)) {
+      if (mat.precio_usuario !== null) {
+        startMatTransition(async () => {
+          await resetMaterialPrecio(mat.id);
+          setMateriales((prev) => prev.map((m) => m.id === mat.id ? { ...m, precio_usuario: null } : m));
+        });
+      }
+      return;
+    }
+    if (num === mat.precio_usuario) return;
+    startMatTransition(async () => {
+      await upsertMaterialPrecio(mat.id, num);
+      setMateriales((prev) => prev.map((m) => m.id === mat.id ? { ...m, precio_usuario: num } : m));
+    });
+  }, [startMatTransition]);
+
+  const handleMatReset = useCallback((mat: MaterialConPrecio) => {
+    startMatTransition(async () => {
+      await resetMaterialPrecio(mat.id);
+      setMateriales((prev) => prev.map((m) => m.id === mat.id ? { ...m, precio_usuario: null } : m));
+    });
+  }, [startMatTransition]);
+
+  // ── Handlers: precios de Equipos ─────────────────────────────────────────
+
+  const handleEqBlur = useCallback((eq: EquipoConPrecio, rawValue: string) => {
+    const num = parseFloat(rawValue);
+    if (rawValue === '' || isNaN(num)) {
+      if (eq.precio_usuario !== null) {
+        startEqTransition(async () => {
+          await resetEquipoPrecio(eq.id);
+          setEquipos((prev) => prev.map((e) => e.id === eq.id ? { ...e, precio_usuario: null } : e));
+        });
+      }
+      return;
+    }
+    if (num === eq.precio_usuario) return;
+    startEqTransition(async () => {
+      await upsertEquipoPrecio(eq.id, num);
+      setEquipos((prev) => prev.map((e) => e.id === eq.id ? { ...e, precio_usuario: num } : e));
+    });
+  }, [startEqTransition]);
+
+  const handleEqReset = useCallback((eq: EquipoConPrecio) => {
+    startEqTransition(async () => {
+      await resetEquipoPrecio(eq.id);
+      setEquipos((prev) => prev.map((e) => e.id === eq.id ? { ...e, precio_usuario: null } : e));
+    });
+  }, [startEqTransition]);
+
+  // ── Handlers: Cuadrillas ──────────────────────────────────────────────────
+
+  async function loadTrabajadoresIfNeeded() {
+    if (trabajadoresDisponibles.length === 0) {
+      setLoadingTrabajadores(true);
+      const list = await getTrabajadores();
+      const byEsp = new Map<string, any>();
+      for (const t of list) {
+        const key = (t.especialidad || '').toLowerCase();
+        const prev = byEsp.get(key);
+        if (!prev || t.user_id !== null) byEsp.set(key, t);
+      }
+      setTrabajadoresDisponibles(Array.from(byEsp.values()));
+      setLoadingTrabajadores(false);
+    }
+    if (laborCatalog.length === 0) {
+      getLabor().then((l) => setLaborCatalog(l || []));
+    }
   }
 
   async function openEditCuadrilla(cuadrilla: any) {
@@ -149,12 +262,8 @@ export default function InsumosPage() {
     setCuadrillaError('');
     setTrabajadoresSeleccionados(
       (cuadrilla.trabajadores || []).map((t: any) => ({
-        id: t.id,
-        especialidad: t.especialidad,
-        categoria: t.categoria,
-        jornal_base: t.jornal_base,
-        factor_prestacional: t.factor_prestacional ?? 1.5988,
-        cantidad: t.cantidad,
+        id: t.id, especialidad: t.especialidad, categoria: t.categoria,
+        jornal_base: t.jornal_base, factor_prestacional: t.factor_prestacional ?? 1.5988, cantidad: t.cantidad,
       }))
     );
     setTrabajadorElegido('');
@@ -165,18 +274,9 @@ export default function InsumosPage() {
     setRendimientoNormal(rend ? String(rend.rendimiento_normal) : '');
     setRendimientoUnidad(rend?.unidad ?? 'm²');
     setRendimientoFuente(rend?.fuente ?? 'SIPO Colombia 2026');
-    setCuadrillaModalKey(k => k + 1);
+    setCuadrillaModalKey((k) => k + 1);
     setShowCuadrillaModal(true);
-    if (trabajadoresDisponibles.length === 0) {
-      setLoadingTrabajadores(true);
-      const list = await getTrabajadores();
-      const unicos = list.filter((t, i, self) => i === self.findIndex(x => x.id === t.id));
-      setTrabajadoresDisponibles(unicos);
-      setLoadingTrabajadores(false);
-    }
-    if (laborCatalog.length === 0) {
-      getLabor().then(list => setLaborCatalog(list || []));
-    }
+    await loadTrabajadoresIfNeeded();
   }
 
   async function openCreateCuadrilla() {
@@ -190,25 +290,9 @@ export default function InsumosPage() {
     setRendimientoNormal('');
     setRendimientoUnidad('m²');
     setRendimientoFuente('SIPO Colombia 2026');
-    setCuadrillaModalKey(k => k + 1);
+    setCuadrillaModalKey((k) => k + 1);
     setShowCuadrillaModal(true);
-    if (tab !== 'crews') setTab('crews');
-    const promises: Promise<void>[] = [];
-    if (trabajadoresDisponibles.length === 0) {
-      setLoadingTrabajadores(true);
-      // FIX 2: deduplicar por id para evitar entradas repetidas
-      promises.push(getTrabajadores().then(list => {
-        const unicos = list.filter((t, i, self) =>
-          i === self.findIndex(x => x.id === t.id)
-        );
-        setTrabajadoresDisponibles(unicos);
-        setLoadingTrabajadores(false);
-      }));
-    }
-    if (laborCatalog.length === 0) {
-      promises.push(getLabor().then(list => setLaborCatalog(list || [])));
-    }
-    await Promise.all(promises);
+    await loadTrabajadoresIfNeeded();
   }
 
   async function handleImportarLabor(labor: any) {
@@ -216,85 +300,91 @@ export default function InsumosPage() {
     setCuadrillaError('');
     const result = await importarLaborComoTrabajador(labor.id);
     setImportandoLaborId(null);
-    if (!result.success || !result.trabajador) {
-      setCuadrillaError(result.error || 'Error al importar trabajador');
-      return;
-    }
+    if (!result.success || !result.trabajador) { setCuadrillaError(result.error || 'Error al importar'); return; }
     const t = result.trabajador;
-    if (!trabajadoresDisponibles.some(td => td.id === t.id)) {
-      setTrabajadoresDisponibles(prev => [...prev, t]);
-    }
-    if (!trabajadoresSeleccionados.some(ts => ts.id === t.id)) {
-      setTrabajadoresSeleccionados(prev => [...prev, {
-        id: t.id,
-        especialidad: t.especialidad,
-        categoria: t.categoria,
-        jornal_base: t.jornal_base,
-        factor_prestacional: t.factor_prestacional ?? 1.5988,
-        cantidad: 1,
+    if (!trabajadoresDisponibles.some((td) => td.id === t.id)) setTrabajadoresDisponibles((prev) => [...prev, t]);
+    if (!trabajadoresSeleccionados.some((ts) => ts.id === t.id)) {
+      setTrabajadoresSeleccionados((prev) => [...prev, {
+        id: t.id, especialidad: t.especialidad, categoria: t.categoria,
+        jornal_base: t.jornal_base, factor_prestacional: t.factor_prestacional ?? 1.5988, cantidad: 1,
       }]);
     }
   }
-  function closeCuadrillaModal() {
-    setShowCuadrillaModal(false);
-    setEditCuadrilla(null);
-    setCuadrillaError('');
+
+  function closeCuadrillaModal() { setShowCuadrillaModal(false); setEditCuadrilla(null); setCuadrillaError(''); }
+
+  function handleTrabajadorCreado(t: TrabajadorReferencia) {
+    if (!trabajadoresDisponibles.some((td) => td.id === t.id)) setTrabajadoresDisponibles((prev) => [...prev, t]);
+    setTrabajadorElegido(t.id);
+    setShowCrearTrabajador(false);
   }
+
   function agregarTrabajador() {
-    const t = trabajadoresDisponibles.find(t => t.id === trabajadorElegido);
-    if (!t) return;
-    if (trabajadoresSeleccionados.some(s => s.id === t.id)) return;
-    setTrabajadoresSeleccionados(prev => [...prev, {
-      id: t.id,
-      especialidad: t.especialidad,
-      categoria: t.categoria,
-      jornal_base: t.jornal_base,
-      factor_prestacional: t.factor_prestacional ?? 1.5988,
-      cantidad: cantidadTrabajador,
+    const t = trabajadoresDisponibles.find((w) => w.id === trabajadorElegido);
+    if (!t || trabajadoresSeleccionados.some((s) => s.id === t.id)) return;
+    setTrabajadoresSeleccionados((prev) => [...prev, {
+      id: t.id, especialidad: t.especialidad, categoria: t.categoria,
+      jornal_base: t.jornal_base, factor_prestacional: t.factor_prestacional ?? 1.5988, cantidad: cantidadTrabajador,
     }]);
     setTrabajadorElegido('');
     setCantidadTrabajador(1);
   }
+
   function quitarTrabajador(id: string) {
-    setTrabajadoresSeleccionados(prev => prev.filter(t => t.id !== id));
+    setTrabajadoresSeleccionados((prev) => prev.filter((t) => t.id !== id));
   }
+
   async function handleCuadrillaSubmit(e: { preventDefault(): void; currentTarget: HTMLFormElement }) {
     e.preventDefault();
-    if (trabajadoresSeleccionados.length === 0) {
-      setCuadrillaError('Agrega al menos un trabajador a la cuadrilla');
-      return;
-    }
+    if (trabajadoresSeleccionados.length === 0) { setCuadrillaError('Agrega al menos un trabajador'); return; }
     const fd = new FormData(e.currentTarget);
     setSavingCuadrilla(true);
     setCuadrillaError('');
-    // FIX 5: incluir rendimiento si fue diligenciado
     const payload = {
       nombre: fd.get('nombre') as string,
       descripcion: fd.get('descripcion') as string || undefined,
       categoria_actividad: fd.get('categoria_actividad') as string || undefined,
-      trabajadores: trabajadoresSeleccionados.map(t => ({
-        trabajador_id: t.id,
-        cantidad: t.cantidad,
-      })),
+      trabajadores: trabajadoresSeleccionados.map((t) => ({ trabajador_id: t.id, cantidad: t.cantidad })),
       rendimiento_normal: rendimientoNormal ? Number(rendimientoNormal) : undefined,
       rendimiento_unidad: rendimientoNormal ? rendimientoUnidad : undefined,
       rendimiento_fuente: rendimientoNormal ? rendimientoFuente || 'SIPO Colombia 2026' : undefined,
     };
-    const result = editCuadrilla
-      ? await updateCuadrilla(editCuadrilla.id, payload)
-      : await crearCuadrillaPersonalizada(payload);
+    const result = editCuadrilla ? await updateCuadrilla(editCuadrilla.id, payload) : await crearCuadrillaPersonalizada(payload);
     setSavingCuadrilla(false);
-    if (!result.success) { setCuadrillaError(result.error || (editCuadrilla ? 'Error al actualizar' : 'Error al crear')); return; }
+    if (!result.success) { setCuadrillaError(result.error || 'Error al guardar'); return; }
     closeCuadrillaModal();
-    loadData();
+    setLoadingCrews(true);
+    getCuadrillas().then((d) => { setCuadrillas(d || []); setLoadingCrews(false); });
   }
+
   async function handleDeleteCuadrilla(id: string) {
     if (!confirm('¿Eliminar esta cuadrilla personalizada?')) return;
     setDeletingCuadrillaId(id);
     const result = await deleteCuadrilla(id);
     setDeletingCuadrillaId(null);
     if (!result.success) { alert(result.error || 'Error al eliminar'); return; }
-    loadData();
+    setCuadrillas((prev) => prev.filter((c) => c.id !== id));
+  }
+
+  async function openQuickAdd(cuadrilla: any) {
+    const existingIds = (cuadrilla.trabajadores || []).map((t: any) => t.id);
+    setQuickAdd({ cuadrillaId: cuadrilla.id, cuadrillaName: cuadrilla.nombre, existingIds });
+    setQuickWorkerId('');
+    setQuickCantidad(1);
+    setQuickError('');
+    await loadTrabajadoresIfNeeded();
+  }
+
+  async function handleQuickAdd() {
+    if (!quickAdd || !quickWorkerId) return;
+    setQuickLoading(true);
+    setQuickError('');
+    const res = await agregarTrabajadorACuadrilla(quickAdd.cuadrillaId, quickWorkerId, quickCantidad);
+    setQuickLoading(false);
+    if (!res.success) { setQuickError(res.error || 'Error al agregar'); return; }
+    setQuickAdd(null);
+    setLoadingCrews(true);
+    getCuadrillas().then((d) => { setCuadrillas(d || []); setLoadingCrews(false); });
   }
 
   function costoJornadaCuadrilla(cuadrilla: any): number {
@@ -303,515 +393,502 @@ export default function InsumosPage() {
     );
   }
 
-  const filteredData = data.filter(item =>
-    (item.nombre || item.especialidad || '').toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredCrews = useMemo(() => {
+    if (!searchCrews.trim()) return cuadrillas;
+    const q = searchCrews.toLowerCase();
+    return cuadrillas.filter((c) => c.nombre.toLowerCase().includes(q));
+  }, [cuadrillas, searchCrews]);
 
-  /* Clases de icono por pestaña */
-  const tabIconClass: Record<string, string> = {
-    material:  'bg-[#FAF0EB] text-[#D95510]',
-    equipment: 'bg-[#EBFAF0] text-[#166534]',
-    labor:     'bg-[#EEF2FF] text-[#3730A3]',
-    user:      'bg-[#FEF3E2] text-[#7A4B00]',
-    crews:     'bg-[#E4E7EC] text-[#4B5563]',
-  };
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8 animate-fade-in">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div>
-          <h1 className="text-2xl font-bold text-[#1F2937] tracking-tight">Catálogo de Insumos</h1>
-          <p className="text-[#6B7A8D] mt-1 text-sm">Gestiona los materiales, cuadrillas y equipos base para tus presupuestos.</p>
-        </div>
+      <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6B7A8D]" />
-            <input
-              placeholder="Filtrar por nombre..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 pr-4 py-2 bg-white border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none w-64 transition-all"
-            />
+          <div className="p-2 rounded-lg bg-burn-orange/10">
+            <Package className="h-5 w-5 text-burn-orange" />
           </div>
-          <Button
-            icon={<Plus className="h-4 w-4" />}
-            onClick={tab === 'crews' ? openCreateCuadrilla : openCreateInsumo}
-          >
-            {tab === 'crews' ? 'Nueva Cuadrilla' : tab === 'user' ? 'Agregar Propio' : 'Agregar a Mis Insumos'}
-          </Button>
+          <div>
+            <h1 className="text-xl font-semibold text-charcoal">Catálogo de Insumos</h1>
+            <p className="text-sm text-steel-mid">
+              Precios de referencia Colombia 2026 · Personaliza tus precios sin alterar el catálogo
+            </p>
+          </div>
         </div>
+        {tab === 'crews' && (
+          <Button size="sm" icon={<Plus className="h-4 w-4" />} onClick={openCreateCuadrilla}>
+            Nueva cuadrilla
+          </Button>
+        )}
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 border-b border-[#D0D4DB] pb-px overflow-x-auto">
-        {[
-          { id: 'material',  label: 'Materiales',   icon: Package    },
-          { id: 'equipment', label: 'Equipos',       icon: Drill      },
-          { id: 'labor',     label: 'Mano de Obra',  icon: HardHat    },
-          { id: 'user',      label: 'Mis Insumos',   icon: Star       },
-          { id: 'crews',     label: 'Cuadrillas',    icon: ShieldCheck },
-        ].map(t => (
+      <div className="flex items-center gap-1 border-b border-concrete overflow-x-auto">
+        {([
+          { id: 'material',  label: 'Materiales', icon: Package,     badge: matPersonalizados > 0 ? `${matPersonalizados} propios` : null },
+          { id: 'equipment', label: 'Equipos',     icon: Drill,       badge: eqPersonalizados > 0 ? `${eqPersonalizados} propios` : null },
+          { id: 'crews',     label: 'Cuadrillas',  icon: ShieldCheck, badge: null },
+        ] as const).map((t) => (
           <button
             key={t.id}
-            onClick={() => setTab(t.id as TabId)}
+            onClick={() => setTab(t.id)}
             className={cn(
-              "flex items-center gap-2 px-5 py-3 text-sm font-semibold transition-all relative whitespace-nowrap",
+              'flex items-center gap-2 px-5 py-3 text-sm font-medium transition-all relative whitespace-nowrap',
               tab === t.id
-                ? "text-[#D95510] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-[#D95510] after:rounded-t-full"
-                : "text-[#6B7A8D] hover:text-[#4B5563]"
+                ? 'text-burn-orange after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-burn-orange after:rounded-t-full'
+                : 'text-steel-mid hover:text-charcoal'
             )}
           >
             <t.icon className="h-4 w-4" />
             {t.label}
+            {t.badge && (
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-burn-orange/10 text-burn-orange">
+                {t.badge}
+              </span>
+            )}
           </button>
         ))}
       </div>
 
-      {/* Content */}
-      <Card padding="none" className="overflow-hidden border-[#D0D4DB] bg-white">
-        {loading ? (
-          <div className="py-24 flex flex-col items-center justify-center gap-4">
-            <Loader2 className="h-8 w-8 text-[#D95510] animate-spin" />
-            <p className="text-sm font-semibold text-[#6B7A8D] uppercase tracking-widest">Cargando catálogo...</p>
+      {/* Aviso cuadrillas */}
+      {tab === 'crews' && (
+        <div className="flex items-center justify-between gap-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded-xl">
+          <p className="text-sm text-blue-800 font-medium">
+            Las cuadrillas agrupan trabajadores. Para editar tarifas salariales ve a Tarifas Salariales.
+          </p>
+          <Link
+            href="/mano-obra"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-700 text-white text-xs font-semibold rounded-lg hover:bg-blue-800 transition-colors whitespace-nowrap shrink-0"
+          >
+            Gestionar trabajadores <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      )}
+
+      {/* ── PESTAÑA MATERIALES ── */}
+      {tab === 'material' && (
+        <Card>
+          {/* Nota informativa */}
+          <div className="px-4 py-3 bg-amber-50 border-b border-amber-100 flex items-start gap-2">
+            <Info className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+            <p className="text-xs text-amber-700">
+              Edita el precio de cualquier material para marcarlo como <strong>Propio</strong>. El Panel APU usará tu precio en lugar del de referencia.
+            </p>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            {/* Tabla genérica: material | equipment | labor | user */}
-            {tab !== 'crews' && (
-              <table className="w-full text-left">
-                <thead className="bg-[#DDE0E6] border-b border-[#D0D4DB]">
-                  <tr>
-                    <th className="px-6 py-3 text-[9px] font-bold text-[#6B7A8D] uppercase tracking-wide">Descripción</th>
-                    <th className="px-6 py-3 text-[9px] font-bold text-[#6B7A8D] uppercase tracking-wide">
-                      {tab === 'labor' ? 'Categoría / Ciudad' : 'Unidad / Categoría'}
-                    </th>
-                    <th className="px-6 py-3 text-[9px] font-bold text-[#6B7A8D] uppercase tracking-wide text-right">
-                      {tab === 'labor' ? 'Jornal c/ Prestaciones' : 'Precio Ref. (COP)'}
-                    </th>
-                    <th className="px-6 py-3 w-28"></th>
+
+          {/* Toolbar */}
+          <div className="p-4 border-b border-concrete space-y-3">
+            <div className="relative max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-steel-mid pointer-events-none" />
+              <Input
+                placeholder="Buscar por nombre o categoría…"
+                value={searchMat}
+                onChange={(e) => setSearchMat(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            {categoriasMat.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-steel-mid font-medium shrink-0">Categoría:</span>
+                <button
+                  onClick={() => setCategoriaMat(null)}
+                  className={cn(
+                    'px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer',
+                    categoriaMat === null ? 'bg-burn-orange text-white' : 'bg-sand text-steel-mid hover:bg-concrete/60 hover:text-charcoal'
+                  )}
+                >
+                  Todas
+                </button>
+                {categoriasMat.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setCategoriaMat((prev) => prev === cat ? null : cat)}
+                    className={cn(
+                      'px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer',
+                      categoriaMat === cat ? 'bg-burn-orange text-white' : 'bg-sand text-steel-mid hover:bg-concrete/60 hover:text-charcoal'
+                    )}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {loadingMat ? (
+            <div className="p-4"><SkeletonTable rows={8} cols={6} /></div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-[#1A2535] border-b border-[#2A3B50]">
+                    {([
+                      { key: 'nombre',       label: 'Nombre',    align: 'left'  },
+                      { key: 'categoria',    label: 'Categoría', align: 'left'  },
+                      { key: 'unidad',       label: 'Unidad',    align: 'left'  },
+                      { key: 'precio_usuario', label: 'Precio',  align: 'right' },
+                    ] as const).map((col) => (
+                      <th
+                        key={col.key}
+                        onClick={() => toggleSort(col.key as MatColKey, sortMatCol, sortMatDir, (c, d) => { setSortMatCol(c); setSortMatDir(d); })}
+                        className={cn(
+                          'px-4 py-3 font-medium text-white/60 cursor-pointer select-none hover:text-white transition-colors whitespace-nowrap',
+                          col.align === 'right' ? 'text-right' : 'text-left'
+                        )}
+                      >
+                        <span className="inline-flex items-center gap-1.5">
+                          {col.align === 'right' && <SortIcon col={col.key as MatColKey} sortCol={sortMatCol} sortDir={sortMatDir} />}
+                          {col.label}
+                          {col.align === 'left' && <SortIcon col={col.key as MatColKey} sortCol={sortMatCol} sortDir={sortMatDir} />}
+                        </span>
+                      </th>
+                    ))}
+                    <th className="px-4 py-3 w-10 bg-[#1A2535]" />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#E4E7EC]">
-                  {filteredData.map((item) => (
-                    <tr key={item.id} className="bg-[#E4E7EC] hover:bg-[#DDE0E6] transition-colors group">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className={cn(
-                            "h-8 w-8 rounded-lg flex items-center justify-center shrink-0",
-                            tabIconClass[tab] ?? tabIconClass.material
-                          )}>
-                            {tab === 'material'  ? <Package  className="h-4 w-4" /> :
-                             tab === 'equipment' ? <Drill    className="h-4 w-4" /> :
-                             tab === 'labor'     ? <HardHat  className="h-4 w-4" /> :
-                                                   <Star     className="h-4 w-4" />}
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold text-[#1F2937]">{item.nombre || item.especialidad}</p>
-                            <p className="text-[10px] text-[#6B7A8D] font-medium">
-                              {tab === 'labor'
-                                ? (item.ciudad_referencia || 'Referencia Nacional')
-                                : (item.departamento || 'Referencia Nacional')}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        {tab === 'labor' ? (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold text-[#3730A3] bg-[#EEF2FF] px-2 py-0.5 rounded uppercase">{item.categoria || 'Oficial'}</span>
-                            <span className="text-[10px] text-[#6B7A8D] font-semibold">Base: {formatearCOP(item.jornal_base)}</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold text-[#4B5563] bg-[#DDE0E6] px-2 py-0.5 rounded uppercase">{item.unidad || 'Día'}</span>
-                            <span className="text-[10px] text-[#6B7A8D] font-semibold uppercase">{item.categoria || item.oficio || item.tipo}</span>
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        {tab === 'labor' ? (
-                          <div>
-                            <p className="text-sm font-bold text-[#1F2937] tabular-nums">{formatearCOP(item.jornal_con_prestaciones)}</p>
-                            <p className="text-[10px] text-[#6B7A8D]">factor ×{Number(item.factor_prestacional || 1.5988).toFixed(4)}</p>
-                          </div>
-                        ) : (
-                          <p className="text-sm font-bold text-[#1F2937] tabular-nums">{formatearCOP(item.precio_referencia || item.precio_diario || item.precio_unitario || 0)}</p>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        {tab === 'user' ? (
-                          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => openEditInsumo(item as UserMaterial)} className="p-2 hover:bg-[#DDE0E6] rounded-lg text-[#6B7A8D] hover:text-[#4B5563]" title="Editar">
-                              <Edit2 className="h-3.5 w-3.5" />
-                            </button>
-                            <button onClick={() => handleDeleteInsumo(item.id)} disabled={deletingInsumoId === item.id} className="p-2 hover:bg-[#FEF0F0] rounded-lg text-[#6B7A8D] hover:text-[#991B1B] disabled:opacity-40" title="Eliminar">
-                              {deletingInsumoId === item.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={() => openImportarACatalogo(item)}
-                              className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-[#D95510] hover:bg-[#FAF0EB] rounded-lg transition-colors uppercase"
-                              title="Copiar a Mis Insumos"
-                            >
-                              <Copy className="h-3 w-3" /> Copiar
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
+                <tbody className="divide-y divide-concrete/50">
+                  {filasMat.map((mat) => (
+                    <MatRow
+                      key={mat.id}
+                      mat={mat}
+                      onBlur={handleMatBlur}
+                      onReset={handleMatReset}
+                    />
                   ))}
                 </tbody>
               </table>
-            )}
+              {filasMat.length === 0 && (
+                <div className="py-16 text-center text-sm text-steel-mid">
+                  No hay materiales que coincidan con los filtros.
+                </div>
+              )}
+              <div className="px-4 py-2.5 border-t border-concrete bg-sand/20 text-xs text-steel-mid flex justify-between">
+                <span>{filasMat.length} materiales</span>
+                <span>{matPersonalizados} con precio personalizado</span>
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
 
-            {/* Tabla específica: cuadrillas */}
-            {tab === 'crews' && (
-              <table className="w-full text-left">
-                <thead className="bg-[#DDE0E6] border-b border-[#D0D4DB]">
-                  <tr>
-                    <th className="px-6 py-3 text-[9px] font-bold text-[#6B7A8D] uppercase tracking-wide">Cuadrilla</th>
-                    <th className="px-6 py-3 text-[9px] font-bold text-[#6B7A8D] uppercase tracking-wide">Trabajadores</th>
-                    {/* FIX 6: columna rendimiento */}
-                    <th className="px-6 py-3 text-[9px] font-bold text-[#6B7A8D] uppercase tracking-wide">Rendimiento</th>
-                    <th className="px-6 py-3 text-[9px] font-bold text-[#6B7A8D] uppercase tracking-wide text-right">Costo / Jornada (COP)</th>
-                    <th className="px-6 py-3 w-24"></th>
+      {/* ── PESTAÑA EQUIPOS ── */}
+      {tab === 'equipment' && (
+        <Card>
+          {/* Nota informativa */}
+          <div className="px-4 py-3 bg-amber-50 border-b border-amber-100 flex items-start gap-2">
+            <Info className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+            <p className="text-xs text-amber-700">
+              Edita el <strong>Precio diario</strong> para marcarlo como <strong>Propio</strong>. Los precios semanal y mensual son solo informativos.
+            </p>
+          </div>
+
+          {/* Toolbar */}
+          <div className="p-4 border-b border-concrete">
+            <div className="relative max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-steel-mid pointer-events-none" />
+              <Input
+                placeholder="Buscar por nombre o tipo…"
+                value={searchEq}
+                onChange={(e) => setSearchEq(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          </div>
+
+          {loadingEq ? (
+            <div className="p-4"><SkeletonTable rows={8} cols={7} /></div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-[#1A2535] border-b border-[#2A3B50]">
+                    {([
+                      { key: 'nombre',         label: 'Nombre',       align: 'left'  },
+                      { key: 'tipo',           label: 'Tipo',         align: 'left'  },
+                      { key: 'precio_usuario', label: 'Precio diario',align: 'right' },
+                      { key: 'precio_semanal', label: 'Ref. semanal', align: 'right' },
+                      { key: 'precio_mensual', label: 'Ref. mensual', align: 'right' },
+                    ] as const).map((col) => (
+                      <th
+                        key={col.key}
+                        onClick={() => toggleSort(col.key as EqColKey, sortEqCol, sortEqDir, (c, d) => { setSortEqCol(c); setSortEqDir(d); })}
+                        className={cn(
+                          'px-4 py-3 font-medium text-white/60 cursor-pointer select-none hover:text-white transition-colors whitespace-nowrap',
+                          col.align === 'right' ? 'text-right' : 'text-left'
+                        )}
+                      >
+                        <span className="inline-flex items-center gap-1.5">
+                          {col.align === 'right' && <SortIcon col={col.key as EqColKey} sortCol={sortEqCol} sortDir={sortEqDir} />}
+                          {col.label}
+                          {col.align === 'left' && <SortIcon col={col.key as EqColKey} sortCol={sortEqCol} sortDir={sortEqDir} />}
+                        </span>
+                      </th>
+                    ))}
+                    <th className="px-4 py-3 w-10 bg-[#1A2535]" />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#E4E7EC]">
-                  {filteredData.map((item) => (
-                    <tr key={item.id} className="bg-[#E4E7EC] hover:bg-[#DDE0E6] transition-colors group">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-lg bg-[#E4E7EC] border border-[#C8CDD6] text-[#4B5563] flex items-center justify-center shrink-0">
-                            <ShieldCheck className="h-4 w-4" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold text-[#1F2937]">{item.nombre}</p>
-                            <p className="text-[10px] text-[#6B7A8D] font-medium uppercase">
-                              {item.categoria_actividad || 'Sin categoría'} · {item.es_sistema ? 'Sistema' : 'Personalizada'}
-                            </p>
-                          </div>
-                        </div>
+                <tbody className="divide-y divide-concrete/50">
+                  {filasEq.map((eq) => (
+                    <EqRow
+                      key={eq.id}
+                      eq={eq}
+                      onBlur={handleEqBlur}
+                      onReset={handleEqReset}
+                    />
+                  ))}
+                </tbody>
+              </table>
+              {filasEq.length === 0 && (
+                <div className="py-16 text-center text-sm text-steel-mid">
+                  No hay equipos que coincidan con la búsqueda.
+                </div>
+              )}
+              <div className="px-4 py-2.5 border-t border-concrete bg-sand/20 text-xs text-steel-mid flex justify-between">
+                <span>{filasEq.length} equipos</span>
+                <span>{eqPersonalizados} con precio personalizado</span>
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* ── PESTAÑA CUADRILLAS ── */}
+      {tab === 'crews' && (
+        <Card>
+          <div className="p-4 border-b border-concrete">
+            <div className="relative max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-steel-mid pointer-events-none" />
+              <Input
+                placeholder="Buscar cuadrilla…"
+                value={searchCrews}
+                onChange={(e) => setSearchCrews(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          </div>
+
+          {loadingCrews ? (
+            <div className="p-4"><SkeletonTable rows={6} cols={4} /></div>
+          ) : filteredCrews.length === 0 ? (
+            <div className="py-16 flex flex-col items-center gap-3 text-center">
+              <ShieldCheck className="h-10 w-10 text-concrete" />
+              <p className="text-sm font-medium text-charcoal">
+                {searchCrews ? 'Sin resultados' : 'No hay cuadrillas disponibles'}
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-[#1A2535] border-b border-[#2A3B50]">
+                    <th className="px-4 py-3 text-left font-medium text-white/60">Cuadrilla</th>
+                    <th className="px-4 py-3 text-left font-medium text-white/60">Trabajadores</th>
+                    <th className="px-4 py-3 text-left font-medium text-white/60">Rendimiento</th>
+                    <th className="px-4 py-3 text-right font-medium text-white/60">Costo / jornada</th>
+                    <th className="px-4 py-3 w-24 bg-[#1A2535]" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-concrete/50">
+                  {filteredCrews.map((item) => (
+                    <tr key={item.id} className="hover:bg-sand/20 transition-colors group">
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-charcoal">{item.nombre}</p>
+                        <p className="text-xs text-steel-mid">
+                          {item.categoria_actividad || 'Sin categoría'} · {item.es_sistema ? 'Sistema' : 'Personalizada'}
+                        </p>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1">
                           {(item.trabajadores || []).slice(0, 3).map((t: any, i: number) => (
-                            <span key={i} className="text-[10px] font-semibold text-[#4B5563] bg-[#DDE0E6] px-2 py-0.5 rounded uppercase">
+                            <span key={i} className="text-[10px] font-semibold text-steel-mid bg-sand px-2 py-0.5 rounded uppercase">
                               {t.cantidad > 1 ? `${t.cantidad}×` : ''}{t.especialidad}
                             </span>
                           ))}
                           {(item.trabajadores || []).length > 3 && (
-                            <span className="text-[10px] font-semibold text-[#6B7A8D] bg-[#ECEEF2] px-2 py-0.5 rounded">
+                            <span className="text-[10px] text-steel-mid bg-sand px-2 py-0.5 rounded">
                               +{item.trabajadores.length - 3} más
                             </span>
                           )}
                           {(item.trabajadores || []).length === 0 && (
-                            <span className="text-[10px] text-[#6B7A8D]">Sin trabajadores</span>
+                            <span className="text-xs text-steel-mid">Sin trabajadores</span>
                           )}
                         </div>
                       </td>
-                      {/* FIX 6: celda rendimiento */}
-                      <td className="px-6 py-4">
-                        {item.rendimientos?.length > 0 ? (
-                          <span className="text-xs font-semibold text-[#1F2937]">
-                            {item.rendimientos[0].rendimiento_normal} {item.rendimientos[0].unidad}/día
-                          </span>
-                        ) : (
-                          <span className="text-xs text-[#9CA3AF]">— Sin definir</span>
-                        )}
+                      <td className="px-4 py-3 text-steel-mid text-xs">
+                        {item.rendimientos?.length > 0
+                          ? `${item.rendimientos[0].rendimiento_normal} ${item.rendimientos[0].unidad}/día`
+                          : '—'
+                        }
                       </td>
-                      <td className="px-6 py-4 text-right">
-                        <p className="text-sm font-bold text-[#1F2937] tabular-nums">{formatearCOP(costoJornadaCuadrilla(item))}</p>
-                        <p className="text-[10px] text-[#6B7A8D]">con prestaciones</p>
+                      <td className="px-4 py-3 text-right tabular-nums font-semibold text-burn-orange" style={{ fontFamily: 'var(--font-mono)' }}>
+                        {formatearCOP(costoJornadaCuadrilla(item))}
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-4 py-3 text-right">
                         {!item.es_sistema ? (
                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={() => openEditCuadrilla(item)}
-                              className="p-2 hover:bg-[#DDE0E6] rounded-lg text-[#6B7A8D] hover:text-[#4B5563]"
-                              title="Editar"
-                            >
+                            <button onClick={() => openQuickAdd(item)} className="inline-flex items-center justify-center h-7 w-7 rounded-md text-steel-mid hover:text-burn-orange hover:bg-burn-orange/10 transition-colors cursor-pointer" title="Agregar trabajador">
+                              <UserPlus className="h-3.5 w-3.5" />
+                            </button>
+                            <button onClick={() => openEditCuadrilla(item)} className="inline-flex items-center justify-center h-7 w-7 rounded-md text-steel-mid hover:text-charcoal hover:bg-sand transition-colors cursor-pointer" title="Editar">
                               <Edit2 className="h-3.5 w-3.5" />
                             </button>
-                            <button
-                              onClick={() => handleDeleteCuadrilla(item.id)}
-                              disabled={deletingCuadrillaId === item.id}
-                              className="p-2 hover:bg-[#FEF0F0] rounded-lg text-[#6B7A8D] hover:text-[#991B1B] disabled:opacity-40"
-                              title="Eliminar"
-                            >
+                            <button onClick={() => handleDeleteCuadrilla(item.id)} disabled={deletingCuadrillaId === item.id} className="inline-flex items-center justify-center h-7 w-7 rounded-md text-steel-mid hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-40" title="Eliminar">
                               {deletingCuadrillaId === item.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                             </button>
                           </div>
                         ) : (
-                          <span className="text-[9px] font-bold text-[#C8CDD6] uppercase tracking-tighter">Sistema</span>
+                          <span className="text-[9px] font-bold text-concrete uppercase tracking-tighter">Sistema</span>
                         )}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            )}
-
-            {/* Estado vacío */}
-            {filteredData.length === 0 && (
-              <div className="py-24 flex flex-col items-center justify-center text-center px-6">
-                <div className="h-16 w-16 rounded-full bg-[#ECEEF2] flex items-center justify-center mb-4">
-                  {tab === 'user'  ? <Star       className="h-8 w-8 text-[#C8CDD6]" /> :
-                   tab === 'crews' ? <ShieldCheck className="h-8 w-8 text-[#C8CDD6]" /> :
-                   tab === 'labor' ? <HardHat     className="h-8 w-8 text-[#C8CDD6]" /> :
-                   <Info className="h-8 w-8 text-[#C8CDD6]" />}
-                </div>
-                <h3 className="text-base font-semibold text-[#1F2937]">
-                  {tab === 'user'  ? 'Aún no tienes insumos propios' :
-                   tab === 'crews' ? 'No hay cuadrillas disponibles' :
-                   'No se encontraron resultados'}
-                </h3>
-                <p className="text-[#6B7A8D] text-sm max-w-xs mt-1">
-                  {tab === 'user'  ? 'Haz clic en "Agregar Propio" para crear tu primer insumo personalizado.' :
-                   tab === 'crews' ? 'Crea tu primera cuadrilla personalizada o verifica que el catálogo base esté cargado.' :
-                   'Intenta con otra palabra clave o cambia de pestaña.'}
-                </p>
-                {(tab === 'user' || tab === 'crews') && (
-                  <button
-                    onClick={tab === 'crews' ? openCreateCuadrilla : openCreateInsumo}
-                    className="mt-4 flex items-center gap-2 px-4 py-2 bg-[#D95510] text-white rounded-lg text-sm font-semibold hover:bg-[#C04A0D] transition-colors"
-                  >
-                    <Plus className="h-4 w-4" />
-                    {tab === 'crews' ? 'Crear Cuadrilla' : 'Agregar Insumo Propio'}
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </Card>
-
-      {/* Info Box */}
-      <div className="bg-[#1A2535] rounded-2xl p-8 text-white relative overflow-hidden">
-        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
-          <div className="space-y-2 text-center md:text-left">
-            <h2 className="text-xl font-bold tracking-tight">Base de Datos 2026 Integrada</h2>
-            <p className="text-[#F0A882] text-sm max-w-xl font-medium opacity-90">
-              SIPO incluye por defecto los precios de referencia del mercado colombiano actualizados.
-              Puedes agregar tus propios insumos y cuadrillas personalizadas para un control total de costos.
-            </p>
-          </div>
-          <ShieldCheck className="h-24 w-24 text-white/10 absolute right-8 top-1/2 -translate-y-1/2" />
-        </div>
-      </div>
-
-      {/* MODAL: Insumo propio */}
-      {showInsumoModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeInsumoModal} />
-          <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#D0D4DB] bg-[#ECEEF2]">
-              <h2 className="text-sm font-bold text-[#1F2937] uppercase tracking-wider">
-                {editItem ? 'Editar Insumo' : prefillData ? 'Copiar a Mis Insumos' : 'Nuevo Insumo Propio'}
-              </h2>
-              <button onClick={closeInsumoModal} className="p-1.5 hover:bg-[#DDE0E6] rounded-lg transition-colors">
-                <X className="h-4 w-4 text-[#6B7A8D]" />
-              </button>
             </div>
-            <form onSubmit={handleInsumoSubmit} className="p-6 space-y-4">
+          )}
+        </Card>
+      )}
+
+      {/* ── MODAL: Quick-add trabajador ── */}
+      {quickAdd && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setQuickAdd(null)} />
+          <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-concrete bg-sand">
               <div>
-                <label className="block text-xs font-bold text-[#4B5563] uppercase tracking-wider mb-1.5">Nombre <span className="text-[#991B1B]">*</span></label>
-                <input name="nombre" defaultValue={editItem?.nombre ?? prefillData?.nombre ?? ''} required maxLength={200} placeholder="Ej: Cemento Portland Tipo I" className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all" />
+                <h2 className="text-sm font-bold text-charcoal">Agregar trabajador</h2>
+                <p className="text-xs text-steel-mid mt-0.5">{quickAdd.cuadrillaName}</p>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-[#4B5563] uppercase tracking-wider mb-1.5">Tipo <span className="text-[#991B1B]">*</span></label>
-                <select name="tipo" defaultValue={editItem?.tipo ?? prefillData?.tipo ?? 'material'} required className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all bg-white">
-                  <option value="material">Material</option>
-                  <option value="mano_obra">Mano de Obra</option>
-                  <option value="equipo">Equipo</option>
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-[#4B5563] uppercase tracking-wider mb-1.5">Unidad <span className="text-[#991B1B]">*</span></label>
-                  <input name="unidad" defaultValue={editItem?.unidad ?? prefillData?.unidad ?? ''} required maxLength={20} placeholder="kg, m², día" className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-[#4B5563] uppercase tracking-wider mb-1.5">Precio Unit. <span className="text-[#991B1B]">*</span></label>
-                  <input name="precio_unitario" type="number" defaultValue={editItem?.precio_unitario ?? prefillData?.precio_unitario ?? ''} required min={0} step="0.01" placeholder="0" className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-[#4B5563] uppercase tracking-wider mb-1.5">Descripción <span className="text-[#6B7A8D] font-normal normal-case">(opcional)</span></label>
-                <textarea name="descripcion" defaultValue={editItem?.descripcion ?? ''} maxLength={500} rows={2} placeholder="Especificaciones adicionales..." className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all resize-none" />
-              </div>
-              {insumoError && <p className="text-xs text-[#991B1B] bg-[#FEF0F0] px-3 py-2 rounded-lg border border-[#F5C2C2]">{insumoError}</p>}
-              <div className="flex gap-3 pt-2">
-                <button type="button" onClick={closeInsumoModal} className="flex-1 px-4 py-2.5 border border-[#C8CDD6] rounded-lg text-sm font-semibold text-[#4B5563] hover:bg-[#E4E7EC] transition-colors">Cancelar</button>
-                <button type="submit" disabled={savingInsumo} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-[#D95510] text-white rounded-lg text-sm font-semibold hover:bg-[#C04A0D] transition-colors disabled:opacity-60">
-                  {savingInsumo ? <><Loader2 className="h-4 w-4 animate-spin" /> Guardando...</> : <><Save className="h-4 w-4" /> {editItem ? 'Guardar Cambios' : prefillData ? 'Agregar a Mis Insumos' : 'Crear Insumo'}</>}
+              <button onClick={() => setQuickAdd(null)} className="p-1.5 hover:bg-concrete/40 rounded-lg transition-colors"><X className="h-4 w-4 text-steel-mid" /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              {loadingTrabajadores ? (
+                <div className="flex items-center gap-2 text-sm text-steel-mid"><Loader2 className="h-4 w-4 animate-spin text-burn-orange" /> Cargando…</div>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-steel-mid uppercase tracking-wider mb-1.5">Trabajador</label>
+                    <select value={quickWorkerId} onChange={(e) => setQuickWorkerId(e.target.value)} className="w-full px-3 py-2.5 border border-concrete rounded-lg text-sm focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20 outline-none bg-white">
+                      <option value="">Selecciona un trabajador…</option>
+                      {trabajadoresDisponibles.filter((t) => !quickAdd.existingIds.includes(t.id)).map((t) => (
+                        <option key={t.id} value={t.id}>{t.especialidad} · {t.categoria} · {formatearCOP(t.jornal_base)}/día</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-steel-mid uppercase tracking-wider mb-1.5">Cantidad</label>
+                    <input type="number" value={quickCantidad} onChange={(e) => setQuickCantidad(Math.max(1, parseInt(e.target.value) || 1))} min={1} max={20} className="w-full px-3 py-2.5 border border-concrete rounded-lg text-sm focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20 outline-none" />
+                  </div>
+                </>
+              )}
+              {quickError && <p className="text-xs text-red-700 bg-red-50 px-3 py-2 rounded-lg border border-red-200">{quickError}</p>}
+              <div className="flex gap-3 pt-1">
+                <button type="button" onClick={() => setQuickAdd(null)} className="flex-1 px-4 py-2.5 border border-concrete rounded-lg text-sm font-semibold text-steel-mid hover:bg-sand transition-colors">Cancelar</button>
+                <button type="button" onClick={handleQuickAdd} disabled={!quickWorkerId || quickLoading} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-burn-orange text-white rounded-lg text-sm font-semibold hover:bg-burn-orange/90 transition-colors disabled:opacity-60">
+                  {quickLoading ? <><Loader2 className="h-4 w-4 animate-spin" /> Agregando…</> : <><UserPlus className="h-4 w-4" /> Agregar</>}
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
 
-      {/* MODAL: Nueva cuadrilla */}
+      {/* ── MODAL: Cuadrilla ── */}
       {showCuadrillaModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeCuadrillaModal} />
           <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#D0D4DB] bg-[#ECEEF2] shrink-0">
-              <h2 className="text-sm font-bold text-[#1F2937] uppercase tracking-wider">
-                {editCuadrilla ? 'Editar Cuadrilla' : 'Nueva Cuadrilla Personalizada'}
-              </h2>
-              <button onClick={closeCuadrillaModal} className="p-1.5 hover:bg-[#DDE0E6] rounded-lg transition-colors">
-                <X className="h-4 w-4 text-[#6B7A8D]" />
-              </button>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-concrete bg-sand shrink-0">
+              <h2 className="text-sm font-bold text-charcoal">{editCuadrilla ? 'Editar cuadrilla' : 'Nueva cuadrilla personalizada'}</h2>
+              <button onClick={closeCuadrillaModal} className="p-1.5 hover:bg-concrete/40 rounded-lg transition-colors"><X className="h-4 w-4 text-steel-mid" /></button>
             </div>
-
             <form key={cuadrillaModalKey} ref={cuadrillaFormRef} onSubmit={handleCuadrillaSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
-                  <label className="block text-xs font-bold text-[#4B5563] uppercase tracking-wider mb-1.5">Nombre <span className="text-[#991B1B]">*</span></label>
-                  <input name="nombre" required maxLength={150} defaultValue={editCuadrilla?.nombre ?? ''} placeholder="Ej: Cuadrilla Mampostería" className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all" />
+                  <label className="block text-xs font-bold text-steel-mid uppercase tracking-wider mb-1.5">Nombre *</label>
+                  <input name="nombre" required maxLength={150} defaultValue={editCuadrilla?.nombre ?? ''} placeholder="Ej: Cuadrilla Mampostería" className="w-full px-3 py-2.5 border border-concrete rounded-lg text-sm focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20 outline-none transition-all" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#4B5563] uppercase tracking-wider mb-1.5">Categoría</label>
-                  <input name="categoria_actividad" maxLength={100} defaultValue={editCuadrilla?.categoria_actividad ?? ''} placeholder="Ej: Mampostería" className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all" />
+                  <label className="block text-xs font-bold text-steel-mid uppercase tracking-wider mb-1.5">Categoría</label>
+                  <input name="categoria_actividad" maxLength={100} defaultValue={editCuadrilla?.categoria_actividad ?? ''} placeholder="Ej: Mampostería" className="w-full px-3 py-2.5 border border-concrete rounded-lg text-sm focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20 outline-none transition-all" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-[#4B5563] uppercase tracking-wider mb-1.5">Descripción</label>
-                  <input name="descripcion" maxLength={300} defaultValue={editCuadrilla?.descripcion ?? ''} placeholder="Opcional" className="w-full px-3 py-2.5 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all" />
+                  <label className="block text-xs font-bold text-steel-mid uppercase tracking-wider mb-1.5">Descripción</label>
+                  <input name="descripcion" maxLength={300} defaultValue={editCuadrilla?.descripcion ?? ''} placeholder="Opcional" className="w-full px-3 py-2.5 border border-concrete rounded-lg text-sm focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20 outline-none transition-all" />
                 </div>
               </div>
 
               <div className="space-y-3">
-                <label className="block text-xs font-bold text-[#4B5563] uppercase tracking-wider">
-                  Trabajadores <span className="text-[#991B1B]">*</span>
-                </label>
-
+                <label className="block text-xs font-bold text-steel-mid uppercase tracking-wider">Trabajadores *</label>
                 {loadingTrabajadores ? (
-                  <div className="flex items-center gap-2 text-sm text-[#6B7A8D]">
-                    <Loader2 className="h-4 w-4 animate-spin text-[#D95510]" /> Cargando trabajadores...
-                  </div>
+                  <div className="flex items-center gap-2 text-sm text-steel-mid"><Loader2 className="h-4 w-4 animate-spin text-burn-orange" /> Cargando…</div>
                 ) : (
-                  <div className="flex gap-2">
-                    <select
-                      value={trabajadorElegido}
-                      onChange={e => setTrabajadorElegido(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none bg-white"
-                    >
-                      <option value="">Selecciona un trabajador...</option>
-                      {/* FIX 4: deshabilitar y marcar trabajadores ya agregados */}
-                      {trabajadoresDisponibles.map(t => (
-                        <option
-                          key={t.id}
-                          value={t.id}
-                          disabled={trabajadoresSeleccionados.some(s => s.id === t.id)}
-                        >
-                          {trabajadoresSeleccionados.some(s => s.id === t.id) ? '✓ ' : ''}
-                          {t.especialidad} · {t.categoria} · {formatearCOP(t.jornal_base)}/día
+                  <div className="space-y-2">
+                    <select value={trabajadorElegido} onChange={(e) => setTrabajadorElegido(e.target.value)} className="w-full px-3 py-2 border border-concrete rounded-lg text-sm focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20 outline-none bg-white">
+                      <option value="">Selecciona un trabajador…</option>
+                      {trabajadoresDisponibles.map((t) => (
+                        <option key={t.id} value={t.id} disabled={trabajadoresSeleccionados.some((s) => s.id === t.id)}>
+                          {trabajadoresSeleccionados.some((s) => s.id === t.id) ? '✓ ' : ''}{t.especialidad} · {t.categoria} · {formatearCOP(t.jornal_base)}/día
                         </option>
                       ))}
                     </select>
-                    {/* FIX 1: placeholder y title descriptivo */}
-                    <input
-                      type="number"
-                      value={cantidadTrabajador}
-                      onChange={e => setCantidadTrabajador(Math.max(1, parseInt(e.target.value) || 1))}
-                      min={1}
-                      max={20}
-                      placeholder="Cant."
-                      className="w-16 px-2 py-2 border border-[#C8CDD6] rounded-lg text-sm text-center focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none"
-                      title="Cantidad de este trabajador"
-                    />
-                    <button
-                      type="button"
-                      onClick={agregarTrabajador}
-                      disabled={!trabajadorElegido}
-                      className="flex items-center gap-1.5 px-3 py-2 bg-[#D95510] text-white rounded-lg text-sm font-semibold hover:bg-[#C04A0D] disabled:opacity-40 transition-colors"
-                    >
-                      <UserPlus className="h-4 w-4" /> Agregar
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-steel-mid font-semibold shrink-0">Cantidad:</span>
+                      <input type="number" value={cantidadTrabajador} onChange={(e) => setCantidadTrabajador(Math.max(1, parseInt(e.target.value) || 1))} min={1} max={20} className="w-16 px-2 py-2 border border-concrete rounded-lg text-sm text-center focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20 outline-none" />
+                      <button type="button" onClick={agregarTrabajador} disabled={!trabajadorElegido} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-burn-orange text-white rounded-lg text-sm font-semibold hover:bg-burn-orange/90 disabled:opacity-40 transition-colors">
+                        <UserPlus className="h-4 w-4" /> Agregar
+                      </button>
+                    </div>
                   </div>
                 )}
 
-                <div className="border-t border-[#D0D4DB] pt-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowLaborImport(p => !p)}
-                    className="flex items-center gap-2 text-xs font-semibold text-[#D95510] hover:text-[#C04A0D] uppercase tracking-wider transition-colors"
-                  >
-                    <UserPlus className="h-3.5 w-3.5" />
-                    {showLaborImport ? 'Ocultar catálogo' : '¿No encuentras el trabajador? Importar desde Mano de Obra'}
+                <div className="border-t border-concrete pt-3 space-y-2">
+                  <button type="button" onClick={() => setShowCrearTrabajador(true)} className="flex items-center gap-1.5 text-xs font-semibold text-burn-orange hover:text-burn-orange/80 transition-colors">
+                    <UserPlus className="h-3.5 w-3.5" /> ¿No encuentras el trabajador? + Crear nuevo
                   </button>
-
+                  <button type="button" onClick={() => setShowLaborImport((p) => !p)} className="flex items-center gap-1.5 text-xs text-steel-mid hover:text-charcoal transition-colors">
+                    {showLaborImport ? 'Ocultar catálogo M.O.' : 'Importar desde catálogo de Mano de Obra'}
+                  </button>
                   {showLaborImport && (
                     <div className="mt-3 space-y-2">
-                      <input
-                        placeholder="Buscar en catálogo de mano de obra..."
-                        value={busquedaLabor}
-                        onChange={e => setBusquedaLabor(e.target.value)}
-                        className="w-full px-3 py-2 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all"
-                      />
-                      <div className="max-h-44 overflow-y-auto border border-[#D0D4DB] rounded-lg divide-y divide-[#E4E7EC]">
-                        {laborCatalog
-                          .filter(l => (l.nombre || '').toLowerCase().includes(busquedaLabor.toLowerCase()))
-                          .map(l => {
-                            const yaAgregado = trabajadoresSeleccionados.some(t => t.especialidad === l.nombre);
-                            return (
-                              <div key={l.id} className="flex items-center justify-between px-3 py-2.5 hover:bg-[#ECEEF2]">
-                                <div>
-                                  <p className="text-xs font-semibold text-[#1F2937]">{l.nombre}</p>
-                                  <p className="text-[10px] text-[#6B7A8D]">
-                                    {formatearCOP(l.precio_diario)}/día · {l.oficio || 'Mano de obra'}
-                                  </p>
-                                </div>
-                                <button
-                                  type="button"
-                                  disabled={importandoLaborId === l.id || yaAgregado}
-                                  onClick={() => handleImportarLabor(l)}
-                                  className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-[#D95510] hover:bg-[#FAF0EB] rounded-lg disabled:opacity-40 transition-colors uppercase"
-                                  title={yaAgregado ? 'Ya agregado' : 'Importar como trabajador'}
-                                >
-                                  {importandoLaborId === l.id
-                                    ? <Loader2 className="h-3 w-3 animate-spin" />
-                                    : yaAgregado ? '✓' : <><UserPlus className="h-3 w-3" /> Agregar</>
-                                  }
-                                </button>
+                      <input placeholder="Buscar en catálogo…" value={busquedaLabor} onChange={(e) => setBusquedaLabor(e.target.value)} className="w-full px-3 py-2 border border-concrete rounded-lg text-sm focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20 outline-none transition-all" />
+                      <div className="max-h-44 overflow-y-auto border border-concrete rounded-lg divide-y divide-concrete/50">
+                        {laborCatalog.filter((l) => (l.nombre || '').toLowerCase().includes(busquedaLabor.toLowerCase())).map((l) => {
+                          const yaAgregado = trabajadoresSeleccionados.some((t) => t.especialidad === l.nombre);
+                          return (
+                            <div key={l.id} className="flex items-center justify-between px-3 py-2.5 hover:bg-sand/40">
+                              <div>
+                                <p className="text-xs font-semibold text-charcoal">{l.nombre}</p>
+                                <p className="text-[10px] text-steel-mid">{formatearCOP(l.precio_diario)}/día</p>
                               </div>
-                            );
-                          })
-                        }
-                        {laborCatalog.filter(l => (l.nombre || '').toLowerCase().includes(busquedaLabor.toLowerCase())).length === 0 && (
-                          <p className="text-xs text-[#6B7A8D] text-center py-6">
-                            {laborCatalog.length === 0
-                              ? 'El catálogo de mano de obra está vacío. Ejecuta pnpm run seed:catalogo.'
-                              : 'No se encontraron resultados para la búsqueda.'}
-                          </p>
-                        )}
+                              <button type="button" disabled={importandoLaborId === l.id || yaAgregado} onClick={() => handleImportarLabor(l)} className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-burn-orange hover:bg-burn-orange/10 rounded-lg disabled:opacity-40 transition-colors uppercase">
+                                {importandoLaborId === l.id ? <Loader2 className="h-3 w-3 animate-spin" /> : yaAgregado ? '✓' : <><UserPlus className="h-3 w-3" /> Agregar</>}
+                              </button>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
                 </div>
 
                 {trabajadoresSeleccionados.length > 0 && (
-                  <div className="border border-[#D0D4DB] rounded-lg overflow-hidden">
+                  <div className="border border-concrete rounded-lg overflow-hidden">
                     {trabajadoresSeleccionados.map((t, i) => (
-                      <div key={t.id} className={cn("flex items-center justify-between px-4 py-3 text-sm bg-[#E4E7EC]", i > 0 && "border-t border-[#D0D4DB]")}>
+                      <div key={t.id} className={cn('flex items-center justify-between px-4 py-3 text-sm bg-sand/30', i > 0 && 'border-t border-concrete')}>
                         <div>
-                          <span className="font-semibold text-[#1F2937]">{t.cantidad > 1 ? `${t.cantidad}× ` : ''}{t.especialidad}</span>
-                          <span className="text-[#6B7A8D] ml-2 text-xs">{t.categoria} · {formatearCOP(t.jornal_base * t.factor_prestacional * t.cantidad)}/día c/prest.</span>
+                          <span className="font-semibold text-charcoal">{t.cantidad > 1 ? `${t.cantidad}× ` : ''}{t.especialidad}</span>
+                          <span className="text-steel-mid ml-2 text-xs">{t.categoria} · {formatearCOP(t.jornal_base * t.factor_prestacional * t.cantidad)}/día</span>
                         </div>
-                        <button type="button" onClick={() => quitarTrabajador(t.id)} className="p-1.5 hover:bg-[#FEF0F0] rounded-lg text-[#6B7A8D] hover:text-[#991B1B] transition-colors">
+                        <button type="button" onClick={() => quitarTrabajador(t.id)} className="p-1.5 hover:bg-red-50 rounded-lg text-steel-mid hover:text-red-600 transition-colors">
                           <Minus className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     ))}
-                    <div className="px-4 py-2 bg-[#DDE0E6] border-t border-[#D0D4DB] text-right">
-                      <span className="text-xs font-semibold text-[#6B7A8D] uppercase tracking-wider">Costo jornada total: </span>
-                      <span className="text-sm font-bold text-[#1F2937] tabular-nums">
+                    <div className="px-4 py-2 bg-sand/50 border-t border-concrete text-right">
+                      <span className="text-xs font-semibold text-steel-mid uppercase tracking-wider">Costo jornada total: </span>
+                      <span className="text-sm font-bold text-charcoal tabular-nums">
                         {formatearCOP(trabajadoresSeleccionados.reduce((s, t) => s + t.jornal_base * t.factor_prestacional * t.cantidad, 0))}
                       </span>
                     </div>
@@ -819,53 +896,178 @@ export default function InsumosPage() {
                 )}
               </div>
 
-              {/* FIX 5: sección Rendimiento Base */}
-              <div className="border border-[#D0D4DB] rounded-xl p-4 space-y-3 bg-[#F8F7F5]">
-                <p className="text-[10px] font-bold text-[#4B5563] uppercase tracking-widest">Rendimiento Base <span className="text-[#6B7A8D] font-normal normal-case">(opcional)</span></p>
+              <div className="border border-concrete rounded-xl p-4 space-y-3 bg-sand/20">
+                <p className="text-[10px] font-bold text-steel-mid uppercase tracking-widest">Rendimiento base <span className="font-normal normal-case">(opcional)</span></p>
                 <div className="flex gap-2">
-                  <input
-                    type="number"
-                    value={rendimientoNormal}
-                    onChange={e => setRendimientoNormal(e.target.value)}
-                    min={0}
-                    step="0.01"
-                    placeholder="Rendimiento: ej. 8"
-                    className="flex-1 px-3 py-2 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all bg-white"
-                  />
-                  <select
-                    value={rendimientoUnidad}
-                    onChange={e => setRendimientoUnidad(e.target.value)}
-                    className="w-28 px-3 py-2 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none bg-white"
-                  >
-                    {['m²','m³','ml','kg','gl','un','hr','pto','día','ton'].map(u => (
-                      <option key={u} value={u}>Unidad: {u}</option>
-                    ))}
+                  <input type="number" value={rendimientoNormal} onChange={(e) => setRendimientoNormal(e.target.value)} min={0} step="0.01" placeholder="Ej: 8" className="flex-1 px-3 py-2 border border-concrete rounded-lg text-sm focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20 outline-none transition-all bg-white" />
+                  <select value={rendimientoUnidad} onChange={(e) => setRendimientoUnidad(e.target.value)} className="w-28 px-3 py-2 border border-concrete rounded-lg text-sm focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20 outline-none bg-white">
+                    {['m²','m³','ml','kg','gl','un','hr','pto','día','ton'].map((u) => <option key={u} value={u}>Unidad: {u}</option>)}
                   </select>
                 </div>
-                <input
-                  type="text"
-                  value={rendimientoFuente}
-                  onChange={e => setRendimientoFuente(e.target.value)}
-                  maxLength={150}
-                  placeholder="Fuente: SIPO Colombia 2026"
-                  className="w-full px-3 py-2 border border-[#C8CDD6] rounded-lg text-sm focus:border-[#D95510] focus:ring-2 focus:ring-[#D95510]/20 outline-none transition-all bg-white"
-                />
+                <input type="text" value={rendimientoFuente} onChange={(e) => setRendimientoFuente(e.target.value)} maxLength={150} placeholder="Fuente: SIPO Colombia 2026" className="w-full px-3 py-2 border border-concrete rounded-lg text-sm focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20 outline-none transition-all bg-white" />
               </div>
 
-              {cuadrillaError && (
-                <p className="text-xs text-[#991B1B] bg-[#FEF0F0] px-3 py-2 rounded-lg border border-[#F5C2C2]">{cuadrillaError}</p>
-              )}
+              {cuadrillaError && <p className="text-xs text-red-700 bg-red-50 px-3 py-2 rounded-lg border border-red-200">{cuadrillaError}</p>}
 
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={closeCuadrillaModal} className="flex-1 px-4 py-2.5 border border-[#C8CDD6] rounded-lg text-sm font-semibold text-[#4B5563] hover:bg-[#E4E7EC] transition-colors">Cancelar</button>
-                <button type="submit" disabled={savingCuadrilla} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-[#D95510] text-white rounded-lg text-sm font-semibold hover:bg-[#C04A0D] transition-colors disabled:opacity-60">
-                  {savingCuadrilla ? <><Loader2 className="h-4 w-4 animate-spin" /> {editCuadrilla ? 'Guardando...' : 'Creando...'}</> : <><Save className="h-4 w-4" /> {editCuadrilla ? 'Guardar Cambios' : 'Crear Cuadrilla'}</>}
+                <button type="button" onClick={closeCuadrillaModal} className="flex-1 px-4 py-2.5 border border-concrete rounded-lg text-sm font-semibold text-steel-mid hover:bg-sand transition-colors">Cancelar</button>
+                <button type="submit" disabled={savingCuadrilla} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-burn-orange text-white rounded-lg text-sm font-semibold hover:bg-burn-orange/90 transition-colors disabled:opacity-60">
+                  {savingCuadrilla ? <><Loader2 className="h-4 w-4 animate-spin" /> {editCuadrilla ? 'Guardando…' : 'Creando…'}</> : <><Save className="h-4 w-4" /> {editCuadrilla ? 'Guardar cambios' : 'Crear cuadrilla'}</>}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      {showCrearTrabajador && (
+        <ModalTrabajador onClose={() => setShowCrearTrabajador(false)} onSaved={handleTrabajadorCreado} />
+      )}
     </div>
+  );
+}
+
+// ── Subcomponentes de fila para evitar re-renders masivos ─────────────────────
+
+function MatRow({
+  mat, onBlur, onReset,
+}: {
+  mat: MaterialConPrecio;
+  onBlur: (mat: MaterialConPrecio, raw: string) => void;
+  onReset: (mat: MaterialConPrecio) => void;
+}) {
+  const personalizado = mat.precio_usuario !== null;
+  const [localVal, setLocalVal] = useState(
+    personalizado ? String(mat.precio_usuario) : String(mat.precio_referencia)
+  );
+
+  useEffect(() => {
+    setLocalVal(mat.precio_usuario !== null ? String(mat.precio_usuario) : String(mat.precio_referencia));
+  }, [mat.precio_usuario, mat.precio_referencia]);
+
+  return (
+    <tr className="hover:bg-sand/20 transition-colors group">
+      <td className="px-4 py-3 font-medium text-charcoal">{mat.nombre}</td>
+      <td className="px-4 py-3">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-sand text-steel-mid">
+          {mat.categoria}
+        </span>
+      </td>
+      <td className="px-4 py-3 text-steel-mid text-xs">{mat.unidad}</td>
+      <td className="px-4 py-3 text-right">
+        <div className="flex flex-col items-end gap-1">
+          {personalizado ? (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700 uppercase tracking-wide">
+              Propio
+            </span>
+          ) : (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#F3F4F6] text-[#6B7280] uppercase tracking-wide">
+              Referencia
+            </span>
+          )}
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            value={localVal}
+            onChange={(e) => setLocalVal(e.target.value)}
+            onBlur={(e) => onBlur(mat, e.target.value)}
+            className={cn(
+              'w-36 px-2 py-1 rounded-lg text-sm text-right tabular-nums outline-none transition-all',
+              'bg-transparent border focus:bg-white',
+              personalizado
+                ? 'border-blue-300 text-blue-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                : 'border-concrete/60 text-steel-mid focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20'
+            )}
+            style={{ fontFamily: 'var(--font-mono)' }}
+          />
+        </div>
+      </td>
+      <td className="px-4 py-3 text-right w-10">
+        {personalizado && (
+          <button
+            onClick={() => onReset(mat)}
+            title="Restablecer precio de referencia"
+            className="inline-flex items-center justify-center h-7 w-7 rounded-md text-steel-mid hover:text-burn-orange hover:bg-burn-orange/10 transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+function EqRow({
+  eq, onBlur, onReset,
+}: {
+  eq: EquipoConPrecio;
+  onBlur: (eq: EquipoConPrecio, raw: string) => void;
+  onReset: (eq: EquipoConPrecio) => void;
+}) {
+  const personalizado = eq.precio_usuario !== null;
+  const [localVal, setLocalVal] = useState(
+    personalizado ? String(eq.precio_usuario) : String(eq.precio_diario)
+  );
+
+  useEffect(() => {
+    setLocalVal(eq.precio_usuario !== null ? String(eq.precio_usuario) : String(eq.precio_diario));
+  }, [eq.precio_usuario, eq.precio_diario]);
+
+  return (
+    <tr className="hover:bg-sand/20 transition-colors group">
+      <td className="px-4 py-3 font-medium text-charcoal">{eq.nombre}</td>
+      <td className="px-4 py-3">
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-sand text-steel-mid">
+          {eq.tipo}
+        </span>
+      </td>
+      <td className="px-4 py-3 text-right">
+        <div className="flex flex-col items-end gap-1">
+          {personalizado ? (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700 uppercase tracking-wide">
+              Propio
+            </span>
+          ) : (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#F3F4F6] text-[#6B7280] uppercase tracking-wide">
+              Referencia
+            </span>
+          )}
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            value={localVal}
+            onChange={(e) => setLocalVal(e.target.value)}
+            onBlur={(e) => onBlur(eq, e.target.value)}
+            className={cn(
+              'w-36 px-2 py-1 rounded-lg text-sm text-right tabular-nums outline-none transition-all',
+              'bg-transparent border focus:bg-white',
+              personalizado
+                ? 'border-blue-300 text-blue-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+                : 'border-concrete/60 text-steel-mid focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20'
+            )}
+            style={{ fontFamily: 'var(--font-mono)' }}
+          />
+        </div>
+      </td>
+      <td className="px-4 py-3 text-right tabular-nums text-steel-mid/70 text-xs" style={{ fontFamily: 'var(--font-mono)' }}>
+        {formatearCOP(eq.precio_semanal)}
+      </td>
+      <td className="px-4 py-3 text-right tabular-nums text-steel-mid/70 text-xs" style={{ fontFamily: 'var(--font-mono)' }}>
+        {formatearCOP(eq.precio_mensual)}
+      </td>
+      <td className="px-4 py-3 text-right w-10">
+        {personalizado && (
+          <button
+            onClick={() => onReset(eq)}
+            title="Restablecer precio de referencia"
+            className="inline-flex items-center justify-center h-7 w-7 rounded-md text-steel-mid hover:text-burn-orange hover:bg-burn-orange/10 transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </td>
+    </tr>
   );
 }

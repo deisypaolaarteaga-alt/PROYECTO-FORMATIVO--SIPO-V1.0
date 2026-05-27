@@ -26,6 +26,18 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     );
     const validated = proyectoSchema.parse(sanitized);
 
+    if (!validated.cliente_id) {
+      return { success: false, error: 'El cliente es obligatorio.' };
+    }
+
+    const { data: clienteExiste } = await supabase
+      .from('clientes')
+      .select('id')
+      .eq('id', validated.cliente_id)
+      .eq('activo', true)
+      .maybeSingle();
+    if (!clienteExiste) return { success: false, error: 'Cliente no válido.' };
+
     const { data, error } = await supabase
       .from('projects')
       .insert({
@@ -192,8 +204,8 @@ export async function actualizarProyecto(
 }
 
 const TRANSICIONES_PROYECTO: Record<string, string[]> = {
-  borrador:    ['en_progreso'],
-  en_progreso: ['finalizado'],
+  borrador:    ['en_progreso', 'archivado'],
+  en_progreso: ['finalizado', 'archivado'],
   finalizado:  ['archivado'],
   archivado:   [],
 };

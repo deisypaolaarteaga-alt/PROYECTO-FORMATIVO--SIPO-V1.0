@@ -19,7 +19,7 @@ import {
 } from '@/components/shared/DropdownMenu';
 import {
   agregarCapitulo, agregarActividad,
-  actualizarActividad, actualizarPresupuesto,
+  actualizarActividad, actualizarPresupuesto, actualizarCapitulo,
   eliminarActividad, eliminarCapitulo,
   aprobarPresupuesto, reabrirPresupuesto,
 } from '@/actions/presupuestos';
@@ -72,6 +72,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
   const [catalogoOpen, setCatalogoOpen] = useState(false);
   const [bannerCiudadIgnorado, setBannerCiudadIgnorado] = useState(false);
   const [isChangingEstado, setIsChangingEstado] = useState(false);
+  const [newChapterId, setNewChapterId] = useState<string | null>(null);
 
   // Drag & drop (local reorder solo — sin persistir en BD)
   const [dragSrcActId, setDragSrcActId] = useState<string | null>(null);
@@ -172,7 +173,9 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
         ...prev,
         chapters: [...(prev.chapters || []), { ...(res.data as Record<string, unknown>), activities: [] }],
       }));
-      setExpanded(prev => new Set(prev).add((res.data as any).id));
+      const chId = (res.data as any).id;
+      setExpanded(prev => new Set(prev).add(chId));
+      setNewChapterId(chId);
     }
   };
 
@@ -216,6 +219,16 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
     setIsSaving(false);
     setLastSaved(new Date());
   };
+
+  const handleUpdateChapter = useCallback(async (chId: string, nombre: string) => {
+    const nombreFinal = nombre.trim() || 'Sin nombre';
+    setBudget((prev: any) => ({
+      ...prev,
+      chapters: prev.chapters.map((c: any) => c.id === chId ? { ...c, nombre: nombreFinal } : c),
+    }));
+    setNewChapterId(null);
+    await actualizarCapitulo(chId, budget.id, nombreFinal);
+  }, [budget.id]);
 
   const handleAprobar = async () => {
     setIsChangingEstado(true);
@@ -558,9 +571,23 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                     <span className="h-6 w-6 rounded bg-[#FAF0EB] flex items-center justify-center shrink-0 text-[10px] font-bold text-[#C84B1A]">
                       {String(idx + 1).padStart(2, '0')}
                     </span>
-                    <span className="font-semibold text-[#1C1814] text-[11px] uppercase">
-                      {(ch.nombre ?? '').replace(/^\d{2,3}\.\s*/, '')}
-                    </span>
+                    <div
+                      className="font-semibold text-[#1C1814] text-[11px] uppercase min-w-[120px]"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <InputEditable
+                        value={(ch.nombre ?? '').replace(/^\d{2,3}\.\s*/, '')}
+                        onChange={(val) => setBudget((prev: any) => ({
+                          ...prev,
+                          chapters: prev.chapters.map((c: any) => c.id === ch.id ? { ...c, nombre: val } : c),
+                        }))}
+                        onBlur={(val) => handleUpdateChapter(ch.id, val)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                        placeholder="Sin nombre"
+                        autoFocus={newChapterId === ch.id}
+                        className="font-semibold text-[#1C1814] text-[11px] uppercase"
+                      />
+                    </div>
                   </div>
                   <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
                     <span className="font-semibold text-[#1C1814] text-sm tabular-nums" style={{ fontFamily: 'var(--font-mono)' }}>{formatearCOP(chTotal)}</span>
@@ -871,6 +898,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
         isOpen={catalogoOpen}
         onClose={() => setCatalogoOpen(false)}
         budgetId={budget.id}
+        tipoObraInicial={(budget as any).projects?.tipo_obra ?? undefined}
         onImported={() => router.refresh()}
       />
 

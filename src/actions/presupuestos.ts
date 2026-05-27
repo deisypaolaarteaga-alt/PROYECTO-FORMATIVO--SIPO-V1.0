@@ -109,10 +109,11 @@ export async function obtenerPresupuesto(budgetId: string) {
       .select(`
         *,
         projects(
-          nombre, 
-          ubicacion, 
-          cliente_id, 
+          nombre,
+          ubicacion,
+          cliente_id,
           cliente_nombre,
+          tipo_obra,
           clientes (*)
         ),
         chapters (
@@ -266,6 +267,27 @@ export async function agregarCapitulo(budgetId: string, nombre: string): Promise
   } catch (error: any) {
     console.error('[agregarCapitulo] error:', error);
     return { success: false, error: 'No se pudo agregar el capítulo.' };
+  }
+}
+
+export async function actualizarCapitulo(chapterId: string, budgetId: string, nombre: string): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'No autorizado' };
+
+    const nombreFinal = nombre.trim() || 'Sin nombre';
+    const { error } = await supabase
+      .from('chapters')
+      .update({ nombre: nombreFinal })
+      .eq('id', chapterId)
+      .eq('user_id', user.id);
+
+    if (error) throw error;
+    revalidatePath(`/presupuestos/${budgetId}`);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: 'Error al actualizar el capítulo.' };
   }
 }
 

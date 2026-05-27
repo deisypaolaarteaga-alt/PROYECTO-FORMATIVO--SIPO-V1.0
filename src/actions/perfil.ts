@@ -16,6 +16,8 @@ export interface PerfilEmpresaData {
 }
 
 export async function guardarPerfilEmpresa(data: PerfilEmpresaData) {
+  if (!data.empresa?.trim()) return { success: false, error: 'La razón social es obligatoria' };
+
   const supabase = await createClient();
   const { data: { user }, error: authErr } = await supabase.auth.getUser();
   if (authErr || !user) return { success: false, error: 'Sin sesión activa.' };

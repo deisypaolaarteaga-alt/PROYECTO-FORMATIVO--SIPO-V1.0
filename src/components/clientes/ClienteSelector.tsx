@@ -3,36 +3,50 @@
 import { useState, useEffect } from 'react';
 import { buscarClientes } from '@/actions/clientes';
 import { Cliente } from '@/types';
-import { Search, Plus, User, X, Building2 } from 'lucide-react';
+import { Search, Plus, User, X, Building2, AlertCircle } from 'lucide-react';
 import { ModalCliente } from './ModalCliente';
 
 interface ClienteSelectorProps {
   selectedId?: string | null;
   onSelect: (clienteId: string | null) => void;
   initialCliente?: { id: string; nombre_razon_social: string; nit_cedula?: string | null; ciudad?: string | null } | null;
+  required?: boolean;
+  error?: string;
 }
 
-export function ClienteSelector({ selectedId, onSelect, initialCliente }: ClienteSelectorProps) {
+export function ClienteSelector({ selectedId, onSelect, initialCliente, required, error }: ClienteSelectorProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Pick<Cliente, 'id' | 'nombre_razon_social' | 'nit_cedula' | 'ciudad'>[]>([]);
+  const [initialList, setInitialList] = useState<Pick<Cliente, 'id' | 'nombre_razon_social' | 'nit_cedula' | 'ciudad'>[]>([]);
+  const [isFocused, setIsFocused] = useState(false);
   const [selectedCliente, setSelectedCliente] = useState<any>(initialCliente ?? null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [blurError, setBlurError] = useState(false);
+  const [isMouseDownOnList, setIsMouseDownOnList] = useState(false);
+
+  // Carga los primeros 10 clientes al montar para que aparezcan de inmediato al hacer clic
+  useEffect(() => {
+    buscarClientes('').then(setInitialList);
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(async () => {
-      if (query.length >= 2) {
+      if (query.length >= 1) {
         const data = await buscarClientes(query);
         setResults(data);
       } else {
-        setResults([]);
+        setResults(initialList);
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, initialList]);
 
   const handleSelect = (cliente: any) => {
+    setIsMouseDownOnList(false);
     setQuery('');
     setResults([]);
+    setIsFocused(false);
+    setBlurError(false);
     setSelectedCliente(cliente);
     onSelect(cliente.id);
   };
@@ -46,9 +60,23 @@ export function ClienteSelector({ selectedId, onSelect, initialCliente }: Client
     if (nuevoCliente) handleSelect(nuevoCliente);
   };
 
+  const handleBlur = () => {
+    if (isMouseDownOnList) return;
+    setIsFocused(false);
+    if (query.trim().length > 0) {
+      setBlurError(true);
+    }
+    setQuery('');
+    setResults([]);
+  };
+
+  const hasInputError = blurError || !!error;
+
   return (
     <div className="space-y-1.5">
-      <label className="text-[13px] font-medium text-stone">Cliente (Opcional)</label>
+      <label className="text-[13px] font-medium text-stone">
+        {required ? 'Cliente *' : 'Cliente (Opcional)'}
+      </label>
 
       {selectedCliente ? (
         <div className="flex items-center justify-between p-3 bg-steel-fog rounded-lg border border-concrete animate-in fade-in zoom-in duration-200">
@@ -81,13 +109,23 @@ export function ClienteSelector({ selectedId, onSelect, initialCliente }: Client
               type="text"
               placeholder="Buscar por nombre o NIT..."
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="w-full h-10 pl-10 pr-3 text-[14px] rounded-lg border border-concrete bg-white text-ink hover:border-mortar focus:outline-none focus:border-[var(--accent-primary)] transition-all"
+              onChange={(e) => { setQuery(e.target.value); setBlurError(false); }}
+              onFocus={() => { setIsFocused(true); if (!query) setResults(initialList); }}
+              onBlur={handleBlur}
+              className={`w-full h-10 pl-10 pr-3 text-[14px] rounded-lg border bg-white text-ink focus:outline-none transition-all ${
+                hasInputError
+                  ? 'border-red-400 hover:border-red-400 focus:border-red-500'
+                  : 'border-concrete hover:border-mortar focus:border-[var(--accent-primary)]'
+              }`}
             />
           </div>
 
-          {results.length > 0 && (
-            <ul className="w-full bg-white border border-concrete rounded-xl overflow-hidden">
+          {isFocused && results.length > 0 && (
+            <ul
+              className="w-full bg-white border border-concrete rounded-xl overflow-hidden"
+              onMouseDown={() => setIsMouseDownOnList(true)}
+              onMouseUp={() => setIsMouseDownOnList(false)}
+            >
               {results.map((cliente) => (
                 <li key={cliente.id} className="border-b border-concrete last:border-0">
                   <button
@@ -110,13 +148,52 @@ export function ClienteSelector({ selectedId, onSelect, initialCliente }: Client
             </ul>
           )}
 
-          <button
-            type="button"
-            onClick={() => setIsModalOpen(true)}
-            className="w-full flex items-center justify-center gap-2 h-9 px-3 rounded-lg border border-dashed border-[var(--accent-primary)]/40 text-[var(--accent-primary)] text-[13px] font-semibold hover:bg-[var(--accent-primary)]/5 transition-colors"
-          >
-            <Plus className="h-4 w-4" /> Crear nuevo cliente
-          </button>
+          {isFocused && query.length >= 1 && results.length === 0 && !blurError && (
+            <div className="flex items-center justify-between gap-2 px-3 py-2 bg-steel-fog border border-concrete rounded-lg">
+              <div className="flex items-center gap-2 text-mortar text-[12px]">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                <span>No se encontró ningún cliente — ¿deseas crearlo?</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(true)}
+                className="shrink-0 text-[12px] font-semibold text-[var(--accent-primary)] hover:underline"
+              >
+                Crear cliente
+              </button>
+            </div>
+          )}
+
+          {blurError ? (
+            <div className="flex items-center justify-between gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-center gap-2 text-red-600 text-[12px]">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                <span>Cliente no encontrado — ¿deseas crearlo?</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setBlurError(false); setIsModalOpen(true); }}
+                className="shrink-0 text-[12px] font-semibold text-[var(--accent-primary)] hover:underline"
+              >
+                Crear cliente
+              </button>
+            </div>
+          ) : error ? (
+            <p className="flex items-center gap-1.5 text-[12px] text-red-600">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+              {error}
+            </p>
+          ) : null}
+
+          {!blurError && (
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(true)}
+              className="w-full flex items-center justify-center gap-2 h-9 px-3 rounded-lg border border-dashed border-[var(--accent-primary)]/40 text-[var(--accent-primary)] text-[13px] font-semibold hover:bg-[var(--accent-primary)]/5 transition-colors"
+            >
+              <Plus className="h-4 w-4" /> Crear nuevo cliente
+            </button>
+          )}
         </div>
       )}
 

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Modal, ModalContent, ModalHeader, ModalTitle, ModalDescription } from '@/components/shared/Modal';
 import { Button } from '@/components/shared/Button';
 import { Input } from '@/components/shared/Input';
+import { ErrorMessage } from '@/components/shared/ErrorMessage';
 import { proveedorSchema } from '@/lib/validations/schemas';
 import { crearProveedor, actualizarProveedor } from '@/actions/proveedores';
 import { toast } from 'sonner';
@@ -31,9 +32,15 @@ const FORM_INICIAL = {
   notas: '',
 };
 
+const REGEX_TIPO_B = /^(?=.*[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ])[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ0-9\s.,\-&()'"#/]+$/;
+
 export function ModalProveedor({ isOpen, onClose, proveedor, onSuccess }: ModalProveedorProps) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState(FORM_INICIAL);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [nombreError, setNombreError] = useState('');
+  const [telefonoError, setTelefonoError] = useState('');
+  const [nitError, setNitError] = useState('');
 
   useEffect(() => {
     if (proveedor) {
@@ -51,10 +58,16 @@ export function ModalProveedor({ isOpen, onClose, proveedor, onSuccess }: ModalP
     } else {
       setFormData(FORM_INICIAL);
     }
+    setFormError(null);
+    setNombreError('');
+    setTelefonoError('');
+    setNitError('');
   }, [proveedor, isOpen]);
 
   const set = (field: keyof typeof FORM_INICIAL) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setFormData(prev => ({ ...prev, [field]: e.target.value }));
+
+  const isFormValid = formData.nombre_razon_social.trim().length >= 2 && !nombreError && !telefonoError && !nitError;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -62,6 +75,7 @@ export function ModalProveedor({ isOpen, onClose, proveedor, onSuccess }: ModalP
     try {
       const validated = proveedorSchema.parse(formData);
 
+      setFormError(null);
       if (proveedor) {
         const res = await actualizarProveedor(proveedor.id, validated);
         if (res.success) {
@@ -69,6 +83,7 @@ export function ModalProveedor({ isOpen, onClose, proveedor, onSuccess }: ModalP
           onSuccess?.({} as any);
           onClose();
         } else {
+          setFormError(res.error || 'Error al actualizar proveedor');
           toast.error(res.error || 'Error al actualizar proveedor');
         }
       } else {
@@ -78,11 +93,14 @@ export function ModalProveedor({ isOpen, onClose, proveedor, onSuccess }: ModalP
           onSuccess?.(res.data);
           onClose();
         } else {
+          setFormError(res.error || 'Error al crear proveedor');
           toast.error(res.error || 'Error al crear proveedor');
         }
       }
     } catch (error: any) {
-      toast.error(error.issues?.[0]?.message ?? 'Error de validación');
+      const msg = error.issues?.[0]?.message ?? 'Error de validación';
+      setFormError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -97,6 +115,9 @@ export function ModalProveedor({ isOpen, onClose, proveedor, onSuccess }: ModalP
         </ModalHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {formError && (
+            <ErrorMessage message={formError} onDismiss={() => setFormError(null)} />
+          )}
           {/* Tipo selector */}
           <div className="flex p-1 bg-steel-fog rounded-lg w-fit">
             {(['persona', 'empresa'] as const).map((t) => (
@@ -124,18 +145,30 @@ export function ModalProveedor({ isOpen, onClose, proveedor, onSuccess }: ModalP
               </div>
 
               <Input
-                label={formData.tipo === 'empresa' ? 'Razón Social' : 'Nombre Completo'}
+                label={`${formData.tipo === 'empresa' ? 'Razón Social' : 'Nombre Completo'} *`}
                 required
                 value={formData.nombre_razon_social}
-                onChange={(e) => setFormData(prev => ({ ...prev, nombre_razon_social: e.target.value }))}
+                onChange={(e) => { setFormData(prev => ({ ...prev, nombre_razon_social: e.target.value })); if (nombreError) setNombreError(''); }}
+                onBlur={() => {
+                  const v = formData.nombre_razon_social.trim();
+                  if (v.length >= 2 && !REGEX_TIPO_B.test(v)) setNombreError('Debe contener al menos una letra');
+                  else setNombreError('');
+                }}
                 placeholder={formData.tipo === 'empresa' ? 'Ej. Ferretería El Constructor S.A.S.' : 'Ej. Carlos Herrera'}
+                error={nombreError || undefined}
               />
 
               <Input
                 label={formData.tipo === 'empresa' ? 'NIT' : 'Cédula'}
                 value={formData.nit_cedula}
-                onChange={set('nit_cedula')}
+                onChange={(e) => { setFormData(prev => ({ ...prev, nit_cedula: e.target.value })); if (nitError) setNitError(''); }}
+                onBlur={() => {
+                  const v = formData.nit_cedula.trim();
+                  if (v && !/^[\d.\-]+$/.test(v)) setNitError('Formato inválido. Ej: 900.123.456-7');
+                  else setNitError('');
+                }}
                 placeholder="Ej. 900.123.456-7"
+                error={nitError || undefined}
               />
 
               <div className="space-y-1.5">
@@ -178,10 +211,17 @@ export function ModalProveedor({ isOpen, onClose, proveedor, onSuccess }: ModalP
 
               <Input
                 label="Teléfono"
+                type="text"
                 icon={<Phone className="h-4 w-4" />}
                 value={formData.telefono}
-                onChange={set('telefono')}
+                onChange={(e) => { setFormData(prev => ({ ...prev, telefono: e.target.value })); if (telefonoError) setTelefonoError(''); }}
+                onBlur={() => {
+                  const v = formData.telefono.trim();
+                  if (v && !/^\d{7,10}$/.test(v)) setTelefonoError('Solo se permiten números (7 a 10 dígitos)');
+                  else setTelefonoError('');
+                }}
                 placeholder="Ej. 300 123 4567"
+                error={telefonoError || undefined}
               />
 
               <Input
@@ -215,7 +255,7 @@ export function ModalProveedor({ isOpen, onClose, proveedor, onSuccess }: ModalP
 
           <div className="flex justify-end gap-3 pt-4 border-t border-concrete">
             <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
-            <Button type="submit" loading={loading}>
+            <Button type="submit" loading={loading} disabled={!isFormValid}>
               {proveedor ? 'Guardar Cambios' : 'Crear Proveedor'}
             </Button>
           </div>

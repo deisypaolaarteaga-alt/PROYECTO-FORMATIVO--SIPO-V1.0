@@ -66,7 +66,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/clientes',     icon: Users,        label: 'Clientes'     },
       { href: '/proveedores',  icon: ShoppingBag,  label: 'Proveedores'  },
       { href: '/insumos',      icon: Package,      label: 'Insumos'      },
-      { href: '/mano-obra',    icon: HardHat,      label: 'Mano de obra' },
+      { href: '/mano-obra',    icon: HardHat,      label: 'Tarifas Salariales' },
       { href: '/catalogo',     icon: BookOpen,     label: 'Catálogo'     },
     ],
   },

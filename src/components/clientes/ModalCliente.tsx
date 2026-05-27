@@ -19,8 +19,17 @@ interface ModalClienteProps {
   onSuccess?: (nuevoCliente: any) => void;
 }
 
+const REGEX_TIPO_B = /^(?=.*[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ])[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ0-9\s.,\-&()'"#/]+$/;
+const REGEX_TIPO_A = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s.\-]+$/;
+
 export function ModalCliente({ isOpen, onClose, cliente, onSuccess }: ModalClienteProps) {
   const [loading, setLoading] = useState(false);
+  const [nombreError, setNombreError] = useState('');
+  const [ciudadError, setCiudadError] = useState('');
+  const [nombreContactoError, setNombreContactoError] = useState('');
+  const [cargoContactoError, setCargoContactoError] = useState('');
+  const [telefonoError, setTelefonoError] = useState('');
+  const [nitError, setNitError] = useState('');
   const [formData, setFormData] = useState({
     tipo: 'empresa' as 'persona_natural' | 'empresa',
     nombre_razon_social: '',
@@ -65,10 +74,37 @@ export function ModalCliente({ isOpen, onClose, cliente, onSuccess }: ModalClien
         notas: '',
       });
     }
+    setNombreError('');
+    setCiudadError('');
+    setNombreContactoError('');
+    setCargoContactoError('');
+    setTelefonoError('');
+    setNitError('');
   }, [cliente, isOpen]);
+
+  const isFormValid =
+    formData.nombre_razon_social.trim().length >= 2 &&
+    formData.ciudad.trim().length >= 1 &&
+    !nombreError &&
+    !nombreContactoError &&
+    !cargoContactoError &&
+    !telefonoError &&
+    !nitError;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    let valid = true;
+    if (formData.nombre_razon_social.trim().length < 2) {
+      setNombreError('Este campo es obligatorio');
+      valid = false;
+    }
+    if (!formData.ciudad.trim()) {
+      setCiudadError('Este campo es obligatorio');
+      valid = false;
+    }
+    if (!valid) return;
+
     setLoading(true);
 
     try {
@@ -151,25 +187,47 @@ export function ModalCliente({ isOpen, onClose, cliente, onSuccess }: ModalClien
             </div>
             
             <Input
-              label={formData.tipo === 'empresa' ? 'Razón Social' : 'Nombre Completo'}
+              label={`${formData.tipo === 'empresa' ? 'Razón Social' : 'Nombre Completo'} *`}
               required
               value={formData.nombre_razon_social}
-              onChange={(e) => setFormData({ ...formData, nombre_razon_social: e.target.value })}
+              onChange={(e) => { setFormData({ ...formData, nombre_razon_social: e.target.value }); if (nombreError) setNombreError(''); }}
+              onBlur={() => {
+                const v = formData.nombre_razon_social.trim();
+                if (v.length < 2) setNombreError('Este campo es obligatorio');
+                else if (!REGEX_TIPO_B.test(v)) setNombreError('Debe contener al menos una letra');
+                else setNombreError('');
+              }}
               placeholder={formData.tipo === 'empresa' ? 'Ej. Constructora S.A.S.' : 'Ej. Juan Pérez'}
+              error={nombreError || undefined}
             />
 
             <Input
               label={formData.tipo === 'empresa' ? 'NIT' : 'Cédula'}
               value={formData.nit_cedula}
-              onChange={(e) => setFormData({ ...formData, nit_cedula: e.target.value })}
+              onChange={(e) => { setFormData({ ...formData, nit_cedula: e.target.value }); if (nitError) setNitError(''); }}
+              onBlur={() => {
+                const v = formData.nit_cedula.trim();
+                if (v && !/^[\d.\-]+$/.test(v)) setNitError('Formato inválido. Ej: 900.123.456-7');
+                else setNitError('');
+              }}
               placeholder="Ej. 900.123.456-7"
+              error={nitError || undefined}
             />
 
-            <MunicipioCombobox
-              value={formData.ciudad}
-              onChange={(ciudad) => setFormData({ ...formData, ciudad })}
-              onDepartamentoChange={(departamento) => setFormData(prev => ({ ...prev, departamento }))}
-            />
+            <div className="space-y-1.5">
+              <MunicipioCombobox
+                value={formData.ciudad}
+                onChange={(ciudad) => { setFormData({ ...formData, ciudad }); if (ciudadError) setCiudadError(''); }}
+                onDepartamentoChange={(departamento) => setFormData(prev => ({ ...prev, departamento }))}
+                label="Ciudad *"
+              />
+              {ciudadError && (
+                <p className="flex items-center gap-1 text-[11px] text-danger-text">
+                  <span className="h-3.5 w-3.5 shrink-0">⚠</span>
+                  {ciudadError}
+                </p>
+              )}
+            </div>
 
             <Input
               label="Dirección"
@@ -189,24 +247,43 @@ export function ModalCliente({ isOpen, onClose, cliente, onSuccess }: ModalClien
             <Input
               label="Nombre del contacto"
               value={formData.nombre_contacto}
-              onChange={(e) => setFormData({ ...formData, nombre_contacto: e.target.value })}
+              onChange={(e) => { setFormData({ ...formData, nombre_contacto: e.target.value }); if (nombreContactoError) setNombreContactoError(''); }}
+              onBlur={() => {
+                const v = formData.nombre_contacto.trim();
+                if (v && !REGEX_TIPO_A.test(v)) setNombreContactoError('Este campo solo acepta letras');
+                else setNombreContactoError('');
+              }}
               placeholder="Ej. María López (Firma contracts)"
+              error={nombreContactoError || undefined}
             />
 
             <Input
               label="Cargo del contacto"
               value={formData.cargo_contacto}
-              onChange={(e) => setFormData({ ...formData, cargo_contacto: e.target.value })}
+              onChange={(e) => { setFormData({ ...formData, cargo_contacto: e.target.value }); if (cargoContactoError) setCargoContactoError(''); }}
+              onBlur={() => {
+                const v = formData.cargo_contacto.trim();
+                if (v && !REGEX_TIPO_A.test(v)) setCargoContactoError('Este campo solo acepta letras');
+                else setCargoContactoError('');
+              }}
               placeholder="Ej. Gerente de Compras"
+              error={cargoContactoError || undefined}
             />
 
             <div className="grid grid-cols-1 gap-4">
               <Input
                 label="Teléfono"
+                type="text"
                 icon={<Phone className="h-4 w-4" />}
                 value={formData.telefono}
-                onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
+                onChange={(e) => { setFormData({ ...formData, telefono: e.target.value }); if (telefonoError) setTelefonoError(''); }}
+                onBlur={() => {
+                  const v = formData.telefono.trim();
+                  if (v && !/^\d{7,10}$/.test(v)) setTelefonoError('Solo se permiten números (7 a 10 dígitos)');
+                  else setTelefonoError('');
+                }}
                 placeholder="Ej. 300 123 4567"
+                error={telefonoError || undefined}
               />
               <Input
                 label="Email"
@@ -234,7 +311,7 @@ export function ModalCliente({ isOpen, onClose, cliente, onSuccess }: ModalClien
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancelar
           </Button>
-          <Button type="submit" loading={loading}>
+          <Button type="submit" loading={loading} disabled={!isFormValid}>
             {cliente ? 'Guardar Cambios' : 'Crear Cliente'}
           </Button>
         </div>

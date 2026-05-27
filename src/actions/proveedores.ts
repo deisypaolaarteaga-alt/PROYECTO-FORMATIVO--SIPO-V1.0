@@ -77,6 +77,33 @@ export async function crearProveedor(
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { success: false, error: 'No autorizado' };
 
+    // Verificar duplicado: por NIT/cédula si viene, o por nombre si no
+    if (validated.nit_cedula) {
+      const { data: existing } = await supabase
+        .from('proveedores')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('nit_cedula', validated.nit_cedula)
+        .is('deleted_at', null)
+        .maybeSingle();
+
+      if (existing) {
+        return { success: false, error: 'Ya tienes un proveedor registrado con ese NIT/cédula.' };
+      }
+    } else {
+      const { data: existing } = await supabase
+        .from('proveedores')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('nombre_razon_social', validated.nombre_razon_social)
+        .is('deleted_at', null)
+        .maybeSingle();
+
+      if (existing) {
+        return { success: false, error: 'Ya tienes un proveedor registrado con ese nombre.' };
+      }
+    }
+
     const { data: nuevo, error } = await supabase
       .from('proveedores')
       .insert([{ ...validated, user_id: user.id }])
@@ -89,6 +116,7 @@ export async function crearProveedor(
     return { success: true, data: nuevo };
   } catch (error: any) {
     console.error('[crearProveedor] error:', error);
+    if (error.name === 'ZodError') return { success: false, error: error.issues?.[0]?.message ?? 'Completa todos los campos obligatorios' };
     return { success: false, error: 'No se pudo crear el proveedor.' };
   }
 }

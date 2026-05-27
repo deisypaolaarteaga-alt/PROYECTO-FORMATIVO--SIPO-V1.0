@@ -38,6 +38,11 @@ export interface VencimientoItem {
   dias_restantes: number;
 }
 
+export interface RangoOpts {
+  desde?: string; // ISO string
+  hasta?: string; // ISO string
+}
+
 const VACIO_KPIS: KPIsGlobales = {
   proyectos_en_progreso: 0,
   proyectos_borrador: 0,
@@ -49,40 +54,53 @@ const VACIO_KPIS: KPIsGlobales = {
   proximos_a_vencer: 0,
 };
 
-export async function getKPIsGlobales(): Promise<KPIsGlobales> {
+export async function getKPIsGlobales(opts: RangoOpts = {}): Promise<KPIsGlobales> {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return VACIO_KPIS;
 
-    const [{ data: proyectos }, { data: presupuestos }, { data: resumenes }, { data: budgetsVigencia }] =
-      await Promise.all([
-        supabase.from('projects').select('estado').eq('user_id', user.id),
-        supabase
-          .from('budgets')
-          .select('estado')
-          .eq('user_id', user.id)
-          .is('deleted_at', null),
-        supabase
-          .from('budgets')
-          .select('id')
-          .eq('user_id', user.id)
-          .is('deleted_at', null)
-          .then(async ({ data: bs }) => {
-            const ids = (bs ?? []).map((b) => b.id);
-            if (ids.length === 0) return { data: [] };
-            return supabase
-              .from('v_resumen_presupuesto')
-              .select('total_oferta, costo_directo')
-              .in('budget_id', ids);
-          }),
-        supabase
-          .from('budgets')
-          .select('created_at, vigencia_dias')
-          .eq('user_id', user.id)
-          .is('deleted_at', null)
-          .gt('vigencia_dias', 0),
-      ]);
+    // Queries con filtro de fecha opcional (proyectos y presupuestos)
+    let proyectosQ = supabase.from('projects').select('estado').eq('user_id', user.id);
+    if (opts.desde) proyectosQ = proyectosQ.gte('created_at', opts.desde);
+    if (opts.hasta) proyectosQ = proyectosQ.lte('created_at', opts.hasta);
+
+    let presupuestosQ = supabase.from('budgets').select('estado').eq('user_id', user.id).is('deleted_at', null);
+    if (opts.desde) presupuestosQ = presupuestosQ.gte('created_at', opts.desde);
+    if (opts.hasta) presupuestosQ = presupuestosQ.lte('created_at', opts.hasta);
+
+    let budgetIdsQ = supabase.from('budgets').select('id').eq('user_id', user.id).is('deleted_at', null);
+    if (opts.desde) budgetIdsQ = budgetIdsQ.gte('created_at', opts.desde);
+    if (opts.hasta) budgetIdsQ = budgetIdsQ.lte('created_at', opts.hasta);
+
+    // proximos_a_vencer siempre sin filtro de período (es una métrica de "ahora")
+    const [
+      { data: proyectos },
+      { data: presupuestos },
+      { data: budgetIds },
+      { data: budgetsVigencia },
+    ] = await Promise.all([
+      proyectosQ,
+      presupuestosQ,
+      budgetIdsQ,
+      supabase
+        .from('budgets')
+        .select('created_at, vigencia_dias')
+        .eq('user_id', user.id)
+        .is('deleted_at', null)
+        .gt('vigencia_dias', 0),
+    ]);
+
+    // Totales financieros desde la vista, solo para los IDs filtrados
+    const ids = (budgetIds ?? []).map((b) => b.id);
+    let resumenes: Array<{ total_oferta: number; costo_directo: number }> = [];
+    if (ids.length > 0) {
+      const { data } = await supabase
+        .from('v_resumen_presupuesto')
+        .select('total_oferta, costo_directo')
+        .in('budget_id', ids);
+      resumenes = data ?? [];
+    }
 
     const proyectosPorEstado: Record<string, number> = {};
     for (const p of proyectos ?? []) {
@@ -107,8 +125,8 @@ export async function getKPIsGlobales(): Promise<KPIsGlobales> {
       proyectos_por_estado: proyectosPorEstado,
       presupuestos_total: presupuestos?.length ?? 0,
       presupuestos_por_estado: presupuestosPorEstado,
-      valor_total_oferta: (resumenes ?? []).reduce((s, r) => s + Number(r.total_oferta ?? 0), 0),
-      valor_costo_directo: (resumenes ?? []).reduce((s, r) => s + Number(r.costo_directo ?? 0), 0),
+      valor_total_oferta: resumenes.reduce((s, r) => s + Number(r.total_oferta ?? 0), 0),
+      valor_costo_directo: resumenes.reduce((s, r) => s + Number(r.costo_directo ?? 0), 0),
       proximos_a_vencer: proximos,
     };
   } catch (err) {
@@ -117,35 +135,44 @@ export async function getKPIsGlobales(): Promise<KPIsGlobales> {
   }
 }
 
-export async function getDistribucionCD(): Promise<DistribucionCDItem[]> {
+export async function getDistribucionCD(opts: RangoOpts = {}): Promise<DistribucionCDItem[]> {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
 
-    // Paso 1: queries independientes en paralelo (sin apu_items que requiere los IDs de apus)
-    const [{ data: resumenes }, { data: budgets }, { data: apusData }] = await Promise.all([
+    // Primero obtenemos los budgets filtrados por fecha
+    let budgetsQ = supabase
+      .from('budgets')
+      .select('id, estado')
+      .eq('user_id', user.id)
+      .is('deleted_at', null);
+    if (opts.desde) budgetsQ = budgetsQ.gte('created_at', opts.desde);
+    if (opts.hasta) budgetsQ = budgetsQ.lte('created_at', opts.hasta);
+
+    const { data: budgets } = await budgetsQ;
+    if (!budgets || budgets.length === 0) return [];
+
+    const budgetIds = budgets.map((b) => b.id);
+    const budgetEstado: Record<string, string> = {};
+    for (const b of budgets) budgetEstado[b.id] = b.estado;
+
+    // Ahora en paralelo: resumenes y APUs, ambos filtrados por los IDs del período
+    const [{ data: resumenes }, { data: apusData }] = await Promise.all([
       supabase
         .from('v_resumen_presupuesto')
-        .select('budget_id, titulo, costo_directo, aiu, iva, total_oferta'),
-      supabase
-        .from('budgets')
-        .select('id, estado')
-        .eq('user_id', user.id)
-        .is('deleted_at', null),
+        .select('budget_id, titulo, costo_directo, aiu, iva, total_oferta')
+        .in('budget_id', budgetIds),
       supabase
         .from('apus')
         .select('budget_id, costo_material, costo_mano_obra, costo_equipo, costo_herramienta_menor, costo_epp')
         .eq('user_id', user.id)
-        .is('deleted_at', null),
+        .is('deleted_at', null)
+        .in('budget_id', budgetIds),
     ]);
 
     if (!resumenes) return [];
 
-    const budgetEstado: Record<string, string> = {};
-    for (const b of budgets ?? []) budgetEstado[b.id] = b.estado;
-
-    // Agregar costo_* precalculados por budget_id
     type ApuAcum = { material: number; mano_obra: number; equipo: number; herramienta_menor: number; epp: number };
     const apuPorBudget: Record<string, ApuAcum> = {};
     for (const apu of apusData ?? []) {
@@ -185,7 +212,6 @@ export async function getPresupuestosVencimiento(): Promise<VencimientoItem[]> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
 
-    // Sin join embebido para evitar problemas con la FK de projects
     const { data: budgets } = await supabase
       .from('budgets')
       .select('id, titulo, estado, created_at, vigencia_dias')

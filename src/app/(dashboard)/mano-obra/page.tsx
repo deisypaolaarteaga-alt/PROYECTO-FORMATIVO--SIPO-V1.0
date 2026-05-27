@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   HardHat, Search, ChevronUp, ChevronDown, ChevronsUpDown,
   Download, Plus, Layers, CheckCircle2, AlertCircle, ExternalLink,
+  Power, PowerOff, Loader2, Edit2, UserPlus, Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Card } from '@/components/shared/Card';
@@ -14,8 +15,15 @@ import { SkeletonTable } from '@/components/shared/Skeleton';
 import {
   Modal, ModalContent, ModalHeader, ModalTitle, ModalFooter,
 } from '@/components/shared/Modal';
+import { ModalTrabajador } from '@/components/mano-obra/ModalTrabajador';
 import { formatearCOP } from '@/lib/utils/formato-cop';
-import { getTrabajadoresReferencia, type TrabajadorReferencia } from '@/actions/mano-obra';
+import {
+  getTrabajadoresReferencia,
+  toggleTrabajadorUsuario,
+  prepararTrabajadorParaEdicion,
+  eliminarTrabajador,
+  type TrabajadorReferencia,
+} from '@/actions/mano-obra';
 import { getCuadrillas, agregarTrabajadorACuadrilla } from '@/actions/cuadrillas';
 import { cn } from '@/lib/utils';
 
@@ -55,12 +63,13 @@ function valorOrden(t: TrabajadorReferencia, col: ColKey): string | number {
 
 function exportarCSV(filas: TrabajadorReferencia[]) {
   const headers = [
-    'Especialidad', 'Categoría', 'Jornal base (COP)',
+    'Especialidad', 'Categoría', 'Tipo', 'Jornal base (COP)',
     'Factor prestacional (%)', 'Jornal c/prestaciones (COP)', 'Costo/hora (COP)',
   ];
   const rows = filas.map((t) => [
     `"${t.especialidad}"`,
     `"${t.categoria}"`,
+    t.user_id ? '"Propio"' : '"Referencia"',
     t.jornal_base.toFixed(2),
     (t.factor_prestacional * 100).toFixed(2),
     t.jornal_con_prestaciones.toFixed(2),
@@ -71,7 +80,7 @@ function exportarCSV(filas: TrabajadorReferencia[]) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `referencia-salarial-sipo-2026.csv`;
+  a.download = `trabajadores-sipo-2026.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -83,6 +92,15 @@ export default function ManoObraPage() {
   const [categoriaFiltro, setCategoriaFiltro] = useState<string | null>(null);
   const [sortCol, setSortCol] = useState<ColKey>('especialidad');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [mostrarInactivos, setMostrarInactivos] = useState(true);
+  const [toggling, setToggling] = useState<string | null>(null);
+  const [preparandoEdicion, setPreparandoEdicion] = useState<string | null>(null);
+  const [eliminando, setEliminando] = useState<string | null>(null);
+
+  // Modal crear/editar trabajador propio
+  const [modalTrabajador, setModalTrabajador] = useState<
+    { open: true; trabajador?: TrabajadorReferencia } | { open: false }
+  >({ open: false });
 
   // Modal agregar a cuadrilla
   const [trabajadorModal, setTrabajadorModal] = useState<TrabajadorReferencia | null>(null);
@@ -100,7 +118,7 @@ export default function ManoObraPage() {
     });
   }, []);
 
-  const abrirModal = useCallback(async (t: TrabajadorReferencia) => {
+  const abrirModalCuadrilla = useCallback(async (t: TrabajadorReferencia) => {
     setTrabajadorModal(t);
     setCuadrillaId('');
     setCantidad(1);
@@ -115,7 +133,7 @@ export default function ManoObraPage() {
     setLoadingCuadrillas(false);
   }, []);
 
-  const cerrarModal = useCallback(() => {
+  const cerrarModalCuadrilla = useCallback(() => {
     setTrabajadorModal(null);
     setResultadoModal(null);
   }, []);
@@ -132,6 +150,71 @@ export default function ManoObraPage() {
     );
   }
 
+  async function handleToggle(t: TrabajadorReferencia) {
+    setToggling(t.id);
+    let target = t;
+
+    if (!t.user_id) {
+      const res = await prepararTrabajadorParaEdicion(t.id);
+      if (!res.success || !res.data) { setToggling(null); return; }
+      const copia = res.data;
+      setTrabajadores((prev) => {
+        const sinRef = prev.filter(
+          (w) => !(w.user_id === null && w.especialidad.toLowerCase() === copia.especialidad.toLowerCase())
+        );
+        const yaExiste = sinRef.some((w) => w.id === copia.id);
+        return yaExiste ? sinRef : [...sinRef, copia];
+      });
+      target = copia;
+      setToggling(copia.id);
+    }
+
+    const res = await toggleTrabajadorUsuario(target.id, !target.activo);
+    setToggling(null);
+    if (res.success) {
+      setTrabajadores((prev) =>
+        prev.map((w) => (w.id === target.id ? { ...w, activo: !target.activo } : w))
+      );
+    }
+  }
+
+  async function handleEliminar(t: TrabajadorReferencia) {
+    if (!t.user_id) return;
+    if (!confirm(`¿Eliminar "${t.especialidad}"? Esta acción no se puede deshacer.`)) return;
+    setEliminando(t.id);
+    const res = await eliminarTrabajador(t.id);
+    setEliminando(null);
+    if (res.success) {
+      setTrabajadores((prev) => prev.filter((w) => w.id !== t.id));
+    }
+  }
+
+  async function handleEditar(t: TrabajadorReferencia) {
+    if (t.user_id) {
+      setModalTrabajador({ open: true, trabajador: t });
+      return;
+    }
+    // Trabajador de referencia: copiar internamente si no existe copia, luego abrir modal
+    setPreparandoEdicion(t.id);
+    const res = await prepararTrabajadorParaEdicion(t.id);
+    setPreparandoEdicion(null);
+    if (!res.success || !res.data) return;
+    // Reemplazar la fila de referencia con la copia propia en el estado local
+    setTrabajadores((prev) => {
+      const sinRef = prev.filter(
+        (w) => !(w.user_id === null && w.especialidad.toLowerCase() === res.data!.especialidad.toLowerCase())
+      );
+      const yaExiste = sinRef.some((w) => w.id === res.data!.id);
+      return yaExiste ? sinRef : [...sinRef, res.data!];
+    });
+    setModalTrabajador({ open: true, trabajador: res.data });
+  }
+
+  function handleSaved(_nuevo: TrabajadorReferencia) {
+    getTrabajadoresReferencia().then(setTrabajadores);
+    setModalTrabajador({ open: false });
+  }
+
   function toggleSort(col: ColKey) {
     if (col === sortCol) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -142,7 +225,7 @@ export default function ManoObraPage() {
   }
 
   const filas = useMemo(() => {
-    let filtrado = trabajadores;
+    let filtrado = mostrarInactivos ? trabajadores : trabajadores.filter((t) => t.activo);
     if (categoriaFiltro) {
       filtrado = filtrado.filter((t) => t.categoria === categoriaFiltro);
     }
@@ -160,7 +243,7 @@ export default function ManoObraPage() {
       const cmp = typeof va === 'string' ? va.localeCompare(vb as string) : (va as number) - (vb as number);
       return sortDir === 'asc' ? cmp : -cmp;
     });
-  }, [trabajadores, search, categoriaFiltro, sortCol, sortDir]);
+  }, [trabajadores, search, categoriaFiltro, sortCol, sortDir, mostrarInactivos]);
 
   return (
     <div className="space-y-6">
@@ -173,23 +256,43 @@ export default function ManoObraPage() {
           <div>
             <h1 className="text-xl font-semibold text-charcoal">Mano de Obra</h1>
             <p className="text-sm text-steel-mid">
-              Referencia salarial Colombia 2026 · Solo lectura
+              Referencia salarial Colombia 2026 · Gestiona tu propio catálogo
             </p>
           </div>
         </div>
-        <Button
-          variant="secondary"
-          size="sm"
-          icon={<Download className="h-4 w-4" />}
-          onClick={() => exportarCSV(filas)}
-          disabled={filas.length === 0}
-        >
-          Exportar CSV
-        </Button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setMostrarInactivos((v) => !v)}
+            className={cn(
+              'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border',
+              mostrarInactivos
+                ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
+                : 'bg-sand text-steel-mid border-concrete hover:bg-concrete/60'
+            )}
+          >
+            {mostrarInactivos ? 'Ocultar inactivos' : 'Mostrar inactivos'}
+          </button>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<Download className="h-4 w-4" />}
+            onClick={() => exportarCSV(filas)}
+            disabled={filas.length === 0}
+          >
+            Exportar CSV
+          </Button>
+          <Button
+            size="sm"
+            icon={<UserPlus className="h-4 w-4" />}
+            onClick={() => setModalTrabajador({ open: true })}
+          >
+            Agregar trabajador
+          </Button>
+        </div>
       </div>
 
       <Card>
-        {/* Toolbar: buscador + chips de categoría */}
+        {/* Toolbar */}
         <div className="p-4 border-b border-concrete space-y-3">
           <div className="relative max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-steel-mid pointer-events-none" />
@@ -201,7 +304,6 @@ export default function ManoObraPage() {
             />
           </div>
 
-          {/* Chips de filtro por categoría */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-steel-mid font-medium shrink-0">Filtrar:</span>
             <button
@@ -272,16 +374,42 @@ export default function ManoObraPage() {
                       </span>
                     </th>
                   ))}
-                  {/* Columna acciones sin encabezado */}
-                  <th className="px-4 py-3 w-10 bg-[#1A2535]" />
+                  <th className="px-4 py-3 w-28 bg-[#1A2535]" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-concrete/50">
                 {filas.map((t) => {
                   const costoHora = t.jornal_con_prestaciones / 8;
+                  const isToggling = toggling === t.id;
+                  const esPropio = !!t.user_id;
+
                   return (
-                    <tr key={t.id} className="hover:bg-sand/20 transition-colors group">
-                      <td className="px-4 py-3 font-medium text-charcoal">{t.especialidad}</td>
+                    <tr
+                      key={t.id}
+                      className={cn(
+                        'hover:bg-sand/20 transition-colors group',
+                        !t.activo && 'opacity-50'
+                      )}
+                    >
+                      <td className="px-4 py-3 font-medium text-charcoal">
+                        <span className="flex items-center gap-2 flex-wrap">
+                          {t.especialidad}
+                          {esPropio ? (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700 uppercase tracking-wide">
+                              Propio
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#F3F4F6] text-[#6B7280] uppercase tracking-wide">
+                              Referencia
+                            </span>
+                          )}
+                          {!t.activo && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-700 uppercase tracking-wide">
+                              Inactivo
+                            </span>
+                          )}
+                        </span>
+                      </td>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-sand text-steel-mid capitalize">
                           {t.categoria}
@@ -304,18 +432,63 @@ export default function ManoObraPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => abrirModal(t)}
-                          title="Agregar a cuadrilla"
-                          className={cn(
-                            'inline-flex items-center justify-center h-7 w-7 rounded-md',
-                            'text-steel-mid hover:text-burn-orange hover:bg-burn-orange/10',
-                            'transition-colors cursor-pointer',
-                            'opacity-0 group-hover:opacity-100'
+                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {/* Toggle activo/inactivo — todos */}
+                          <button
+                            onClick={() => handleToggle(t)}
+                            disabled={isToggling}
+                            title={t.activo ? 'Inactivar' : 'Activar'}
+                            className={cn(
+                              'inline-flex items-center justify-center h-7 w-7 rounded-md transition-colors cursor-pointer',
+                              t.activo
+                                ? 'text-steel-mid hover:text-red-600 hover:bg-red-50'
+                                : 'text-red-500 hover:text-green-600 hover:bg-green-50'
+                            )}
+                          >
+                            {isToggling
+                              ? <Loader2 className="h-4 w-4 animate-spin" />
+                              : t.activo
+                                ? <PowerOff className="h-4 w-4" />
+                                : <Power className="h-4 w-4" />
+                            }
+                          </button>
+                          {/* Editar — todos los trabajadores */}
+                          <button
+                            onClick={() => handleEditar(t)}
+                            disabled={preparandoEdicion === t.id}
+                            title="Editar"
+                            className="inline-flex items-center justify-center h-7 w-7 rounded-md text-steel-mid hover:text-charcoal hover:bg-sand transition-colors cursor-pointer disabled:opacity-40"
+                          >
+                            {preparandoEdicion === t.id
+                              ? <Loader2 className="h-4 w-4 animate-spin" />
+                              : <Edit2 className="h-4 w-4" />
+                            }
+                          </button>
+                          {/* Agregar a cuadrilla — trabajadores activos */}
+                          {t.activo && (
+                            <button
+                              onClick={() => abrirModalCuadrilla(t)}
+                              title="Agregar a cuadrilla"
+                              className="inline-flex items-center justify-center h-7 w-7 rounded-md text-steel-mid hover:text-burn-orange hover:bg-burn-orange/10 transition-colors cursor-pointer"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </button>
                           )}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </button>
+                          {/* Eliminar — solo propios */}
+                          {esPropio && (
+                            <button
+                              onClick={() => handleEliminar(t)}
+                              disabled={eliminando === t.id}
+                              title="Eliminar"
+                              className="inline-flex items-center justify-center h-7 w-7 rounded-md text-steel-mid hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-40"
+                            >
+                              {eliminando === t.id
+                                ? <Loader2 className="h-4 w-4 animate-spin" />
+                                : <Trash2 className="h-4 w-4" />
+                              }
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -323,18 +496,33 @@ export default function ManoObraPage() {
               </tbody>
             </table>
 
-            {/* Footer con conteo */}
-            <div className="px-4 py-2.5 border-t border-concrete bg-sand/20 text-xs text-steel-mid">
-              {filas.length === trabajadores.length
-                ? `${trabajadores.length} trabajadores`
-                : `${filas.length} de ${trabajadores.length} trabajadores`}
+            {/* Footer */}
+            <div className="px-4 py-2.5 border-t border-concrete bg-sand/20 text-xs text-steel-mid flex items-center justify-between">
+              <span>
+                {filas.length === trabajadores.filter((t) => mostrarInactivos || t.activo).length
+                  ? `${filas.length} trabajadores`
+                  : `${filas.length} de ${trabajadores.filter((t) => mostrarInactivos || t.activo).length} trabajadores`}
+              </span>
+              <span>
+                {trabajadores.filter((t) => !!t.user_id).length} propios ·{' '}
+                {trabajadores.filter((t) => !t.user_id).length} referencia
+              </span>
             </div>
           </div>
         )}
       </Card>
 
+      {/* Modal: Crear / Editar trabajador propio */}
+      {modalTrabajador.open && (
+        <ModalTrabajador
+          trabajador={modalTrabajador.trabajador}
+          onClose={() => setModalTrabajador({ open: false })}
+          onSaved={handleSaved}
+        />
+      )}
+
       {/* Modal: Agregar a cuadrilla */}
-      <Modal open={!!trabajadorModal} onOpenChange={(open) => !open && cerrarModal()}>
+      <Modal open={!!trabajadorModal} onOpenChange={(open) => !open && cerrarModalCuadrilla()}>
         <ModalContent className="max-w-md">
           <ModalHeader>
             <div className="flex items-center gap-2">
@@ -352,14 +540,11 @@ export default function ManoObraPage() {
             )}
           </ModalHeader>
 
-          {/* Resultado */}
           {resultadoModal && (
             <div
               className={cn(
                 'flex items-start gap-2 rounded-lg px-3 py-2.5 text-sm',
-                resultadoModal.ok
-                  ? 'bg-green-50 text-green-800'
-                  : 'bg-red-50 text-red-700'
+                resultadoModal.ok ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-700'
               )}
             >
               {resultadoModal.ok
@@ -369,7 +554,6 @@ export default function ManoObraPage() {
             </div>
           )}
 
-          {/* Contenido del modal */}
           {!resultadoModal && (
             <div className="space-y-4">
               {loadingCuadrillas ? (
@@ -384,7 +568,7 @@ export default function ManoObraPage() {
                   <Link
                     href="/insumos"
                     className="inline-flex items-center gap-1.5 text-sm text-burn-orange hover:underline font-medium"
-                    onClick={cerrarModal}
+                    onClick={cerrarModalCuadrilla}
                   >
                     Ir a Insumos
                     <ExternalLink className="h-3.5 w-3.5" />
@@ -445,12 +629,12 @@ export default function ManoObraPage() {
 
           <ModalFooter className="gap-2">
             {resultadoModal?.ok ? (
-              <Button variant="secondary" onClick={cerrarModal}>
+              <Button variant="secondary" onClick={cerrarModalCuadrilla}>
                 Cerrar
               </Button>
             ) : (
               <>
-                <Button variant="secondary" onClick={cerrarModal}>
+                <Button variant="secondary" onClick={cerrarModalCuadrilla}>
                   Cancelar
                 </Button>
                 {cuadrillas.length > 0 && (

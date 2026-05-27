@@ -154,6 +154,7 @@ export async function crearCliente(data: z.infer<typeof clienteSchema>): Promise
     return { success: true, data: newCliente };
   } catch (error: any) {
     console.error('[crearCliente] error:', error);
+    if (error.name === 'ZodError') return { success: false, error: error.issues?.[0]?.message ?? 'Completa todos los campos obligatorios' };
     return { success: false, error: 'No se pudo crear el cliente.' };
   }
 }
@@ -187,6 +188,7 @@ export async function actualizarCliente(
     return { success: true };
   } catch (error: any) {
     console.error('[actualizarCliente] error:', error);
+    if (error.name === 'ZodError') return { success: false, error: error.issues?.[0]?.message ?? 'Completa todos los campos obligatorios' };
     return { success: false, error: 'No se pudo actualizar el cliente.' };
   }
 }
@@ -243,23 +245,28 @@ export async function reactivarCliente(clienteId: string): Promise<ActionResult>
 }
 
 /**
- * Buscar clientes para selectores
+ * Buscar clientes para selectores.
+ * Si query está vacío retorna los primeros 10 activos ordenados por nombre.
  */
 export async function buscarClientes(query: string): Promise<Pick<Cliente, 'id' | 'nombre_razon_social' | 'nit_cedula' | 'ciudad'>[]> {
   try {
-    if (!query || query.length < 2) return [];
-    
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
 
-    const { data, error } = await supabase
+    const trimmed = query.trim();
+
+    const base = supabase
       .from('clientes')
       .select('id, nombre_razon_social, nit_cedula, ciudad')
       .eq('user_id', user.id)
       .eq('activo', true)
-      .or(`nombre_razon_social.ilike.%${query}%,nit_cedula.ilike.%${query}%`)
+      .order('nombre_razon_social', { ascending: true })
       .limit(10);
+
+    const { data, error } = trimmed.length > 0
+      ? await base.or(`nombre_razon_social.ilike.%${trimmed}%,nit_cedula.ilike.%${trimmed}%`)
+      : await base;
 
     if (error) throw error;
     return data || [];

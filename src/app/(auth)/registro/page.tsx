@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Mail, Lock, User, Globe, CheckCircle2 } from 'lucide-react';
+import { Mail, Lock, User, Globe } from 'lucide-react';
 import { Button } from '@/components/shared/Button';
 import { Input } from '@/components/shared/Input';
 import { ErrorMessage } from '@/components/shared/ErrorMessage';
@@ -33,25 +33,44 @@ function IndicadorPassword({ password }: { password: string }) {
 }
 
 export default function RegistroPage() {
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState<string | null>(null);
-  const [success, setSuccess]   = useState(false);
-  const [password, setPassword] = useState('');
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState<string | null>(null);
+  const [showRecoverLink, setShowRecoverLink] = useState(false);
+  const [nombre,   setNombre]         = useState('');
+  const [email,    setEmail]          = useState('');
+  const [password, setPassword]       = useState('');
+  const [confirmaPassword, setConfirmaPassword] = useState('');
 
-  async function handleSubmit(formData: FormData) {
+  const [nombreError,   setNombreError]   = useState('');
+  const [emailError,    setEmailError]    = useState('');
+  const [passError,     setPassError]     = useState('');
+  const [confirmaError, setConfirmaError] = useState('');
+
+  const isFormValid =
+    nombre.trim().length >= 1 &&
+    email.trim().length >= 1 &&
+    password.length >= 1 &&
+    confirmaPassword.length >= 1;
+
+  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
+    e.preventDefault();
     setLoading(true);
     setError(null);
+    setShowRecoverLink(false);
     try {
+      const formData = new FormData(e.currentTarget);
       const result = await signUp(formData);
-      if (!result.success && result.error) {
-        setError(result.error);
+      if (!result) return;
+      if (!result.success) {
+        const msg = result.error ?? 'Error desconocido';
+        setError(msg);
+        setShowRecoverLink(msg.includes('Ya existe una cuenta'));
+        return;
       }
-      if (result.success && result.data) {
-        const d = result.data as { needsConfirmation?: boolean };
-        if (d.needsConfirmation) setSuccess(true);
-      }
-    } catch {
-      // redirect esperado
+    } catch (err: unknown) {
+      const digest = (err as { digest?: string })?.digest ?? '';
+      if (digest.startsWith('NEXT_REDIRECT')) return;
+      setError('Error inesperado. Intenta de nuevo.');
     } finally {
       setLoading(false);
     }
@@ -63,25 +82,6 @@ export default function RegistroPage() {
     } catch {
       // redirect esperado
     }
-  }
-
-  if (success) {
-    return (
-      <div className="bg-white border border-[#E8E4DE] rounded-2xl p-8 shadow-sm text-center">
-        <div className="mb-4 mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#E8F4E8]">
-          <CheckCircle2 className="h-8 w-8 text-[#1A5C2A]" />
-        </div>
-        <h2 className="text-[20px] font-semibold text-[#1C1814]">Revisa tu correo</h2>
-        <p className="mt-2 text-[13px] text-[#7A7265] leading-relaxed">
-          Te enviamos un enlace de confirmación. Haz clic en él para activar tu cuenta.
-        </p>
-        <Link href="/login">
-          <Button variant="secondary" className="mt-6">
-            Volver al inicio de sesión
-          </Button>
-        </Link>
-      </div>
-    );
   }
 
   return (
@@ -97,38 +97,58 @@ export default function RegistroPage() {
 
       <div className="bg-white border border-[#E8E4DE] rounded-2xl p-7 shadow-sm">
         {error && (
-          <ErrorMessage message={error} className="mb-5" onDismiss={() => setError(null)} />
+          <div className="mb-5">
+            <ErrorMessage message={error} onDismiss={() => { setError(null); setShowRecoverLink(false); }} />
+            {showRecoverLink && (
+              <p className="mt-2 text-[13px] text-[#7A7265]">
+                <Link href="/recuperar-contrasena" className="font-medium text-[#C84B1A] hover:text-[#A83A14] transition-colors">
+                  ¿Olvidaste tu contraseña? Recupérala aquí
+                </Link>
+              </p>
+            )}
+          </div>
         )}
 
-        <form action={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <Input
             name="nombre_completo"
-            label="Nombre completo"
+            label="Nombre completo *"
             placeholder="Juan Pérez"
             icon={<User className="h-4 w-4" />}
             required
+            value={nombre}
+            onChange={(e) => { setNombre(e.target.value); if (nombreError) setNombreError(''); }}
+            onBlur={() => { if (!nombre.trim()) setNombreError('Este campo es obligatorio'); }}
+            error={nombreError || undefined}
           />
 
           <Input
             name="email"
             type="email"
-            label="Correo electrónico"
+            label="Correo electrónico *"
             placeholder="tu@empresa.com"
             icon={<Mail className="h-4 w-4" />}
             autoComplete="email"
             required
+            value={email}
+            onChange={(e) => { setEmail(e.target.value); if (emailError) setEmailError(''); }}
+            onBlur={() => { if (!email.trim()) setEmailError('Este campo es obligatorio'); }}
+            error={emailError || undefined}
           />
 
           <div>
             <Input
               name="password"
               type="password"
-              label="Contraseña"
+              label="Contraseña *"
               placeholder="Mín. 8 caracteres"
               icon={<Lock className="h-4 w-4" />}
               autoComplete="new-password"
               required
-              onChange={(e) => setPassword(e.target.value)}
+              value={password}
+              onChange={(e) => { setPassword(e.target.value); if (passError) setPassError(''); }}
+              onBlur={() => { if (!password) setPassError('Este campo es obligatorio'); }}
+              error={passError || undefined}
             />
             <IndicadorPassword password={password} />
           </div>
@@ -136,14 +156,18 @@ export default function RegistroPage() {
           <Input
             name="confirmar_password"
             type="password"
-            label="Confirmar contraseña"
+            label="Confirmar contraseña *"
             placeholder="Repite tu contraseña"
             icon={<Lock className="h-4 w-4" />}
             autoComplete="new-password"
             required
+            value={confirmaPassword}
+            onChange={(e) => { setConfirmaPassword(e.target.value); if (confirmaError) setConfirmaError(''); }}
+            onBlur={() => { if (!confirmaPassword) setConfirmaError('Este campo es obligatorio'); }}
+            error={confirmaError || undefined}
           />
 
-          <Button type="submit" fullWidth loading={loading} className="mt-2">
+          <Button type="submit" fullWidth loading={loading} disabled={!isFormValid} className="mt-2">
             Crear cuenta
           </Button>
         </form>

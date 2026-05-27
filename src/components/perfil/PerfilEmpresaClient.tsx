@@ -35,6 +35,8 @@ const DENSIDADES = [
   { value: 'spacious', label: 'Espacioso' },
 ] as const;
 
+const REGEX_TIPO_B = /^(?=.*[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ])[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ0-9\s.,\-&()'"#/]+$/;
+
 export function PerfilEmpresaClient({ profile, email }: Props) {
 
   // ── Tema ──────────────────────────────────────────────────────────
@@ -66,6 +68,10 @@ export function PerfilEmpresaClient({ profile, email }: Props) {
     nombre_completo:    profile.nombre_completo     || '',
     cargo_firma:        profile.cargo_firma         || '',
   });
+
+  const [empresaError, setEmpresaError] = useState('');
+  const [telefonoError, setTelefonoError] = useState('');
+  const [nitPerfilError, setNitPerfilError] = useState('');
 
   // ── Contraseña ────────────────────────────────────────────────────
   const [nuevaPass,    setNuevaPass]    = useState('');
@@ -297,6 +303,7 @@ export function PerfilEmpresaClient({ profile, email }: Props) {
               <Button
                 onClick={handleSave}
                 loading={saving}
+                disabled={saving || !formData.empresa.trim()}
                 icon={<Save className="h-4 w-4" />}
                 size="sm"
               >
@@ -378,21 +385,42 @@ export function PerfilEmpresaClient({ profile, email }: Props) {
                   <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#C4BBAD]" />
                   <input
                     value={formData.empresa}
-                    onChange={field('empresa')}
+                    onChange={(e) => { if (empresaError) setEmpresaError(''); field('empresa')(e); }}
+                    onBlur={() => {
+                      const v = formData.empresa.trim();
+                      if (!v) setEmpresaError('Este campo es obligatorio');
+                      else if (!REGEX_TIPO_B.test(v)) setEmpresaError('Debe contener al menos una letra');
+                      else setEmpresaError('');
+                    }}
                     placeholder="Ej: Constructora ABC S.A.S"
-                    className={cn(inputIcon, 'font-semibold')}
+                    className={cn(inputIcon, 'font-semibold', empresaError && 'border-red-500 focus:border-red-500')}
                   />
                 </div>
+                {empresaError && (
+                  <p className="text-[11px] text-red-600 flex items-center gap-1">
+                    <span>⚠</span>{empresaError}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1.5">
                 <label className={labelCls}>NIT / Documento</label>
                 <input
                   value={formatNit(formData.nit)}
-                  onChange={handleNitChange}
+                  onChange={(e) => { if (nitPerfilError) setNitPerfilError(''); handleNitChange(e); }}
+                  onBlur={() => {
+                    const v = formData.nit.trim();
+                    if (v && !/^\d+$/.test(v)) setNitPerfilError('Formato inválido. Ej: 900.123.456-7');
+                    else setNitPerfilError('');
+                  }}
                   placeholder="900.123.456-7"
-                  className={cn(inputBase, 'font-mono tracking-wider')}
+                  className={cn(inputBase, 'font-mono tracking-wider', nitPerfilError && 'border-red-500 focus:border-red-500')}
                 />
+                {nitPerfilError && (
+                  <p className="text-[11px] text-red-600 flex items-center gap-1">
+                    <span>⚠</span>{nitPerfilError}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -425,12 +453,23 @@ export function PerfilEmpresaClient({ profile, email }: Props) {
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#C4BBAD]" />
                   <input
+                    type="text"
                     value={formData.telefono}
-                    onChange={field('telefono')}
+                    onChange={(e) => { if (telefonoError) setTelefonoError(''); field('telefono')(e); }}
+                    onBlur={() => {
+                      const v = formData.telefono.trim();
+                      if (v && !/^\d{7,10}$/.test(v)) setTelefonoError('Solo se permiten números (7 a 10 dígitos)');
+                      else setTelefonoError('');
+                    }}
                     placeholder="Ej: 300 123 4567"
-                    className={inputIcon}
+                    className={cn(inputIcon, telefonoError && 'border-red-500 focus:border-red-500')}
                   />
                 </div>
+                {telefonoError && (
+                  <p className="text-[11px] text-red-600 flex items-center gap-1">
+                    <span>⚠</span>{telefonoError}
+                  </p>
+                )}
               </div>
 
               <div className="md:col-span-2 space-y-1.5">
@@ -568,6 +607,7 @@ export function PerfilEmpresaClient({ profile, email }: Props) {
               <Button
                 onClick={handleSave}
                 loading={saving}
+                disabled={saving || !formData.empresa.trim()}
                 icon={<Save className="h-4 w-4" />}
                 size="sm"
               >

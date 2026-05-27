@@ -23,10 +23,11 @@ interface ModalCatalogoProps {
   onClose: () => void;
   budgetId: string;
   onImported: (nuevosCapitulos: any[]) => void;
+  tipoObraInicial?: string;
 }
 
-export function ModalCatalogo({ isOpen, onClose, budgetId, onImported }: ModalCatalogoProps) {
-  const [tipoObra, setTipoObra] = useState<string>('residencial');
+export function ModalCatalogo({ isOpen, onClose, budgetId, onImported, tipoObraInicial }: ModalCatalogoProps) {
+  const [tipoObra, setTipoObra] = useState<string>(tipoObraInicial ?? 'residencial');
   const [capitulos, setCapitulos] = useState<CatalogoCapitulo[]>([]);
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -36,10 +37,12 @@ export function ModalCatalogo({ isOpen, onClose, budgetId, onImported }: ModalCa
 
   useEffect(() => {
     if (!isOpen) return;
+    const tipo = tipoObraInicial ?? 'residencial';
     setSelected(new Set());
     setSearch('');
-    cargarCatalogo(tipoObra);
-  }, [isOpen, tipoObra]);
+    setTipoObra(tipo);
+    cargarCatalogo(tipo);
+  }, [isOpen, tipoObraInicial]);
 
   async function cargarCatalogo(tipo: string) {
     setLoading(true);
@@ -111,33 +114,44 @@ export function ModalCatalogo({ isOpen, onClose, budgetId, onImported }: ModalCa
       <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3 shrink-0">
-          <div className="h-9 w-9 rounded-xl bg-blue-50 flex items-center justify-center">
-            <BookOpen className="h-4.5 w-4.5 text-blue-600" />
+          <div className="h-9 w-9 rounded-xl bg-burn-pale flex items-center justify-center">
+            <BookOpen className="h-4.5 w-4.5 text-burn-orange" />
           </div>
           <div>
             <h2 className="text-[15px] font-bold text-slate-900">Importar desde catálogo</h2>
-            <p className="text-[11px] text-slate-400 mt-0.5">Precios de referencia Colombia 2025</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Precios de referencia Colombia 2026</p>
           </div>
         </div>
 
         {/* Filtros tipo de obra */}
         <div className="px-6 pt-4 pb-3 border-b border-slate-100 shrink-0 space-y-3">
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             {TIPOS_OBRA.map(t => (
               <button
                 key={t.id}
-                onClick={() => setTipoObra(t.id)}
+                onClick={() => { setTipoObra(t.id); cargarCatalogo(t.id); }}
                 className={cn(
                   'px-3 py-1.5 rounded-lg text-[12px] font-bold transition-all border',
                   tipoObra === t.id
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white text-slate-500 border-slate-200 hover:border-blue-300 hover:text-blue-600'
+                    ? 'bg-burn-orange text-white border-burn-orange'
+                    : 'bg-white text-slate-500 border-slate-200 hover:border-burn-orange/40 hover:text-burn-orange'
                 )}
               >
                 {t.label}
               </button>
             ))}
           </div>
+          {tipoObraInicial && (
+            tipoObra === tipoObraInicial ? (
+              <p className="text-[10px] text-slate-400 -mt-1">
+                Tipo de obra heredado del proyecto
+              </p>
+            ) : (
+              <p className="text-[10px] text-warning-text -mt-1">
+                Importando capítulos de tipo {TIPOS_OBRA.find(t => t.id === tipoObra)?.label ?? tipoObra} — el presupuesto fue creado como {TIPOS_OBRA.find(t => t.id === tipoObraInicial)?.label ?? tipoObraInicial}
+              </p>
+            )
+          )}
 
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
@@ -146,16 +160,16 @@ export function ModalCatalogo({ isOpen, onClose, budgetId, onImported }: ModalCa
               placeholder="Buscar capítulo o actividad..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full h-9 pl-8 pr-4 text-[13px] border border-slate-200 rounded-lg focus:border-blue-400 focus:outline-none bg-slate-50"
+              className="w-full h-9 pl-8 pr-4 text-[13px] border border-slate-200 rounded-lg focus:border-burn-orange focus:outline-none bg-slate-50"
             />
           </div>
         </div>
 
         {/* Lista de capítulos */}
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1.5">
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-1.5">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+              <Loader2 className="h-6 w-6 animate-spin text-burn-orange" />
             </div>
           ) : filtrados.length === 0 ? (
             <div className="text-center py-12 text-slate-400 text-[13px]">
@@ -168,7 +182,7 @@ export function ModalCatalogo({ isOpen, onClose, budgetId, onImported }: ModalCa
                   {filtrados.length} capítulos disponibles
                 </span>
                 <div className="flex gap-3">
-                  <button onClick={selectAll} className="text-[11px] text-blue-600 font-bold hover:underline">
+                  <button onClick={selectAll} className="text-[11px] text-burn-orange font-bold hover:underline">
                     Seleccionar todos
                   </button>
                   {selected.size > 0 && (
@@ -189,7 +203,7 @@ export function ModalCatalogo({ isOpen, onClose, budgetId, onImported }: ModalCa
                     key={cap.id}
                     className={cn(
                       'rounded-xl border transition-all',
-                      isSelected ? 'border-blue-300 bg-blue-50/50' : 'border-slate-100 bg-white hover:border-slate-200'
+                      isSelected ? 'border-burn-orange/30 bg-burn-pale/50' : 'border-slate-100 bg-white hover:border-slate-200'
                     )}
                   >
                     <div className="flex items-center gap-3 px-4 py-3">
@@ -199,8 +213,8 @@ export function ModalCatalogo({ isOpen, onClose, budgetId, onImported }: ModalCa
                         className={cn(
                           'h-5 w-5 rounded border-2 shrink-0 flex items-center justify-center transition-all',
                           isSelected
-                            ? 'bg-blue-600 border-blue-600'
-                            : 'border-slate-300 hover:border-blue-400'
+                            ? 'bg-burn-orange border-burn-orange'
+                            : 'border-slate-300 hover:border-burn-orange/60'
                         )}
                       >
                         {isSelected && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
@@ -265,7 +279,7 @@ export function ModalCatalogo({ isOpen, onClose, budgetId, onImported }: ModalCa
                               </div>
                               {hasRef && (
                                 <p className="text-[10px] text-slate-600 mt-1 font-medium bg-slate-100/50 px-2 py-0.5 rounded-md inline-block">
-                                  Ref: <span className="text-blue-700 font-bold">{formatearCOP(pRef)}</span>
+                                  Ref: <span className="text-burn-deep font-bold">{formatearCOP(pRef)}</span>
                                   {hasRange && (
                                     <> · Rango: <span className="text-slate-700 font-bold">{formatearCOP(pMin)} – {formatearCOP(pMax)}</span></>
                                   )}

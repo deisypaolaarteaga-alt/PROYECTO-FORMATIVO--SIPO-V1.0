@@ -3,12 +3,13 @@ import { z } from 'zod';
 // ============ Project schemas ============
 
 export const createProjectSchema = z.object({
-  nombre: z.string().min(1, 'El nombre de la obra es obligatorio').max(200),
+  nombre: z.string().min(1, 'El nombre de la obra es obligatorio').max(200)
+    .regex(/^(?=.*[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ])[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ0-9\s.,\-&()'"#/]+$/, 'Debe contener al menos una letra'),
   descripcion: z.string().max(500).optional(),
   ubicacion: z.string().min(1, 'La ciudad es obligatoria'),
-  area_m2: z.coerce.number().positive('El área debe ser mayor a 0').optional().nullable(),
-  tipo_obra: z.enum(['residencial', 'comercial', 'industrial', 'infraestructura', 'institucional', 'hotelero', 'otro']).optional().nullable(),
-  cliente_id: z.string().uuid().optional().nullable(),
+  area_m2: z.coerce.number().positive('El área debe ser mayor a 0'),
+  tipo_obra: z.enum(['residencial', 'comercial', 'industrial', 'infraestructura', 'institucional', 'hotelero', 'otro'], { message: 'El tipo de obra es obligatorio' }),
+  cliente_id: z.string({ message: 'El cliente es obligatorio' }).uuid({ message: 'El cliente es obligatorio' }),
 });
 
 export const updateProjectSchema = createProjectSchema.partial().extend({
@@ -78,30 +79,31 @@ export const createUserMaterialSchema = z.object({
   descripcion: z.string().max(500).optional(),
   tipo: z.enum(['material', 'mano_obra', 'equipo']),
   unidad: z.string().min(1, 'La unidad es obligatoria'),
-  precio_unitario: z.coerce.number().min(0, 'El precio debe ser mayor o igual a 0'),
+  precio_unitario: z.coerce.number().min(0).default(0),
 });
 
 // ============ Profile update schema ============
 
 export const updateProfileSchema = z.object({
   nombre_completo: z.string().min(1).max(100).optional(),
-  empresa: z.string().max(200).optional(),
+  empresa: z.string().max(200).regex(/^$|^(?=.*[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ])[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ0-9\s.,\-&()'"#/]+$/, 'Debe contener al menos una letra').optional(),
   ciudad: z.string().optional(),
-  nit: z.string().max(20).optional(),
-  telefono: z.string().max(20).optional(),
+  nit: z.string().max(20).regex(/^$|^[\d.\-]+$/, 'NIT inválido — solo números, puntos y guión').optional(),
+  telefono: z.string().max(20).regex(/^$|^\d{7,10}$/, 'Teléfono inválido — solo dígitos, 7 a 10 caracteres').optional(),
 });
 
 // ============ Cliente schema ============
 
 export const clienteSchema = z.object({
   tipo: z.enum(['persona_natural', 'empresa']),
-  nombre_razon_social: z.string().min(2, 'Nombre requerido').max(200),
-  nit_cedula: z.string().max(20).optional(),
-  nombre_contacto: z.string().max(100).optional(),
-  cargo_contacto: z.string().max(100).optional(),
-  telefono: z.string().max(20).optional(),
+  nombre_razon_social: z.string().min(2, 'Nombre requerido').max(200)
+    .regex(/^(?=.*[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ])[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ0-9\s.,\-&()'"#/]+$/, 'Debe contener al menos una letra'),
+  nit_cedula: z.string().max(20).regex(/^$|^[\d.\-]+$/, 'NIT inválido — solo números, puntos y guión').optional(),
+  nombre_contacto: z.string().max(100).regex(/^$|^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s.\-]+$/, 'Este campo solo acepta letras').optional(),
+  cargo_contacto: z.string().max(100).regex(/^$|^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s.\-]+$/, 'Este campo solo acepta letras').optional(),
+  telefono: z.string().max(20).regex(/^$|^\d{7,10}$/, 'Teléfono inválido — solo dígitos, 7 a 10 caracteres').optional(),
   email: z.union([z.string().email('Email inválido'), z.literal('')]).optional(),
-  ciudad: z.string().max(100).optional(),
+  ciudad: z.string().min(1, 'La ciudad es obligatoria').max(100),
   departamento: z.string().max(100).optional(),
   direccion: z.string().max(200).optional(),
   notas: z.string().max(500).optional(),
@@ -111,12 +113,13 @@ export const clienteSchema = z.object({
 
 export const proveedorSchema = z.object({
   tipo: z.enum(['persona', 'empresa']),
-  nombre_razon_social: z.string().min(2, 'Nombre requerido').max(200),
-  nit_cedula: z.string().max(20).optional(),
+  nombre_razon_social: z.string().min(2, 'Nombre requerido').max(200)
+    .regex(/^(?=.*[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ])[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ0-9\s.,\-&()'"#/]+$/, 'Debe contener al menos una letra'),
+  nit_cedula: z.string().max(20).regex(/^$|^[\d.\-]+$/, 'NIT inválido — solo números, puntos y guión').optional(),
   categoria: z.enum(['ferreteria', 'contratista', 'equipos', 'laboratorio', 'transporte', 'servicios', 'otro']),
   ciudad: z.string().max(100).optional(),
   email: z.union([z.string().email('Email inválido'), z.literal('')]).optional(),
-  telefono: z.string().max(20).optional(),
+  telefono: z.string().max(20).regex(/^$|^\d{7,10}$/, 'Teléfono inválido — solo dígitos, 7 a 10 caracteres').optional(),
   sitio_web: z.union([z.string().url('URL inválida'), z.literal('')]).optional(),
   notas: z.string().max(500).optional(),
 });

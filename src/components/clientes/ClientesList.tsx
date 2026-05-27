@@ -16,6 +16,7 @@ import {
   DropdownMenuItem,
 } from '@/components/shared/DropdownMenu';
 import { ModalCliente } from './ModalCliente';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { desactivarCliente, getClientes } from '@/actions/clientes';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
@@ -136,6 +137,7 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
   const [pagina, setPagina] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [clienteAEditar, setClienteAEditar] = useState<any>(undefined);
+  const [confirmEliminar, setConfirmEliminar] = useState<{ id: string; nombre: string } | null>(null);
   const [isPending, startTransition] = useTransition();
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -204,15 +206,18 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
     [allClientes],
   );
 
-  async function handleDesactivar(id: string, nombre: string) {
-    if (!confirm(`¿Desactivar a "${nombre}"? Ya no aparecerá en el listado.`)) return;
+  async function handleDesactivar() {
+    if (!confirmEliminar) return;
+    const { id } = confirmEliminar;
+    setConfirmEliminar(null);
     const res = await desactivarCliente(id);
     if (res.success) {
-      toast.success('Cliente desactivado');
+      toast.success('Cliente eliminado');
       setAllClientes(prev => prev.filter(c => c.id !== id));
       setFilteredClientes(prev => prev.filter(c => c.id !== id));
+      router.refresh();
     } else {
-      toast.error(res.error || 'Error al desactivar');
+      toast.error(res.error || 'Error al eliminar cliente');
     }
   }
 
@@ -469,35 +474,44 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
                         </td>
 
                         {/* Acciones */}
-                        <td className="px-3 py-3.5 text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button className="p-1.5 rounded-lg hover:bg-[#F3F4F6] text-[#9CA3AF] hover:text-[#374151] opacity-40 group-hover:opacity-100 focus:opacity-100 transition-all">
-                                <MoreVertical className="h-4 w-4" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem asChild>
-                                <Link href={`/clientes/${cliente.id}`}>
-                                  <ExternalLink className="h-4 w-4 mr-2" />
-                                  Ver detalle
-                                </Link>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => { setClienteAEditar(cliente); setIsModalOpen(true); }}
-                              >
-                                <Edit className="h-4 w-4 mr-2" />
-                                Editar
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleDesactivar(cliente.id, cliente.nombre_razon_social)}
-                                className="text-red-600 focus:bg-red-50 focus:text-red-700"
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Desactivar
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                        <td className="px-3 py-3.5">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              aria-label="Eliminar cliente"
+                              onClick={() => setConfirmEliminar({ id: cliente.id, nombre: cliente.nombre_razon_social })}
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button className="p-1.5 rounded-lg hover:bg-[#F3F4F6] text-[#9CA3AF] hover:text-[#374151] opacity-40 group-hover:opacity-100 focus:opacity-100 transition-all">
+                                  <MoreVertical className="h-4 w-4" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/clientes/${cliente.id}`}>
+                                    <ExternalLink className="h-4 w-4 mr-2" />
+                                    Ver detalle
+                                  </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => { setClienteAEditar(cliente); setIsModalOpen(true); }}
+                                >
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Editar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => setConfirmEliminar({ id: cliente.id, nombre: cliente.nombre_razon_social })}
+                                  className="text-red-600 focus:bg-red-50 focus:text-red-700"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Eliminar
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -634,6 +648,15 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={!!confirmEliminar}
+        title="Eliminar cliente"
+        description="¿Eliminar este cliente? Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        onConfirm={handleDesactivar}
+        onCancel={() => setConfirmEliminar(null)}
+      />
 
       <ModalCliente
         isOpen={isModalOpen}

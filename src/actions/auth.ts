@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
+import { isRedirectError } from 'next/dist/client/components/redirect-error';
 import {
   loginSchema,
   registroSchema,
@@ -10,13 +11,6 @@ import {
 } from '@/lib/validations/schemas';
 import type { ActionResult } from '@/types';
 
-/**
- * Paso 1 del login con 2FA:
- * Verifica email + contraseña. Si son correctos, firma la sesión temporal,
- * la destruye de inmediato (para que el middleware no vea una sesión activa)
- * y envía el OTP al correo. Devuelve el email para que el cliente muestre
- * la pantalla de verificación.
- */
 export async function signIn(formData: FormData): Promise<ActionResult<{ email: string }>> {
   const raw = {
     email: formData.get('email') as string,
@@ -49,20 +43,7 @@ export async function signIn(formData: FormData): Promise<ActionResult<{ email: 
     return { success: false, error: 'Error al iniciar sesión. Intenta de nuevo.' };
   }
 
-  // Destruir la sesión temporal — el usuario completa el login solo después del OTP
-  await supabase.auth.signOut();
-
-  // Enviar OTP al correo
-  const { error: otpError } = await supabase.auth.signInWithOtp({
-    email: parsed.data.email,
-    options: { shouldCreateUser: false },
-  });
-
-  if (otpError) {
-    return { success: false, error: 'No se pudo enviar el código de verificación. Intenta de nuevo.' };
-  }
-
-  return { success: true, data: { email: parsed.data.email } };
+  redirect('/dashboard');
 }
 
 /**
@@ -117,46 +98,59 @@ export async function verifyOtp(email: string, token: string): Promise<ActionRes
  * Registrar nuevo usuario
  */
 export async function signUp(formData: FormData): Promise<ActionResult> {
-  const raw = {
-    nombre_completo: formData.get('nombre_completo') as string,
-    email: formData.get('email') as string,
-    password: formData.get('password') as string,
-    confirmar_password: formData.get('confirmar_password') as string,
-  };
+  try {
+    const raw = {
+      nombre_completo: formData.get('nombre_completo') as string,
+      email: formData.get('email') as string,
+      password: formData.get('password') as string,
+      confirmar_password: formData.get('confirmar_password') as string,
+    };
 
-  const parsed = registroSchema.safeParse(raw);
-  if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0].message };
-  }
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signUp({
-    email: parsed.data.email,
-    password: parsed.data.password,
-    options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
-      data: {
-        nombre_completo: parsed.data.nombre_completo,
-      }
+    const parsed = registroSchema.safeParse(raw);
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0].message };
     }
-  });
 
-  if (error?.message?.includes('already registered')) {
-    return { success: false, error: 'Este email ya tiene una cuenta registrada.' };
-  }
-  if (error) {
+    const supabase = await createClient();
+    const { data, error } = await supabase.auth.signUp({
+      email: parsed.data.email,
+      password: parsed.data.password,
+      options: {
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+        data: {
+          nombre_completo: parsed.data.nombre_completo,
+        }
+      }
+    });
+
+    console.log('SIGNUP RESULT:', JSON.stringify({
+      userId: data?.user?.id,
+      email: data?.user?.email,
+      errorMsg: error?.message,
+      errorCode: error?.code,
+      errorStatus: error?.status,
+    }));
+
+    if (error) {
+      if (error.code === 'user_already_exists' ||
+          error.message.toLowerCase().includes('already registered')) {
+        return { success: false, error: 'Ya existe una cuenta con este correo electrónico.' };
+      }
+      return { success: false, error: 'Error al crear la cuenta. Intenta de nuevo.' };
+    }
+
+    // Fallback: Supabase devuelve identities[] vacío cuando el email ya existe sin error explícito
+    if (data.user && (data.user.identities?.length ?? 0) === 0) {
+      return { success: false, error: 'Ya existe una cuenta con este correo electrónico.' };
+    }
+
+  } catch (e) {
+    if (isRedirectError(e)) throw e;
+    console.error('[signUp] error:', e);
     return { success: false, error: 'Error al crear la cuenta. Intenta de nuevo.' };
   }
 
-  if (data.user && !data.session) {
-    return {
-      success: true,
-      data: { needsConfirmation: true },
-      message: 'Revisa tu correo para confirmar tu cuenta.'
-    };
-  }
-
-  redirect('/onboarding');
+  redirect('/dashboard');
 }
 
 /**

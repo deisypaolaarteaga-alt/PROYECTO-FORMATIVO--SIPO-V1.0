@@ -109,6 +109,30 @@ export const ESTADO_PROYECTO_LABELS: Record<EstadoProyecto, string> = {
   archivado:   'Archivado',
 };
 
+// ── Insumos con precio personalizable ──
+export interface MaterialConPrecio {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  unidad: string;
+  precio_referencia: number;
+  departamento: string;
+  categoria: string;
+  precio_usuario: number | null;
+}
+
+export interface EquipoConPrecio {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  tipo: string;
+  precio_diario: number;
+  precio_semanal: number;
+  precio_mensual: number;
+  departamento: string;
+  precio_usuario: number | null;
+}
+
 // ── Nivel 2: Presupuesto ──
 export interface Budget {
   id: string;
@@ -318,6 +342,7 @@ export type BudgetCompleto = Budget & {
     ubicacion: string | null;
     cliente_id: string | null;
     cliente_nombre: string | null;
+    tipo_obra: string | null;
     clientes?: Cliente;
   };
   chapters?: ChapterWithActivities[];

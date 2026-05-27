@@ -8,9 +8,11 @@ interface InputEditableProps {
   className?: string;
   placeholder?: string;
   autoFocus?: boolean;
+  onBlur?: (value: string) => void;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }
 
-export function InputEditable({ value, onChange, className, placeholder, autoFocus }: InputEditableProps) {
+export function InputEditable({ value, onChange, className, placeholder, autoFocus, onBlur, onKeyDown }: InputEditableProps) {
   const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
     e.target.select();
   };
@@ -21,6 +23,8 @@ export function InputEditable({ value, onChange, className, placeholder, autoFoc
       value={value}
       onChange={(e) => onChange(e.target.value)}
       onFocus={handleFocus}
+      onBlur={onBlur ? (e) => onBlur(e.target.value) : undefined}
+      onKeyDown={onKeyDown}
       autoFocus={autoFocus}
       placeholder={placeholder}
       className={cn(

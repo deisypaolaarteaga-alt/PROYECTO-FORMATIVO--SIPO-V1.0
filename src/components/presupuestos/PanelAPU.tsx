@@ -33,6 +33,7 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
   const [cuadrillas, setCuadrillas] = useState<any[]>([]);
   const [showSearch, setShowSearch] = useState(false);
   const [searchType, setSearchType] = useState<'material' | 'equipo'>('material');
+  const [pendingPriceIdx, setPendingPriceIdx] = useState<number | null>(null);
 
   // Estados del selector inline de cuadrilla
   const [selectedCuadrillaId, setSelectedCuadrillaId] = useState<string | null>(null);
@@ -155,13 +156,18 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
     if (insumo.source === 'equipment') tipo = 'equipo';
     if (insumo.source === 'materials') tipo = 'material';
 
+    const precio = insumo.precio_referencia || insumo.precio_unitario || 0;
+    const newIdx = items.length;
     setItems([...items, {
       tipo,
       nombre: insumo.nombre,
       unidad: insumo.unidad,
       cantidad: 1,
-      precio_unitario: insumo.precio_referencia || insumo.precio_unitario || 0
+      precio_unitario: precio,
     }]);
+    if (precio === 0 && tipo === 'material') {
+      setPendingPriceIdx(newIdx);
+    }
     setShowSearch(false);
     toast.success(`${insumo.nombre} agregado`);
   };
@@ -429,32 +435,44 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
 
                 <div className="space-y-2">
                   {itemsMat.map(({ item, idx }) => (
-                    <div key={item.id || `mat-${idx}`} className="flex items-center gap-2 group">
-                      <InputEditable
-                        value={item.nombre}
-                        onChange={(val) => updateItem(idx, { nombre: val })}
-                        className="text-xs flex-1"
-                        placeholder="Nombre material"
-                      />
-                      <input
-                        value={item.unidad}
-                        onChange={(e) => updateItem(idx, { unidad: e.target.value })}
-                        className="w-10 text-[10px] font-medium text-stone bg-transparent border-none text-center"
-                      />
-                      <input
-                        type="number"
-                        value={item.cantidad}
-                        onChange={(e) => updateItem(idx, { cantidad: parseFloat(e.target.value) || 0 })}
-                        className="w-12 text-xs text-right bg-transparent border-none font-medium"
-                      />
-                      <InputPrecio
-                        value={item.precio_unitario}
-                        onChange={(val) => updateItem(idx, { precio_unitario: val })}
-                        className="w-24 text-xs text-right text-stone"
-                      />
-                      <button onClick={() => removeItem(idx)} className="p-1 text-mortar hover:text-danger-text opacity-0 group-hover:opacity-100 transition-colors duration-150">
-                        <Trash2 className="h-3 w-3" />
-                      </button>
+                    <div key={item.id || `mat-${idx}`}>
+                      <div className="flex items-center gap-2 group">
+                        <InputEditable
+                          value={item.nombre}
+                          onChange={(val) => updateItem(idx, { nombre: val })}
+                          className="text-xs flex-1"
+                          placeholder="Nombre material"
+                        />
+                        <input
+                          value={item.unidad}
+                          onChange={(e) => updateItem(idx, { unidad: e.target.value })}
+                          className="w-10 text-[10px] font-medium text-stone bg-transparent border-none text-center"
+                        />
+                        <input
+                          type="number"
+                          value={item.cantidad}
+                          onChange={(e) => updateItem(idx, { cantidad: parseFloat(e.target.value) || 0 })}
+                          className="w-12 text-xs text-right bg-transparent border-none font-medium"
+                        />
+                        <InputPrecio
+                          value={item.precio_unitario}
+                          onChange={(val) => {
+                            updateItem(idx, { precio_unitario: val });
+                            if (pendingPriceIdx === idx) setPendingPriceIdx(null);
+                          }}
+                          autoFocus={pendingPriceIdx === idx}
+                          className={cn(
+                            "w-24 text-xs text-right",
+                            item.precio_unitario === 0 ? "text-amber-600 font-semibold" : "text-stone"
+                          )}
+                        />
+                        <button onClick={() => removeItem(idx)} className="p-1 text-mortar hover:text-danger-text opacity-0 group-hover:opacity-100 transition-colors duration-150">
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                      {item.precio_unitario === 0 && (
+                        <p className="text-[10px] text-amber-600 pl-1 mt-0.5">Ingresa el precio actual del mercado</p>
+                      )}
                     </div>
                   ))}
                   {itemsMat.length === 0 && (

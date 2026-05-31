@@ -248,7 +248,7 @@ export default function ManoObraPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-2">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-burn-orange/10">
             <HardHat className="h-5 w-5 text-burn-orange" />
@@ -260,11 +260,11 @@ export default function ManoObraPage() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap gap-2 w-full">
           <button
             onClick={() => setMostrarInactivos((v) => !v)}
             className={cn(
-              'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border',
+              'w-full sm:w-auto flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border',
               mostrarInactivos
                 ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
                 : 'bg-sand text-steel-mid border-concrete hover:bg-concrete/60'
@@ -275,6 +275,7 @@ export default function ManoObraPage() {
           <Button
             variant="secondary"
             size="sm"
+            className="w-full sm:w-auto"
             icon={<Download className="h-4 w-4" />}
             onClick={() => exportarCSV(filas)}
             disabled={filas.length === 0}
@@ -283,6 +284,7 @@ export default function ManoObraPage() {
           </Button>
           <Button
             size="sm"
+            className="w-full sm:w-auto"
             icon={<UserPlus className="h-4 w-4" />}
             onClick={() => setModalTrabajador({ open: true })}
           >

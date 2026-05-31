@@ -378,7 +378,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
 
       {/* ── HEADER ─────────────────────────────────────────────────────────── */}
       <div className="bg-white border-b border-[#E8E4DE] px-6 py-4 sticky top-0 z-20 shadow-sm">
-        <div className="flex items-start justify-between gap-6">
+        <div className="flex flex-col md:flex-row items-start gap-3 md:justify-between md:gap-6">
 
           {/* Izquierda: título + estado + fecha */}
           <div className="flex items-start gap-3 min-w-0">
@@ -393,7 +393,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                   <InputEditable
                     value={budget.titulo}
                     onChange={(val) => handleUpdateBudget({ titulo: val })}
-                    className="text-xl font-bold text-[#1C1814] max-w-sm"
+                    className="text-xl font-bold text-[#1C1814] max-w-xs md:max-w-sm truncate"
                   />
                 )}
                 <EstadoBadge
@@ -412,13 +412,13 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                     </span>
                   )}
                   {fechaElaboracion && (
-                    <span className="flex items-center gap-1">
+                    <span className="flex items-center gap-1 whitespace-nowrap">
                       <Calendar className="h-3 w-3" />
                       Elaborado: <span className="font-semibold text-[#1F2937] ml-1">{fechaElaboracion}</span>
                     </span>
                   )}
                   {fechaValidezFormateada && (
-                    <span className="flex items-center gap-1">
+                    <span className="flex items-center gap-1 whitespace-nowrap">
                       <Calendar className="h-3 w-3" />
                       Válido hasta: <span className="font-semibold text-[#1F2937] ml-1">{fechaValidezFormateada}</span>
                     </span>
@@ -429,9 +429,9 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
           </div>
 
           {/* Derecha: indicadores + acciones + total */}
-          <div className="flex flex-col items-end gap-2 shrink-0">
+          <div className="flex flex-col items-start md:items-end gap-2 w-full md:w-auto md:shrink-0">
             {/* Fila superior: guardado + PDF + acciones de estado */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center flex-wrap gap-2">
               {/* Indicador guardado — solo mientras el editor es editable */}
               {!bloqueado && (
                 <div className="h-7 flex items-center">
@@ -503,7 +503,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
             </div>
 
             {/* Fila inferior: total */}
-            <div className="text-right">
+            <div className="text-left md:text-right">
               <p className="text-[10px] text-stone uppercase font-bold tracking-widest">Total Presupuesto</p>
               <p className="text-3xl font-black text-[#1C1814] leading-none" style={{ fontFamily: 'var(--font-mono)' }}>{formatearCOP(totalGeneral)}</p>
             </div>
@@ -648,15 +648,15 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
 
                 {/* Tabla de actividades */}
                 {isExpanded && (
-                  <div>
+                  <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
                       <thead className="text-[9px] text-stone uppercase tracking-wide bg-[#F0EDE8] border-b border-[#E8E4DE]">
                         <tr>
-                          <th className="w-8 px-2 py-2.5" />
+                          <th className="hidden md:table-cell w-8 px-2 py-2.5" />
                           <th className="px-4 py-2.5 font-medium">Descripción</th>
-                          <th className="px-3 py-2.5 font-medium w-20">Unid.</th>
-                          <th className="px-3 py-2.5 font-medium w-28 text-right">Cantidad</th>
-                          <th className="px-3 py-2.5 font-medium w-36 text-right">Precio Unit.</th>
+                          <th className="hidden md:table-cell px-3 py-2.5 font-medium w-20">Unid.</th>
+                          <th className="hidden md:table-cell px-3 py-2.5 font-medium w-28 text-right">Cantidad</th>
+                          <th className="hidden md:table-cell px-3 py-2.5 font-medium w-36 text-right">Precio Unit.</th>
                           <th className="px-3 py-2.5 font-medium w-36 text-right">Total</th>
                           <th className="px-3 py-2.5 w-28 text-right">Acciones</th>
                         </tr>
@@ -679,7 +679,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                             )}
                           >
                             {/* Drag handle */}
-                            <td className="px-2 py-2.5 text-center">
+                            <td className="hidden md:table-cell px-2 py-2.5 text-center">
                               <GripVertical className="h-4 w-4 text-[#E0DAD4] group-hover:text-stone cursor-grab active:cursor-grabbing mx-auto transition-colors" />
                             </td>
 
@@ -695,7 +695,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                             </td>
 
                             {/* Unidad */}
-                            <td className="px-3 py-2.5">
+                            <td className="hidden md:table-cell px-3 py-2.5">
                               <select
                                 value={act.unidad ?? 'un'}
                                 onChange={(e) => handleUpdateAct(act.id, ch.id, { unidad: e.target.value })}
@@ -708,7 +708,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                             </td>
 
                             {/* Cantidad */}
-                            <td className="px-3 py-2.5">
+                            <td className="hidden md:table-cell px-3 py-2.5">
                               <div className="rounded hover:bg-[#EDE6DC] focus-within:ring-1 focus-within:ring-[#C84B1A]/20 transition-colors px-1 -mx-1 cursor-text">
                                 <input
                                   type="number"
@@ -721,7 +721,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                             </td>
 
                             {/* Precio unitario */}
-                            <td className="px-3 py-2.5">
+                            <td className="hidden md:table-cell px-3 py-2.5">
                               <div className="rounded hover:bg-[#EDE6DC] focus-within:ring-1 focus-within:ring-[#C84B1A]/20 transition-colors px-1 -mx-1 cursor-text">
                                 <InputPrecio
                                   value={act.precio_unitario}

@@ -263,7 +263,7 @@ export function ProveedoresList({ initialProveedores }: ProveedoresListProps) {
 
           <button
             onClick={() => { setProveedorAEditar(undefined); setIsModalOpen(true); }}
-            className="h-10 px-4 flex items-center gap-2 bg-[#C84B1A] text-white rounded-lg text-sm font-semibold hover:bg-[#A83A14] active:bg-[#8E2E0E] transition-colors shadow-sm"
+            className="w-full sm:w-auto h-10 px-4 flex items-center justify-center gap-2 bg-[#C84B1A] text-white rounded-lg text-sm font-semibold hover:bg-[#A83A14] active:bg-[#8E2E0E] transition-colors shadow-sm"
           >
             <Plus className="h-4 w-4" />
             Nuevo Proveedor

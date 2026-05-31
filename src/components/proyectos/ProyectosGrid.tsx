@@ -319,6 +319,7 @@ export function ProyectosGrid({ projects }: ProyectosGridProps) {
 
         /* ════ VISTA LISTA ════ */
         <div className="bg-white rounded-xl border border-[#E8E4DE] overflow-hidden shadow-[0_1px_2px_0_rgba(28,24,20,0.04)]">
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#EAE6E0] bg-[#F7F5F2]">
@@ -328,7 +329,7 @@ export function ProyectosGrid({ projects }: ProyectosGridProps) {
                 <th className="text-left px-4 py-3 text-[10px] font-bold text-[#A89F96] uppercase tracking-[0.12em]">
                   Estado
                 </th>
-                <th className="text-left px-4 py-3 text-[10px] font-bold text-[#A89F96] uppercase tracking-[0.12em]">
+                <th className="hidden md:table-cell text-left px-4 py-3 text-[10px] font-bold text-[#A89F96] uppercase tracking-[0.12em]">
                   Modificado
                 </th>
                 <th className="text-left px-4 py-3 text-[10px] font-bold text-[#A89F96] uppercase tracking-[0.12em]">
@@ -359,7 +360,7 @@ export function ProyectosGrid({ projects }: ProyectosGridProps) {
                       p.estado === 'archivado' && 'opacity-50 hover:opacity-70'
                     )}
                   >
-                    <td className="px-5 py-3 max-w-[260px]">
+                    <td className="px-5 py-3 w-full min-w-0">
                       <div className="flex items-center gap-3 min-w-0">
                         <div
                           className="shrink-0 flex items-center justify-center w-7 h-7 rounded-lg"
@@ -392,7 +393,7 @@ export function ProyectosGrid({ projects }: ProyectosGridProps) {
                       </span>
                     </td>
 
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="hidden md:table-cell px-4 py-3 whitespace-nowrap">
                       {fechaLabel ? (
                         <span
                           className="text-[12px] text-[#7A7265]"
@@ -479,6 +480,7 @@ export function ProyectosGrid({ projects }: ProyectosGridProps) {
             </tbody>
           </table>
 
+          </div>{/* end overflow-x-auto */}
           {/* Footer paginación */}
           <div className="px-5 py-3 border-t border-[#EAE6E0] flex items-center justify-between bg-[#F7F5F2]">
             <p className="text-[11px] text-[#A89F96]" style={{ fontFamily: 'var(--font-mono)' }}>

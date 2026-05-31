@@ -360,7 +360,7 @@ function KPICard({
         </div>
       </div>
       <p
-        className="text-[28px] font-semibold text-[#1C1814] leading-none mb-1 truncate"
+        className="text-base sm:text-xl md:text-[28px] font-semibold text-[#1C1814] leading-tight mb-1 break-all"
         style={{ fontFamily: 'var(--font-mono)' }}
       >
         {value}

@@ -639,7 +639,7 @@ export default function InsumosPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-2">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-burn-orange/10">
             <Package className="h-5 w-5 text-burn-orange" />
@@ -651,13 +651,13 @@ export default function InsumosPage() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap gap-2 w-full">
           {tab === 'material' && (
             <>
               <button
                 onClick={() => setMostrarInactivosMat((v) => !v)}
                 className={cn(
-                  'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border',
+                  'w-full sm:w-auto flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border',
                   mostrarInactivosMat
                     ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
                     : 'bg-sand text-steel-mid border-concrete hover:bg-concrete/60'
@@ -665,7 +665,7 @@ export default function InsumosPage() {
               >
                 {mostrarInactivosMat ? 'Ocultar inactivos' : 'Mostrar inactivos'}
               </button>
-              <Button size="sm" icon={<Plus className="h-4 w-4" />} onClick={() => { setShowCreateMat(true); setCreateMatError(''); }}>
+              <Button size="sm" className="w-full sm:w-auto" icon={<Plus className="h-4 w-4" />} onClick={() => { setShowCreateMat(true); setCreateMatError(''); }}>
                 Agregar material
               </Button>
             </>
@@ -675,7 +675,7 @@ export default function InsumosPage() {
               <button
                 onClick={() => setMostrarInactivosEq((v) => !v)}
                 className={cn(
-                  'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border',
+                  'w-full sm:w-auto flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border',
                   mostrarInactivosEq
                     ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
                     : 'bg-sand text-steel-mid border-concrete hover:bg-concrete/60'
@@ -683,13 +683,13 @@ export default function InsumosPage() {
               >
                 {mostrarInactivosEq ? 'Ocultar inactivos' : 'Mostrar inactivos'}
               </button>
-              <Button size="sm" icon={<Plus className="h-4 w-4" />} onClick={() => { setShowCreateEq(true); setCreateEqError(''); }}>
+              <Button size="sm" className="w-full sm:w-auto" icon={<Plus className="h-4 w-4" />} onClick={() => { setShowCreateEq(true); setCreateEqError(''); }}>
                 Agregar equipo
               </Button>
             </>
           )}
           {tab === 'crews' && (
-            <Button size="sm" icon={<Plus className="h-4 w-4" />} onClick={openCreateCuadrilla}>
+            <Button size="sm" className="w-full sm:w-auto" icon={<Plus className="h-4 w-4" />} onClick={openCreateCuadrilla}>
               Nueva cuadrilla
             </Button>
           )}

@@ -282,7 +282,7 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
           </div>
 
           {/* Tipo filter — pills */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             {TIPO_OPTIONS.map(opt => {
               const active = filtroTipo === opt.value;
               return (
@@ -407,13 +407,13 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
                     <th className="px-4 py-3.5 text-left text-[10px] font-bold text-stone uppercase tracking-widest">
                       Tipo
                     </th>
-                    <th className="px-4 py-3.5 text-left text-[10px] font-bold text-stone uppercase tracking-widest">
+                    <th className="hidden sm:table-cell px-4 py-3.5 text-left text-[10px] font-bold text-stone uppercase tracking-widest">
                       Contacto
                     </th>
-                    <th className="px-4 py-3.5 text-center text-[10px] font-bold text-stone uppercase tracking-widest">
+                    <th className="hidden md:table-cell px-4 py-3.5 text-center text-[10px] font-bold text-stone uppercase tracking-widest">
                       Proyectos
                     </th>
-                    <th className="px-4 py-3.5 text-right text-[10px] font-bold text-stone uppercase tracking-widest">
+                    <th className="hidden md:table-cell px-4 py-3.5 text-right text-[10px] font-bold text-stone uppercase tracking-widest">
                       Inversión Total
                     </th>
                     <th className="px-4 py-3.5 text-left text-[10px] font-bold text-stone uppercase tracking-widest">
@@ -469,7 +469,7 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
                         </td>
 
                         {/* Contacto */}
-                        <td className="px-4 py-3.5 max-w-[180px]">
+                        <td className="hidden sm:table-cell px-4 py-3.5 max-w-[180px]">
                           <p className="text-[#374151] font-medium truncate">
                             {cliente.nombre_contacto || <span className="text-[#D1D5DB] font-normal">Sin contacto</span>}
                           </p>
@@ -479,7 +479,7 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
                         </td>
 
                         {/* Proyectos */}
-                        <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                        <td className="hidden md:table-cell px-4 py-3.5 text-center whitespace-nowrap">
                           <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${
                             (cliente.total_proyectos || 0) > 0
                               ? 'bg-[#F0FDF4] text-[#2D7A45]'
@@ -490,7 +490,7 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
                         </td>
 
                         {/* Inversión Total */}
-                        <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                        <td className="hidden md:table-cell px-4 py-3.5 text-right whitespace-nowrap">
                           <span className="font-semibold text-[#111827] tabular-nums">
                             {formatCurrency(cliente.valor_total_proyectos || 0)}
                           </span>

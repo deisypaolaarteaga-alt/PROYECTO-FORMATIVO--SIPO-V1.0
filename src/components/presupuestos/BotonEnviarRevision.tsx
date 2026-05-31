@@ -19,8 +19,6 @@ export function BotonEnviarRevision({ budgetId, proyectoId, estado }: BotonEnvia
   const [loading,     setLoading]     = useState(false);
   const [errorMsg,    setErrorMsg]    = useState('');
 
-  if (estado !== 'borrador') return null;
-
   async function handleConfirm() {
     setLoading(true);
     setErrorMsg('');
@@ -33,6 +31,8 @@ export function BotonEnviarRevision({ budgetId, proyectoId, estado }: BotonEnvia
       setErrorMsg(result.error ?? 'No se pudo enviar a revisión.');
     }
   }
+
+  if (estado !== 'borrador') return null;
 
   return (
     <>

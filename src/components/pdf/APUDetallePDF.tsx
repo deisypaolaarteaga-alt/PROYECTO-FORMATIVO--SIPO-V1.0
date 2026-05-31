@@ -41,10 +41,10 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     fontSize: 9,
   },
-  
+
   // Tablas
   section: {
-    marginBottom: 12,
+    marginBottom: 8,
     marginTop: 4,
   },
   sectionTitle: {
@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E2DDD6',
     paddingVertical: 4,
     paddingHorizontal: 4,
-    minHeight: 18,
+    minHeight: 16,
     alignItems: 'center',
   },
   tableRowAlternate: {
@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#1C2B3A',
   },
-  
+
   notaReferencia: {
     marginTop: 8,
     paddingTop: 6,
@@ -163,10 +163,14 @@ const styles = StyleSheet.create({
   },
 });
 
+// Detecta ítems genéricos o de referencia por nombre
+const esItemReferencia = (nombre: string | null | undefined) =>
+  /actividad general|general de obra/i.test(nombre || '');
+
 interface Props {
   projectName: string;
   activity: Activity;
-  configAiu?: ConfigAIU; // Por si hay AIU a nivel de APU, aunque en algunos contratos se suma al final, pero se pide mostrarlo.
+  configAiu?: ConfigAIU;
   parametros?: ParametrosFiscales;
   chapterNumber: number;
   activityIndex?: number; // Índice secuencial 1-based; si se provee, reemplaza activity.numero
@@ -197,9 +201,9 @@ export const APUDetallePDF = ({ projectName, activity, parametros, chapterNumber
   // Numeración dinámica de secciones — solo se incrementa si la sección existe
   let sectionNum = 0;
 
-  // Detecta si algún ítem tiene nombre genérico (importado del catálogo sin editar)
+  // Detecta si algún ítem tiene nombre genérico o de referencia
   const tieneItemsGenericos = [...itemsEquipo, ...itemsMaterial, ...itemsMO].some(
-    item => /actividad general|sin definir|por definir/i.test(item.nombre || '')
+    item => /actividad general|general de obra|sin definir|por definir/i.test(item.nombre || '')
   );
 
   return (
@@ -247,7 +251,12 @@ export const APUDetallePDF = ({ projectName, activity, parametros, chapterNumber
             </View>
             {itemsEquipo.map((item, i) => (
               <View key={item.id} style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlternate : {}]}>
-                <Text style={styles.colDesc}>{item.nombre}</Text>
+                <Text style={styles.colDesc}>
+                  {item.nombre}
+                  {esItemReferencia(item.nombre) ? (
+                    <Text style={{ color: '#888888', fontStyle: 'italic', fontSize: 7 }}> (referencia)</Text>
+                  ) : null}
+                </Text>
                 <Text style={styles.colUnd}>{item.unidad}</Text>
                 <Text style={styles.colCant}>{item.cantidad}</Text>
                 <Text style={styles.colVrUnit}>{formatoCOP(item.precio_unitario)}</Text>
@@ -276,7 +285,12 @@ export const APUDetallePDF = ({ projectName, activity, parametros, chapterNumber
             </View>
             {itemsMaterial.map((item, i) => (
               <View key={item.id} style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlternate : {}]}>
-                <Text style={styles.colDesc}>{item.nombre}</Text>
+                <Text style={styles.colDesc}>
+                  {item.nombre}
+                  {esItemReferencia(item.nombre) ? (
+                    <Text style={{ color: '#888888', fontStyle: 'italic', fontSize: 7 }}> (referencia)</Text>
+                  ) : null}
+                </Text>
                 <Text style={styles.colUnd}>{item.unidad}</Text>
                 <Text style={styles.colCant}>{item.cantidad}</Text>
                 <Text style={styles.colVrUnit}>{formatoCOP(item.precio_unitario)}</Text>
@@ -305,7 +319,12 @@ export const APUDetallePDF = ({ projectName, activity, parametros, chapterNumber
             </View>
             {itemsMO.map((item, i) => (
               <View key={item.id} style={[styles.tableRow, i % 2 === 1 ? styles.tableRowAlternate : {}]}>
-                <Text style={styles.colDesc}>{item.nombre}</Text>
+                <Text style={styles.colDesc}>
+                  {item.nombre}
+                  {esItemReferencia(item.nombre) ? (
+                    <Text style={{ color: '#888888', fontStyle: 'italic', fontSize: 7 }}> (referencia)</Text>
+                  ) : null}
+                </Text>
                 <Text style={styles.colUnd}>{item.unidad}</Text>
                 <Text style={styles.colCant}>{item.cantidad}</Text>
                 <Text style={styles.colVrUnit}>{formatoCOP(item.precio_unitario)}</Text>
@@ -361,7 +380,7 @@ export const APUDetallePDF = ({ projectName, activity, parametros, chapterNumber
 
       <View style={styles.footer} fixed>
         <Text style={styles.footerText}>
-          Los precios incluyen todos los costos directos e indirectos. Las retenciones son responsabilidad del contratante. 
+          Los precios incluyen todos los costos directos e indirectos. Las retenciones son responsabilidad del contratante.
           Factor prestacional según normativa colombiana.
         </Text>
         <Text style={styles.footerText} render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`} />

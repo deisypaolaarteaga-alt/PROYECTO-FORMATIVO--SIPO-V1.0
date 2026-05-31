@@ -26,6 +26,7 @@ interface EditarProyectoModalProps {
     tipo_obra?: string | null;
     cliente_id?: string | null;
     cliente_nombre?: string | null;
+    area_m2?: number | null;
   };
 }
 
@@ -38,6 +39,7 @@ export function EditarProyectoModal({ isOpen, onClose, proyecto }: EditarProyect
   const [ubicacion,   setUbicacion]   = useState(proyecto.ubicacion   ?? '');
   const [tipoObra,    setTipoObra]    = useState(proyecto.tipo_obra   ?? '');
   const [clienteId,   setClienteId]   = useState<string | null>(proyecto.cliente_id ?? null);
+  const [areaM2,      setAreaM2]      = useState(proyecto.area_m2 != null ? String(proyecto.area_m2) : '');
   const [saving,      setSaving]      = useState(false);
   const [error,       setError]       = useState('');
   const [nombreError, setNombreError] = useState('');
@@ -47,12 +49,14 @@ export function EditarProyectoModal({ isOpen, onClose, proyecto }: EditarProyect
     if (!ubicacion.trim()) { setError('La ciudad es obligatoria.'); return; }
     setSaving(true);
     setError('');
+    const areaM2Num = areaM2.trim() ? Number(areaM2.trim()) : undefined;
     const result = await actualizarProyecto(proyecto.id, {
       nombre:      nombre.trim(),
       descripcion: descripcion.trim() || undefined,
       ubicacion:   ubicacion.trim(),
       tipo_obra:   tipoObra || null,
       cliente_id:  clienteId ?? null,
+      ...(areaM2Num !== undefined && { area_m2: areaM2Num }),
     });
     setSaving(false);
     if (result.success) {
@@ -103,6 +107,19 @@ export function EditarProyectoModal({ isOpen, onClose, proyecto }: EditarProyect
             onChange={setTipoObra}
             label="Tipo de obra"
           />
+
+          <div>
+            <label className="block text-xs font-medium text-neutral-600 mb-1">Área (m²)</label>
+            <input
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={areaM2}
+              onChange={e => setAreaM2(e.target.value)}
+              className={fieldCls}
+              placeholder="Ej. 250.5"
+            />
+          </div>
 
           <div>
             <label className="block text-xs font-medium text-neutral-600 mb-1">Cliente</label>

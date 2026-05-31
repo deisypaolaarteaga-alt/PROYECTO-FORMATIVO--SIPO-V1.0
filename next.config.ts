@@ -22,18 +22,20 @@ const supabaseHost = getSupabaseHost();
 const cspParts = [
   "default-src 'self'",
   isDev
-    ? "script-src 'self' 'unsafe-eval' 'unsafe-inline'"
-    : "script-src 'self' 'unsafe-inline'",
+    ? "script-src 'self' 'unsafe-eval' 'unsafe-inline' 'wasm-unsafe-eval'"
+    : "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'",
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob: https://${supabaseHost}`,
   [
-    "connect-src 'self'",
+    "connect-src 'self' blob:",
     `https://${supabaseHost}`,
     `wss://${supabaseHost}`,
     isDev ? 'ws://localhost:* http://localhost:*' : '',
   ].filter(Boolean).join(' '),
   "font-src 'self' data:",
-  "object-src 'none'",
+  "frame-src 'self' blob:",
+  "worker-src 'self' blob:",
+  "object-src blob:",
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'none'",

@@ -257,19 +257,18 @@ export async function crearPresupuestoConPlantilla(
 
     const admin = createAdminClient();
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('municipio, ciudad')
-      .eq('id', user.id)
-      .single();
+    const [{ data: profile }, { data: proyectoData }] = await Promise.all([
+      supabase.from('profiles').select('municipio, ciudad').eq('id', user.id).single(),
+      supabase.from('projects').select('ubicacion').eq('id', projectId).single(),
+    ]);
 
-    const ciudadFinal = ciudadObra || profile?.municipio || profile?.ciudad || 'Bogotá D.C.';
+    const ciudadFinal = proyectoData?.ubicacion || ciudadObra || profile?.municipio || profile?.ciudad || 'Bogotá D.C.';
     const { data: munData } = await supabase
       .from('municipios')
       .select('reteica_pct')
       .eq('nombre', ciudadFinal)
       .maybeSingle();
-    const icaPct = munData?.reteica_pct != null ? Number(munData.reteica_pct) : 0.5;
+    const icaPct = munData?.reteica_pct != null ? Number(munData.reteica_pct) : 0;
 
     // ── 1. Crear el presupuesto ───────────────────────────────────────────────
     const { data: budget, error: budgetErr } = await admin

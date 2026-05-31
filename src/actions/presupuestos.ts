@@ -7,14 +7,14 @@ import { revalidatePath } from 'next/cache';
 import type { ActionResult } from '@/types';
 import Decimal from 'decimal.js';
 
-// Busca la tasa ReteICA en la tabla municipios. Default 0.5% si no se encuentra.
-async function lookupReteICA(supabase: Awaited<ReturnType<typeof createClient>>, ciudad: string): Promise<number> {
+// Busca la tasa ReteICA en la tabla municipios. Retorna null si la ciudad no está registrada.
+async function lookupReteICA(supabase: Awaited<ReturnType<typeof createClient>>, ciudad: string): Promise<number | null> {
   const { data } = await supabase
     .from('municipios')
     .select('reteica_pct')
     .eq('nombre', ciudad)
     .maybeSingle();
-  return data?.reteica_pct != null ? Number(data.reteica_pct) : 0.5;
+  return data?.reteica_pct != null ? Number(data.reteica_pct) : null;
 }
 
 /**
@@ -34,14 +34,13 @@ export async function crearPresupuesto(
     const rateLimit = checkRateLimit(user.id);
     if (!rateLimit.success) return { success: false, error: 'Límite de solicitudes excedido.' };
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('municipio, ciudad')
-      .eq('id', user.id)
-      .single();
+    const [{ data: profile }, { data: proyectoData }] = await Promise.all([
+      supabase.from('profiles').select('municipio, ciudad').eq('id', user.id).single(),
+      supabase.from('projects').select('ubicacion').eq('id', projectId).single(),
+    ]);
 
-    const ciudadFinal = ciudadObra || profile?.municipio || profile?.ciudad || 'Bogotá D.C.';
-    const icaPct = await lookupReteICA(supabase, ciudadFinal);
+    const ciudadFinal = proyectoData?.ubicacion || ciudadObra || profile?.municipio || profile?.ciudad || 'Bogotá D.C.';
+    const icaPct = (await lookupReteICA(supabase, ciudadFinal)) ?? 0;
 
     const validated = presupuestoSchema.parse({
       titulo,
@@ -111,6 +110,7 @@ export async function obtenerPresupuesto(budgetId: string) {
         projects(
           nombre,
           ubicacion,
+          area_m2,
           cliente_id,
           cliente_nombre,
           tipo_obra,
@@ -156,6 +156,21 @@ export async function obtenerPresupuesto(budgetId: string) {
               apus: apusByActivityId[act.id] ? [apusByActivityId[act.id]] : [],
             })),
         }));
+    }
+
+    // Sincronizar ica_pct al abrir: si la ciudad está en municipios y la tasa cambió, actualizar.
+    // Si la ciudad no está registrada → dejar el valor manual existente.
+    if (data.ciudad_ica) {
+      const icaDesde = await lookupReteICA(supabase, data.ciudad_ica);
+      if (icaDesde !== null && icaDesde !== Number(data.ica_pct)) {
+        await supabase
+          .from('budgets')
+          .update({ ica_pct: icaDesde, updated_at: new Date().toISOString() })
+          .eq('id', budgetId)
+          .eq('user_id', user.id)
+          .is('deleted_at', null);
+        data.ica_pct = icaDesde;
+      }
     }
 
     return { data };
@@ -895,11 +910,21 @@ export async function actualizarCiudadICA(
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { success: false, error: 'No autorizado.' };
 
-    const icaPct = await lookupReteICA(supabase, ciudad);
+    const icaDesde = await lookupReteICA(supabase, ciudad);
+
+    // Solo actualizar ica_pct si la ciudad está en la tabla municipios.
+    // Si no está registrada, actualizar solo ciudad_ica y dejar el valor manual intacto.
+    const updateFields: Record<string, unknown> = {
+      ciudad_ica: ciudad,
+      updated_at: new Date().toISOString(),
+    };
+    if (icaDesde !== null) {
+      updateFields.ica_pct = icaDesde;
+    }
 
     const { error } = await supabase
       .from('budgets')
-      .update({ ciudad_ica: ciudad, ica_pct: icaPct, updated_at: new Date().toISOString() })
+      .update(updateFields)
       .eq('id', budgetId)
       .eq('user_id', user.id)
       .is('deleted_at', null);
@@ -907,8 +932,32 @@ export async function actualizarCiudadICA(
     if (error) throw error;
 
     revalidatePath(`/presupuestos/${budgetId}`);
-    return { success: true, data: { ica_pct: icaPct } };
+    return { success: true, data: { ica_pct: icaDesde ?? 0 } };
   } catch {
     return { success: false, error: 'No se pudo actualizar la ciudad ICA.' };
+  }
+}
+
+export async function actualizarVigencia(
+  budgetId: string,
+  dias: number
+): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'No autorizado.' };
+
+    const { error } = await supabase
+      .from('budgets')
+      .update({ vigencia_dias: dias, updated_at: new Date().toISOString() })
+      .eq('id', budgetId)
+      .eq('user_id', user.id)
+      .is('deleted_at', null);
+
+    if (error) throw error;
+    revalidatePath(`/presupuestos/${budgetId}`);
+    return { success: true };
+  } catch {
+    return { success: false, error: 'No se pudo actualizar la vigencia.' };
   }
 }

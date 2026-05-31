@@ -207,7 +207,7 @@ const TRANSICIONES_PROYECTO: Record<string, string[]> = {
   borrador:    ['en_progreso', 'archivado'],
   en_progreso: ['finalizado', 'archivado'],
   finalizado:  ['archivado'],
-  archivado:   [],
+  archivado:   ['en_progreso'],
 };
 
 /**

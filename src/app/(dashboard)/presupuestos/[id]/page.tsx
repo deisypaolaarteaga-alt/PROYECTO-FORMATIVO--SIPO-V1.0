@@ -1,6 +1,6 @@
-import { obtenerPresupuesto } from '@/actions/presupuestos';
+import { obtenerPresupuesto, actualizarPresupuesto } from '@/actions/presupuestos';
 import { EditorPresupuesto } from '@/components/presupuestos/EditorPresupuesto';
-import { notFound, redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
@@ -10,7 +10,25 @@ export default async function PresupuestoEditorPage({ params }: Props) {
   const { id } = await params;
   const result = await obtenerPresupuesto(id);
   if (!result || !('data' in result) || !result.data) notFound();
-  const budget = result.data;
+  let budget = result.data;
+
+  // Auto-archivado: si la vigencia venció y no está aprobado ni archivado → archivar
+  const vigenciaDias = Number(budget.vigencia_dias ?? 0);
+  if (
+    vigenciaDias > 0 &&
+    budget.created_at &&
+    !['aprobado', 'archivado'].includes(budget.estado ?? '')
+  ) {
+    const fechaVenc = new Date(budget.created_at);
+    fechaVenc.setDate(fechaVenc.getDate() + vigenciaDias);
+    if (new Date() > fechaVenc) {
+      await actualizarPresupuesto(budget.id, { estado: 'archivado' });
+      const refreshed = await obtenerPresupuesto(id);
+      if (refreshed && 'data' in refreshed && refreshed.data) {
+        budget = refreshed.data;
+      }
+    }
+  }
 
   const { createClient: getServerClient } = await import('@/lib/supabase/server');
   const supabase = await getServerClient();

@@ -193,7 +193,7 @@ export function ModalNuevoPresupuesto({
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-steel-dark/60 backdrop-blur-sm animate-fade-in" onClick={onClose} />
+      <div className="absolute inset-0 bg-steel-dark/60 backdrop-blur-sm animate-fade-in" onClick={() => { if (!loading) onClose(); }} />
 
       {/* Modal */}
       <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden animate-scale-in">
@@ -213,7 +213,11 @@ export function ModalNuevoPresupuesto({
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-concrete rounded-full transition-colors">
+          <button
+            onClick={() => { if (!loading) onClose(); }}
+            disabled={loading}
+            className="p-2 hover:bg-concrete rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
             <X className="h-4 w-4 text-stone" />
           </button>
         </div>
@@ -372,7 +376,7 @@ export function ModalNuevoPresupuesto({
                   fullWidth
                   onClick={() => startingPoint === 'template' ? setStep(3) : handleCreate()}
                   className="h-12 text-[15px]"
-                  loading={loading && startingPoint !== 'template'}
+                  loading={loading}
                 >
                   {startingPoint === 'template' ? 'Seleccionar tipo de obra' : 'Crear Presupuesto'}
                 </Button>
@@ -481,9 +485,11 @@ export function ModalNuevoPresupuesto({
                   onClick={handleCreate}
                   className="h-12 text-[15px]"
                 >
-                  {customChapters.length > 0
-                    ? `Crear con ${customChapters.length} capítulos`
-                    : 'Crear presupuesto en blanco'}
+                  {loading
+                    ? 'Creando presupuesto con plantilla…'
+                    : customChapters.length > 0
+                      ? `Crear con ${customChapters.length} capítulos`
+                      : 'Crear presupuesto en blanco'}
                 </Button>
               </div>
             </div>

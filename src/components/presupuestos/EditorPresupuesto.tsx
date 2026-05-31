@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronRight, Plus, Trash2,
   Loader2, FileText, Settings, BookOpen, Package,
   Calendar, Check, Copy, GripVertical, MoreHorizontal, TrendingUp,
-  CheckCircle2, LockOpen,
+  CheckCircle2, LockOpen, Eye,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/shared/Button';
@@ -26,10 +26,12 @@ import {
 import { formatearCOP } from '@/lib/utils/formato-cop';
 import dynamic from 'next/dynamic';
 const PanelAPU = dynamic(() => import('./PanelAPU').then(m => ({ default: m.PanelAPU })), { ssr: false });
+const ModalVistaPrevia = dynamic(
+  () => import('./ModalVistaPrevia').then(m => ({ default: m.ModalVistaPrevia })),
+  { ssr: false }
+);
 import { ResumenFinanciero } from './ResumenFinanciero';
 import { ResumenFinancieroTab } from './ResumenFinancieroTab';
-import { BotonExportarPDF } from '@/components/pdf/BotonExportarPDF';
-import { BotonExportarExcel } from '@/components/pdf/BotonExportarExcel';
 import { ModalCatalogo } from './ModalCatalogo';
 import { BotonEnviarRevision } from './BotonEnviarRevision';
 import { EstadoBadge } from './EstadoBadge';
@@ -70,6 +72,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
     confirmLabel?: string; variant?: 'danger' | 'warning';
   } | null>(null);
   const [catalogoOpen, setCatalogoOpen] = useState(false);
+  const [vistaPreviaOpen, setVistaPreviaOpen] = useState(false);
   const [bannerCiudadIgnorado, setBannerCiudadIgnorado] = useState(false);
   const [isChangingEstado, setIsChangingEstado] = useState(false);
   const [newChapterId, setNewChapterId] = useState<string | null>(null);
@@ -156,6 +159,20 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
   const fechaValidezFormateada = fechaValidez ? new Intl.DateTimeFormat('es-CO', {
     day: '2-digit', month: 'short', year: 'numeric', timeZone: 'America/Bogota',
   }).format(fechaValidez) : null;
+
+  const fechaElaboracion = budget.created_at
+    ? new Intl.DateTimeFormat('es-CO', {
+        day: '2-digit', month: 'short', year: 'numeric', timeZone: 'America/Bogota',
+      }).format(new Date(budget.created_at))
+    : null;
+
+  const TIPO_OBRA_LABELS: Record<string, string> = {
+    residencial: 'Residencial', comercial: 'Comercial', infraestructura: 'Infraestructura',
+    hotelero: 'Hotelero', industrial: 'Industrial', institucional: 'Institucional', otro: 'Otro',
+  };
+  const tipoObraLabel = budget.projects?.tipo_obra
+    ? (TIPO_OBRA_LABELS[budget.projects.tipo_obra as string] ?? budget.projects.tipo_obra)
+    : null;
 
   const toggleChapter = useCallback((id: string) => {
     setExpanded(prev => {
@@ -384,11 +401,29 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                   fechaActualizacion={budget.updated_at}
                 />
               </div>
-              {fechaValidezFormateada && (
-                <p className="flex items-center gap-1.5 text-[11px] text-[#6B7A8D] mt-1">
-                  <Calendar className="h-3 w-3" />
-                  Válido hasta <span className="font-semibold text-[#1F2937]">{fechaValidezFormateada}</span>
-                </p>
+              {(tipoObraLabel || (budget as any).projects?.area_m2 || fechaElaboracion || fechaValidezFormateada) && (
+                <div className="flex items-center gap-4 text-[11px] text-[#6B7A8D] mt-1 flex-wrap">
+                  {tipoObraLabel && (
+                    <span className="font-medium text-[#5A5248]">{tipoObraLabel}</span>
+                  )}
+                  {(budget as any).projects?.area_m2 && (
+                    <span className="px-1.5 py-0.5 rounded bg-[#EBF2FA] text-[#1E4D8C] font-semibold text-[10px]">
+                      {(budget as any).projects.area_m2} m²
+                    </span>
+                  )}
+                  {fechaElaboracion && (
+                    <span className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      Elaborado: <span className="font-semibold text-[#1F2937] ml-1">{fechaElaboracion}</span>
+                    </span>
+                  )}
+                  {fechaValidezFormateada && (
+                    <span className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      Válido hasta: <span className="font-semibold text-[#1F2937] ml-1">{fechaValidezFormateada}</span>
+                    </span>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -414,8 +449,14 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                 </div>
               )}
 
-              <BotonExportarExcel budget={budget} profile={profile} />
-              <BotonExportarPDF budget={budget} profile={profile} />
+              <Button
+                onClick={() => setVistaPreviaOpen(true)}
+                variant="ghost"
+                size="sm"
+                icon={<Eye className="h-4 w-4" />}
+              >
+                Vista previa
+              </Button>
 
               {/* Marcar como aprobado — solo cuando en revisión */}
               {estaEnRevision && (
@@ -843,6 +884,60 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                     <p className="text-[10px] text-stone italic">Aplica 19% sobre la utilidad calculada.</p>
                   </div>
                 </div>
+
+                {/* ReteICA según ciudad de la obra */}
+                <div className="space-y-2 border-t border-[#E8E4DE] pt-4">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-stone uppercase tracking-widest">
+                      ReteICA Municipal
+                    </label>
+                    {budget.ciudad_ica && (
+                      <span className="text-[10px] text-[#166534] bg-[#EBFAF0] px-1.5 py-0.5 rounded font-medium truncate max-w-[140px]">
+                        {budget.ciudad_ica}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      step="0.001"
+                      min="0"
+                      value={budget.ica_pct ?? 0}
+                      onChange={(e) => handleUpdateBudget({ ica_pct: parseFloat(e.target.value) || 0 })}
+                      className="w-full h-9 bg-[#F5F2EE] border border-[#E8E4DE] rounded-lg px-3 focus:ring-1 focus:ring-[#C84B1A]/40 font-semibold text-sm text-[#1C1814]"
+                    />
+                    <span className="text-sm font-semibold text-[#6B7A8D]">%</span>
+                  </div>
+                  <p className="text-[10px] text-stone italic">
+                    {budget.ciudad_ica
+                      ? `${budget.ciudad_ica} — ${budget.ica_pct ?? 0}% (automático). Editable para ajustar.`
+                      : 'Edita para ajustar manualmente.'}
+                  </p>
+                </div>
+
+                {/* Vigencia del presupuesto */}
+                <div className="space-y-2 border-t border-[#E8E4DE] pt-4">
+                  <label className="text-[10px] font-bold text-stone uppercase tracking-widest">
+                    Vigencia (días)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={vigenciaDias || ''}
+                      onChange={e => handleUpdateBudget({ vigencia_dias: Math.max(1, parseInt(e.target.value) || 1) })}
+                      className="w-full h-9 bg-[#F5F2EE] border border-[#E8E4DE] rounded-lg px-3 focus:ring-1 focus:ring-[#C84B1A]/40 font-semibold text-sm text-[#1C1814]"
+                      placeholder="30"
+                    />
+                    <span className="text-sm font-semibold text-[#6B7A8D] shrink-0">días</span>
+                  </div>
+                  <p className="text-[10px] text-stone italic">
+                    {fechaValidezFormateada
+                      ? `Válido hasta el ${fechaValidezFormateada}.`
+                      : 'Sin vigencia definida — el presupuesto no vence.'}
+                  </p>
+                </div>
               </div>
 
               {/* Resumen rápido */}
@@ -871,13 +966,6 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
 
               {/* Resumen Financiero Sticky */}
               <ResumenFinanciero budget={budget} />
-              <div className="bg-white p-5 rounded-xl border border-[#E8E4DE]">
-                <h3 className="text-xs font-bold text-[#1C1814] uppercase tracking-[0.15em] mb-3">Exportar Presupuesto</h3>
-                <div className="flex flex-col gap-2">
-                  <BotonExportarPDF budget={budget} profile={profile} />
-                  <BotonExportarExcel budget={budget} profile={profile} />
-                </div>
-              </div>
           </div> {/* Fin Columna Derecha */}
         </fieldset>
         </div>
@@ -910,6 +998,14 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
         }}
         activity={activeApuActivity!}
         budgetId={budget.id}
+      />
+
+      <ModalVistaPrevia
+        open={vistaPreviaOpen}
+        onClose={() => setVistaPreviaOpen(false)}
+        budget={budget}
+        chapters={budget.chapters}
+        profile={profile}
       />
     </div>
   );

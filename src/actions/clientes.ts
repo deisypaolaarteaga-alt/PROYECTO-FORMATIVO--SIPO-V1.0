@@ -9,10 +9,11 @@ import type { ActionResult, Cliente } from '@/types';
 /**
  * Listar clientes del usuario con estadísticas de proyectos
  */
-export async function getClientes(filtros?: { 
-  busqueda?: string; 
-  tipo?: string; 
-  ciudad?: string 
+export async function getClientes(filtros?: {
+  busqueda?: string;
+  tipo?: string;
+  ciudad?: string;
+  mostrarInactivos?: boolean;
 }) {
   try {
     const supabase = await createClient();
@@ -31,8 +32,11 @@ export async function getClientes(filtros?: {
         )
       `)
       .eq('user_id', user.id)
-      .eq('activo', true)
       .order('nombre_razon_social', { ascending: true });
+
+    if (!filtros?.mostrarInactivos) {
+      query = query.eq('activo', true);
+    }
 
     if (filtros?.busqueda) {
       query = query.or(`nombre_razon_social.ilike.%${filtros.busqueda}%,nit_cedula.ilike.%${filtros.busqueda}%`);
@@ -241,6 +245,31 @@ export async function reactivarCliente(clienteId: string): Promise<ActionResult>
   } catch (error: any) {
     console.error('[reactivarCliente] error:', error);
     return { success: false, error: 'Error al reactivar cliente' };
+  }
+}
+
+/**
+ * Cambiar estado activo/inactivo de un cliente
+ */
+export async function toggleActivoCliente(clienteId: string, activo: boolean): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'No autorizado' };
+
+    const { error } = await supabase
+      .from('clientes')
+      .update({ activo, updated_at: new Date().toISOString() })
+      .eq('id', clienteId)
+      .eq('user_id', user.id);
+
+    if (error) throw error;
+
+    revalidatePath('/clientes');
+    return { success: true };
+  } catch (error: any) {
+    console.error('[toggleActivoCliente] error:', error);
+    return { success: false, error: 'Error al cambiar estado del cliente' };
   }
 }
 

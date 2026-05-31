@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Search, Building2, User, MoreVertical,
-  Edit, Trash2, ExternalLink, Plus, Download,
+  Edit, UserX, UserCheck, ExternalLink, Plus, Download,
   ChevronLeft, ChevronRight,
   ChevronDown, MapPin, Loader2,
 } from 'lucide-react';
@@ -17,7 +17,7 @@ import {
 } from '@/components/shared/DropdownMenu';
 import { ModalCliente } from './ModalCliente';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
-import { desactivarCliente, getClientes } from '@/actions/clientes';
+import { toggleActivoCliente, getClientes } from '@/actions/clientes';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
 
@@ -134,22 +134,24 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
   const [busqueda, setBusqueda] = useState('');
   const [filtroTipo, setFiltroTipo] = useState('todos');
   const [filtroCiudad, setFiltroCiudad] = useState('todas');
+  const [mostrarInactivos, setMostrarInactivos] = useState(false);
   const [pagina, setPagina] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [clienteAEditar, setClienteAEditar] = useState<any>(undefined);
-  const [confirmEliminar, setConfirmEliminar] = useState<{ id: string; nombre: string } | null>(null);
+  const [confirmInhabilitar, setConfirmInhabilitar] = useState<{ id: string; nombre: string } | null>(null);
   const [isPending, startTransition] = useTransition();
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const router = useRouter();
 
-  // Cuando el server hace refresh (crear/editar/eliminar), sincroniza el sidebar y resetea la tabla
+  // Cuando el server hace refresh (crear/editar/toggle), sincroniza el sidebar y resetea la tabla
   useEffect(() => {
     setAllClientes(initialClientes);
     setFilteredClientes(initialClientes);
     setBusqueda('');
     setFiltroTipo('todos');
     setFiltroCiudad('todas');
+    setMostrarInactivos(false);
     setPagina(1);
   }, [initialClientes]);
 
@@ -159,12 +161,13 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
     return Array.from(set).sort() as string[];
   }, [allClientes]);
 
-  function fetchFiltered(q: string, tipo: string, ciudad: string) {
+  function fetchFiltered(q: string, tipo: string, ciudad: string, inactivos: boolean) {
     startTransition(async () => {
       const data = await getClientes({
         busqueda: q || undefined,
         tipo: tipo !== 'todos' ? tipo : undefined,
         ciudad: ciudad !== 'todas' ? ciudad : undefined,
+        mostrarInactivos: inactivos,
       });
       setFilteredClientes(data);
     });
@@ -174,19 +177,26 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
     setBusqueda(q);
     setPagina(1);
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    searchTimeoutRef.current = setTimeout(() => fetchFiltered(q, filtroTipo, filtroCiudad), 300);
+    searchTimeoutRef.current = setTimeout(() => fetchFiltered(q, filtroTipo, filtroCiudad, mostrarInactivos), 300);
   }
 
   function handleFiltroTipo(tipo: string) {
     setFiltroTipo(tipo);
     setPagina(1);
-    fetchFiltered(busqueda, tipo, filtroCiudad);
+    fetchFiltered(busqueda, tipo, filtroCiudad, mostrarInactivos);
   }
 
   function handleFiltroCiudad(ciudad: string) {
     setFiltroCiudad(ciudad);
     setPagina(1);
-    fetchFiltered(busqueda, filtroTipo, ciudad);
+    fetchFiltered(busqueda, filtroTipo, ciudad, mostrarInactivos);
+  }
+
+  function handleToggleMostrarInactivos() {
+    const next = !mostrarInactivos;
+    setMostrarInactivos(next);
+    setPagina(1);
+    fetchFiltered(busqueda, filtroTipo, filtroCiudad, next);
   }
 
   const totalPaginas = Math.max(1, Math.ceil(filteredClientes.length / PAGE_SIZE));
@@ -206,18 +216,26 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
     [allClientes],
   );
 
-  async function handleDesactivar() {
-    if (!confirmEliminar) return;
-    const { id } = confirmEliminar;
-    setConfirmEliminar(null);
-    const res = await desactivarCliente(id);
+  async function handleInhabilitar() {
+    if (!confirmInhabilitar) return;
+    const { id } = confirmInhabilitar;
+    setConfirmInhabilitar(null);
+    const res = await toggleActivoCliente(id, false);
     if (res.success) {
-      toast.success('Cliente eliminado');
-      setAllClientes(prev => prev.filter(c => c.id !== id));
-      setFilteredClientes(prev => prev.filter(c => c.id !== id));
+      toast.success('Cliente inhabilitado');
       router.refresh();
     } else {
-      toast.error(res.error || 'Error al eliminar cliente');
+      toast.error(res.error || 'Error al inhabilitar cliente');
+    }
+  }
+
+  async function handleHabilitar(clienteId: string) {
+    const res = await toggleActivoCliente(clienteId, true);
+    if (res.success) {
+      toast.success('Cliente habilitado');
+      router.refresh();
+    } else {
+      toast.error(res.error || 'Error al habilitar cliente');
     }
   }
 
@@ -314,6 +332,19 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
             </DropdownMenu>
           )}
 
+          {/* Toggle inactivos */}
+          <button
+            type="button"
+            onClick={handleToggleMostrarInactivos}
+            className={`h-8 px-3 rounded-lg text-[12px] font-medium transition-colors whitespace-nowrap ${
+              mostrarInactivos
+                ? 'bg-[#374151] text-white shadow-sm'
+                : 'bg-white border border-[#E8E4DE] text-[#6B7280] hover:border-[#374151] hover:text-[#374151]'
+            }`}
+          >
+            {mostrarInactivos ? 'Ocultar inactivos' : 'Mostrar inactivos'}
+          </button>
+
           <div className="flex-1" />
 
           {/* Exportar */}
@@ -400,7 +431,7 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
                     return (
                       <tr
                         key={cliente.id}
-                        className="hover:bg-[#F5F0EA] transition-colors group"
+                        className={`hover:bg-[#F5F0EA] transition-colors group ${cliente.activo === false ? 'opacity-60' : ''}`}
                       >
                         {/* Cliente */}
                         <td className="px-5 py-3.5">
@@ -467,22 +498,39 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
 
                         {/* Estado — pill badge */}
                         <td className="px-4 py-3.5 whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#F0FDF4] text-[#15803D] border border-[#BBF7D0]">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#22C55E] flex-shrink-0" />
-                            Activo
-                          </span>
+                          {cliente.activo !== false ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#F0FDF4] text-[#15803D] border border-[#BBF7D0]">
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#22C55E] flex-shrink-0" />
+                              Activo
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#F3F4F6] text-[#6B7280] border border-[#E5E7EB]">
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#9CA3AF] flex-shrink-0" />
+                              Inactivo
+                            </span>
+                          )}
                         </td>
 
                         {/* Acciones */}
                         <td className="px-3 py-3.5">
                           <div className="flex items-center justify-end gap-1">
-                            <button
-                              aria-label="Eliminar cliente"
-                              onClick={() => setConfirmEliminar({ id: cliente.id, nombre: cliente.nombre_razon_social })}
-                              className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+                            {cliente.activo !== false ? (
+                              <button
+                                aria-label="Inhabilitar cliente"
+                                onClick={() => setConfirmInhabilitar({ id: cliente.id, nombre: cliente.nombre_razon_social })}
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all"
+                              >
+                                <UserX className="h-4 w-4" />
+                              </button>
+                            ) : (
+                              <button
+                                aria-label="Habilitar cliente"
+                                onClick={() => handleHabilitar(cliente.id)}
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all"
+                              >
+                                <UserCheck className="h-4 w-4" />
+                              </button>
+                            )}
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <button className="p-1.5 rounded-lg hover:bg-[#F3F4F6] text-[#9CA3AF] hover:text-[#374151] opacity-40 group-hover:opacity-100 focus:opacity-100 transition-all">
@@ -502,13 +550,23 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
                                   <Edit className="h-4 w-4 mr-2" />
                                   Editar
                                 </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => setConfirmEliminar({ id: cliente.id, nombre: cliente.nombre_razon_social })}
-                                  className="text-red-600 focus:bg-red-50 focus:text-red-700"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Eliminar
-                                </DropdownMenuItem>
+                                {cliente.activo !== false ? (
+                                  <DropdownMenuItem
+                                    onClick={() => setConfirmInhabilitar({ id: cliente.id, nombre: cliente.nombre_razon_social })}
+                                    className="text-red-600 focus:bg-red-50 focus:text-red-700"
+                                  >
+                                    <UserX className="h-4 w-4 mr-2" />
+                                    Inhabilitar
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem
+                                    onClick={() => handleHabilitar(cliente.id)}
+                                    className="text-green-700 focus:bg-green-50 focus:text-green-800"
+                                  >
+                                    <UserCheck className="h-4 w-4 mr-2" />
+                                    Habilitar
+                                  </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </div>
@@ -650,12 +708,12 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
       </div>
 
       <ConfirmDialog
-        open={!!confirmEliminar}
-        title="Eliminar cliente"
-        description="¿Eliminar este cliente? Esta acción no se puede deshacer."
-        confirmLabel="Eliminar"
-        onConfirm={handleDesactivar}
-        onCancel={() => setConfirmEliminar(null)}
+        open={!!confirmInhabilitar}
+        title="Inhabilitar cliente"
+        description={`¿Inhabilitar a "${confirmInhabilitar?.nombre}"? No aparecerá en selectores ni en la lista principal, pero puedes reactivarlo en cualquier momento.`}
+        confirmLabel="Inhabilitar"
+        onConfirm={handleInhabilitar}
+        onCancel={() => setConfirmInhabilitar(null)}
       />
 
       <ModalCliente

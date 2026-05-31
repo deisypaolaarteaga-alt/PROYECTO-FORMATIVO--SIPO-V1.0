@@ -200,7 +200,7 @@ export default function ParametrosFiscalesPage() {
                 </div>
               </div>
               <div className="space-y-1.5 border-t border-[#D0D4DB] pt-4">
-                <label className="text-xs font-bold text-[#6B7A8D] uppercase">ReteICA Municipal</label>
+                <label className="text-xs font-bold text-[#6B7A8D] uppercase">ReteICA por defecto (si ciudad no está registrada)</label>
                 <div className="flex gap-3">
                   <select value={ciudadIca} onChange={handleCiudadChange} className={cn(inputClass, "flex-1")}>
                     <option value="Bogotá">Bogotá (0.414%)</option>
@@ -226,6 +226,12 @@ export default function ParametrosFiscalesPage() {
                 <p className="text-xs text-[#7A4B00] leading-relaxed">
                   <strong>Las retenciones son informativas.</strong> No aumentan el valor del presupuesto para tu cliente;
                   son descuentos que la empresa o entidad contratante aplica al momento de pagarte para reportar a la DIAN/Municipio.
+                </p>
+              </div>
+              <div className="flex items-start gap-3 p-4 bg-[#EBF2FA] rounded-lg border border-[#A8C4DC]">
+                <Info className="h-5 w-5 text-[#1E4D8C] shrink-0 mt-0.5" />
+                <p className="text-xs text-[#1E4D8C] leading-relaxed">
+                  <strong>El ReteICA se asigna automáticamente por ciudad de la obra.</strong> Al crear o abrir un presupuesto, SIPO busca la tasa en la tabla de municipios según la ciudad donde se ejecuta la obra. El valor por defecto aquí solo aplica cuando esa ciudad no está registrada en dicha tabla.
                 </p>
               </div>
             </div>

@@ -9,6 +9,16 @@ import { ESTADO_PRESUPUESTO_CONFIG } from '@/types';
 
 const PAGE_SIZE = 10;
 
+const TIPO_OBRA_LABEL: Record<string, string> = {
+  residencial:     'Residencial',
+  comercial:       'Comercial',
+  infraestructura: 'Infraestructura',
+  hotelero:        'Hotelero',
+  industrial:      'Industrial',
+  institucional:   'Institucional',
+  otro:            'Otro',
+};
+
 function StatusBadge({ estado }: { estado: string }) {
   const cfg = ESTADO_PRESUPUESTO_CONFIG[estado as keyof typeof ESTADO_PRESUPUESTO_CONFIG]
     ?? ESTADO_PRESUPUESTO_CONFIG.borrador;
@@ -90,6 +100,7 @@ export function PresupuestosTable({ rows, filtro }: { rows: any[]; filtro: strin
             year: 'numeric',
             timeZone: 'America/Bogota',
           });
+          const tipoLabel = r.tipo_obra ? (TIPO_OBRA_LABEL[r.tipo_obra] ?? r.tipo_obra) : null;
 
           const diasColor =
             r.diasRestantes === null
@@ -121,7 +132,7 @@ export function PresupuestosTable({ rows, filtro }: { rows: any[]; filtro: strin
                   {r.titulo}
                 </p>
                 <p className="text-[11px] text-[#9CA3AF] mt-0.5 leading-none">
-                  Creado el {fechaStr}
+                  {[tipoLabel, `Creado el ${fechaStr}`].filter(Boolean).join(' · ')}
                 </p>
               </div>
 

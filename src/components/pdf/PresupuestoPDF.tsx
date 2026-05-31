@@ -5,12 +5,26 @@ import {
   Text,
   View,
   StyleSheet,
-  Image
+  Image,
+  Font,
 } from '@react-pdf/renderer';
+
+// Deshabilitar partición automática de palabras (ej: "INVER-SIONES") en todo el PDF
+Font.registerHyphenationCallback((word) => [word]);
 import Decimal from 'decimal.js';
 import { formatDate } from '@/lib/utils';
 import { formatearCOP } from '@/lib/utils/formato-cop';
 import type { PresupuestoPDFData, ConfigPDFProfesional, PDFExportOptions } from '@/types/pdf';
+
+const TIPO_OBRA_LABEL: Record<string, string> = {
+  residencial:     'Residencial',
+  comercial:       'Comercial',
+  infraestructura: 'Infraestructura',
+  hotelero:        'Hotelero',
+  industrial:      'Industrial',
+  institucional:   'Institucional',
+  otro:            'Otro',
+};
 
 const formatNIT = (nit: string) => {
   if (!nit) return nit;
@@ -29,7 +43,7 @@ const styles = StyleSheet.create({
     color: '#000000',
     backgroundColor: '#ffffff',
   },
-  
+
   // Encabezado
   header: {
     flexDirection: 'row',
@@ -37,7 +51,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 30,
     borderBottomWidth: 2,
-    borderBottomColor: '#1F2937',
+    borderBottomColor: '#D95510',
     paddingBottom: 15,
   },
   logoContainer: {
@@ -55,16 +69,18 @@ const styles = StyleSheet.create({
   },
   companyInfo: {
     alignItems: 'flex-end',
-    width: '60%',
+    flex: 1,
+    minWidth: 250,
   },
   companyName: {
-    fontSize: 14,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#1F2937',
     marginBottom: 4,
+    flexWrap: 'nowrap',
   },
   companyDetails: {
-    fontSize: 9,
+    fontSize: 11,
     color: '#333333',
     textAlign: 'right',
     lineHeight: 1.4,
@@ -112,7 +128,7 @@ const styles = StyleSheet.create({
   },
   tableHeader: {
     flexDirection: 'row',
-    backgroundColor: '#1F2937',
+    backgroundColor: '#1a1a1a',
     color: '#ffffff',
     paddingVertical: 6,
     paddingHorizontal: 4,
@@ -132,7 +148,7 @@ const styles = StyleSheet.create({
     minHeight: 20,
   },
   tableRowAlternate: {
-    backgroundColor: '#FAF0EB',
+    backgroundColor: '#F8F7F5',
   },
   chapterSubtotalRow: {
     flexDirection: 'row',
@@ -241,31 +257,29 @@ const styles = StyleSheet.create({
     backgroundColor: '#E2DDD6',
     paddingHorizontal: 8,
   },
-  
+
   // Firmas
   signatureSection: {
-    marginTop: 50,
+    marginTop: 40,
   },
   signatureIntro: {
     fontSize: 8,
     color: '#555555',
     fontStyle: 'italic',
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
     lineHeight: 1.5,
   },
   signatureRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginTop: 40,
-    paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#D0D4DB',
+    marginTop: 16,
   },
   signatureBox: {
-    width: '44%',
+    width: '48%',
     alignItems: 'center',
+    minHeight: 160,
   },
   signatureText: {
     fontSize: 9,
@@ -274,17 +288,36 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   signatureName: {
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: 'bold',
     color: '#1F2937',
     marginBottom: 3,
     textAlign: 'center',
   },
   signatureRole: {
-    fontSize: 8,
+    fontSize: 10,
     color: '#666666',
     textAlign: 'center',
     marginBottom: 2,
+  },
+  signatureLabel: {
+    fontSize: 9,
+    color: '#AAAAAA',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  signatureCompany: {
+    fontSize: 11,
+    color: '#666666',
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  signatureLine: {
+    width: 220,
+    borderBottomWidth: 1.5,
+    borderBottomColor: '#000',
+    marginTop: 60,
+    marginBottom: 8,
   },
 
   // Pie de página
@@ -362,15 +395,19 @@ export const PresupuestoPDF = ({ budget, profile, options, children }: Props) =>
   // Helper formato moneda: acepta Decimal o number
   const fmtD = (val: Decimal) => formatearCOP(val.toDecimalPlaces(0).toNumber());
   const formatoCOP = (val: number) => formatearCOP(Math.round(val));
-  
+
   const fechaEmision = new Date();
-  const fechaValidez = new Date();
-  fechaValidez.setDate(fechaEmision.getDate() + (options?.vigencia || budget.vigencia_dias || 30));
+  const baseElaboracion = budget.created_at ? new Date(budget.created_at) : fechaEmision;
+  const fechaValidez = new Date(baseElaboracion);
+  fechaValidez.setDate(fechaValidez.getDate() + (options?.vigencia || budget.vigencia_dias || 30));
 
   return (
-    <Document author={profile.nombre_completo || 'SIPO'} title={`Presupuesto - ${budget.titulo}`}>
+    <Document
+      author={profile.nombre_completo || 'SIPO'}
+      title={`Presupuesto - ${budget.titulo}`}
+    >
       <Page size="LETTER" style={styles.page}>
-        
+
         {/* Encabezado */}
         <View style={styles.header}>
           <View style={styles.logoContainer}>
@@ -404,9 +441,9 @@ export const PresupuestoPDF = ({ budget, profile, options, children }: Props) =>
           <View style={styles.projectRow}>
             <Text style={styles.projectLabel}>Cliente:</Text>
             <Text style={styles.projectValue}>
-              {options?.clienteNombre || 
-               (budget.projects as any)?.clientes?.nombre_razon_social || 
-               (budget.projects as any)?.cliente_nombre || 
+              {options?.clienteNombre ||
+               (budget.projects as any)?.clientes?.nombre_razon_social ||
+               (budget.projects as any)?.cliente_nombre ||
                'No especificado'}
             </Text>
           </View>
@@ -416,6 +453,30 @@ export const PresupuestoPDF = ({ budget, profile, options, children }: Props) =>
               <Text style={styles.projectValue}>{(budget.projects as any).clientes.nit_cedula}</Text>
             </View>
           )}
+          {(budget.projects as any)?.tipo_obra && (
+            <View style={styles.projectRow}>
+              <Text style={styles.projectLabel}>Tipo de obra:</Text>
+              <Text style={styles.projectValue}>
+                {TIPO_OBRA_LABEL[(budget.projects as any).tipo_obra] || (budget.projects as any).tipo_obra}
+              </Text>
+            </View>
+          )}
+          {(budget.projects as any)?.area_m2 && (
+            <View style={styles.projectRow}>
+              <Text style={styles.projectLabel}>Área:</Text>
+              <Text style={styles.projectValue}>{(budget.projects as any).area_m2} m²</Text>
+            </View>
+          )}
+          <View style={styles.projectRow}>
+            <Text style={styles.projectLabel}>Fecha elaboración:</Text>
+            <Text style={styles.projectValue}>
+              {budget.created_at
+                ? new Intl.DateTimeFormat('es-CO', {
+                    day: '2-digit', month: 'long', year: 'numeric', timeZone: 'America/Bogota',
+                  }).format(new Date(budget.created_at))
+                : formatDate(fechaEmision.toISOString())}
+            </Text>
+          </View>
           <View style={styles.projectRow}>
             <Text style={styles.projectLabel}>Válido hasta:</Text>
             <Text style={styles.projectValue}>{formatDate(fechaValidez.toISOString())}</Text>
@@ -468,19 +529,19 @@ export const PresupuestoPDF = ({ budget, profile, options, children }: Props) =>
                     : null;
                   return (
                     <View key={act.id || j} style={[styles.tableRow, j % 2 === 1 ? styles.tableRowAlternate : {}]}>
-                      <Text style={[styles.colN, { fontSize: 8 }]}>{ch.numero}.{j + 1}</Text>
-                      <Text style={[styles.colDesc, { fontSize: 8 }]}>{act.nombre}</Text>
-                      <Text style={[styles.colUnd, { fontSize: 8 }]}>{act.unidad}</Text>
-                      <Text style={[styles.colCant, { fontSize: 8 }]}>{cant}</Text>
-                      <Text style={[styles.colVrUnit, { fontSize: 8 }]}>{formatoCOP(vrUnit)}</Text>
-                      <Text style={[styles.colVrTotal, { fontSize: 8 }]}>{formatoCOP(vrTotal)}</Text>
-                      <Text style={[styles.colPctCD, { fontSize: 8 }]}>
+                      <Text style={[styles.colN, { fontSize: 9 }]}>{ch.numero}.{j + 1}</Text>
+                      <Text style={[styles.colDesc, { fontSize: 9 }]}>{act.nombre}</Text>
+                      <Text style={[styles.colUnd, { fontSize: 9 }]}>{act.unidad}</Text>
+                      <Text style={[styles.colCant, { fontSize: 9 }]}>{cant}</Text>
+                      <Text style={[styles.colVrUnit, { fontSize: 9 }]}>{formatoCOP(vrUnit)}</Text>
+                      <Text style={[styles.colVrTotal, { fontSize: 9 }]}>{formatoCOP(vrTotal)}</Text>
+                      <Text style={[styles.colPctCD, { fontSize: 9 }]}>
                         {pctCDAct !== null ? `${pctCDAct.toFixed(1)}%` : '—'}
                       </Text>
                     </View>
                   );
                 })}
-                
+
                 {/* Subtotal del Capítulo */}
                 <View style={styles.chapterSubtotalRow}>
                   <Text style={[styles.chapterSubtotalText, { width: '78%', textAlign: 'right', paddingRight: 10 }]}>
@@ -582,60 +643,51 @@ export const PresupuestoPDF = ({ budget, profile, options, children }: Props) =>
           </View>
         )}
 
-        {/* Firmas */}
-        <View style={styles.signatureSection} wrap={false}>
-          <Text style={styles.signatureIntro}>
-            El presente presupuesto ha sido elaborado con base en precios del mercado colombiano vigentes.{'\n'}
-            La aceptación de este documento implica conformidad con el alcance, cantidades y condiciones técnicas descritas.
-          </Text>
-          <View style={styles.signatureRow}>
-            <View style={{ width: '44%', alignItems: 'center', paddingTop: 8 }}>
-              <View style={{ height: 68, marginBottom: 4, width: '100%', alignItems: 'center', justifyContent: 'flex-end' }}>
-                {profile.firma_url ? (
-                  <Image src={profile.firma_url} style={{ width: 160, height: 64, objectFit: 'contain', marginBottom: 4 }} />
-                ) : null}
-              </View>
-              <View style={{ borderTopWidth: 1.5, borderTopColor: '#1F2937', width: '100%', paddingTop: 10, alignItems: 'center' }}>
-                <Text style={styles.signatureName}>
-                  {profile.nombre_completo || '[Nombre no configurado]'}
-                </Text>
-                {(profile.cargo_firma || profile.profesion) && (
-                  <Text style={styles.signatureRole}>{profile.cargo_firma ?? profile.profesion}</Text>
-                )}
-                <Text style={styles.signatureRole}>{profile.empresa || 'Contratista'}</Text>
-                <Text style={[styles.signatureRole, { marginTop: 4 }]}>Elaboró y Presentó</Text>
-              </View>
-            </View>
-            <View style={styles.signatureBox}>
-              <Text style={styles.signatureName}>
-                {options?.clienteNombre ||
-                 (budget.projects as any)?.clientes?.nombre_contacto ||
-                 (budget.projects as any)?.clientes?.nombre_razon_social ||
-                 (budget.projects as any)?.cliente_nombre ||
-                 'Cliente / Contratante'}
-              </Text>
-              {(budget.projects as any)?.clientes?.cargo_contacto && (
-                <Text style={styles.signatureRole}>
-                  {(budget.projects as any).clientes.cargo_contacto}
-                </Text>
-              )}
-              {(budget.projects as any)?.clientes?.nit_cedula && (
-                <Text style={styles.signatureRole}>
-                  NIT/C.C. {(budget.projects as any).clientes.nit_cedula}
-                </Text>
-              )}
-              <Text style={[styles.signatureRole, { marginTop: 4 }]}>Aceptó y Firmó</Text>
-            </View>
-          </View>
-        </View>
-
         {/* Pie de Página */}
         <View style={styles.footer} fixed>
           <Text style={styles.footerText}>Presupuesto elaborado con SIPO — Sistema Inteligente de Presupuestos de Obra | Este documento no constituye factura de venta</Text>
           <Text style={styles.footerText} render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`} />
         </View>
       </Page>
-      
+
+      {/* Página dedicada de Firmas — evita partición entre páginas */}
+      <Page size="LETTER" style={styles.page}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: 60 }}>
+          <Text style={styles.signatureIntro}>
+            El presente presupuesto ha sido elaborado con base en precios del mercado colombiano vigentes.{'\n'}
+            La aceptación de este documento implica conformidad con el alcance, cantidades y condiciones técnicas descritas.
+          </Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 80 }}>
+            {/* Izquierda: imagen firma (si existe) → línea → nombre → empresa → cargo → etiqueta */}
+            <View style={{ flex: 1, alignItems: 'center' }}>
+              {profile.firma_url && (
+                <Image src={profile.firma_url} style={{ height: 80, objectFit: 'contain', marginBottom: 8 }} />
+              )}
+              <View style={{ width: 220, borderBottomWidth: 1.5, borderBottomColor: '#000', marginBottom: 8 }} />
+              <Text style={styles.signatureName}>
+                {profile.nombre_completo || '[Nombre no configurado]'}
+              </Text>
+              {profile.empresa && (
+                <Text style={styles.signatureCompany}>{profile.empresa}</Text>
+              )}
+              {(profile.cargo_firma || profile.profesion) && (
+                <Text style={styles.signatureRole}>{profile.cargo_firma ?? profile.profesion}</Text>
+              )}
+              <Text style={styles.signatureLabel}>Elaboró y Presentó</Text>
+            </View>
+            {/* Derecha: espacio vacío → línea → etiqueta */}
+            <View style={{ flex: 1, alignItems: 'center' }}>
+              <View style={{ width: 220, borderBottomWidth: 1.5, borderBottomColor: '#000', marginTop: 60, marginBottom: 8 }} />
+              <Text style={styles.signatureLabel}>Aceptó y Firmó</Text>
+            </View>
+          </View>
+        </View>
+        <View style={styles.footer} fixed>
+          <Text style={styles.footerText}>Presupuesto elaborado con SIPO — Sistema Inteligente de Presupuestos de Obra | Este documento no constituye factura de venta</Text>
+          <Text style={styles.footerText} render={({ pageNumber, totalPages }) => `Página ${pageNumber} de ${totalPages}`} />
+        </View>
+      </Page>
+
       {/* Hojas Adicionales (APUs, Anexos, etc) */}
       {children}
     </Document>

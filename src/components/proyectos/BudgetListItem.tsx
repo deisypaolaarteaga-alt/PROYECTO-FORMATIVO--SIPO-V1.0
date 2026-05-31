@@ -2,7 +2,8 @@
 
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Trash2, ChevronDown, Pencil, Check, X } from 'lucide-react';
+import Link from 'next/link';
+import { Trash2, ChevronDown, Pencil, Check, X, Calendar } from 'lucide-react';
 import { Card } from '@/components/shared/Card';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { EstadoBadge } from '@/components/presupuestos/EstadoBadge';
@@ -38,18 +39,27 @@ const TRANSICIONES: Record<EstadoPresupuesto, Transicion[]> = {
   archivado: [],
 };
 
+const TIPO_OBRA_LABELS: Record<string, string> = {
+  residencial: 'Residencial', comercial: 'Comercial', infraestructura: 'Infraestructura',
+  hotelero: 'Hotelero', industrial: 'Industrial', institucional: 'Institucional', otro: 'Otro',
+};
+
 interface BudgetListItemProps {
   budget: {
     id: string;
     titulo: string;
     estado: string;
     updated_at: string;
+    created_at?: string;
+    vigencia_dias?: number | null;
   };
   projectId: string;
   total: number;
+  tipoObra?: string | null;
+  areaM2?: number | null;
 }
 
-export function BudgetListItem({ budget, projectId, total }: BudgetListItemProps) {
+export function BudgetListItem({ budget, projectId, total, tipoObra, areaM2 }: BudgetListItemProps) {
   const router = useRouter();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [loading,       setLoading]       = useState(false);
@@ -62,6 +72,23 @@ export function BudgetListItem({ budget, projectId, total }: BudgetListItemProps
 
   const estado = (budget.estado ?? 'borrador') as EstadoPresupuesto;
   const transiciones = TRANSICIONES[estado] ?? [];
+
+  const tipoObraLabel = tipoObra ? (TIPO_OBRA_LABELS[tipoObra] ?? tipoObra) : null;
+
+  const vigenciaDias = Number(budget.vigencia_dias ?? 0);
+  const fechaVigencia = budget.created_at && vigenciaDias > 0 ? (() => {
+    const d = new Date(budget.created_at);
+    d.setDate(d.getDate() + vigenciaDias);
+    return new Intl.DateTimeFormat('es-CO', {
+      day: '2-digit', month: 'short', year: 'numeric', timeZone: 'America/Bogota',
+    }).format(d);
+  })() : null;
+
+  const fechaModificacion = budget.updated_at
+    ? new Intl.DateTimeFormat('es-CO', {
+        day: '2-digit', month: 'short', year: 'numeric', timeZone: 'America/Bogota',
+      }).format(new Date(budget.updated_at))
+    : null;
 
   async function handleDelete() {
     setLoading(true);
@@ -92,7 +119,6 @@ export function BudgetListItem({ budget, projectId, total }: BudgetListItemProps
   function startEditing() {
     setTitleDraft(budget.titulo);
     setEditing(true);
-    // focus en el siguiente tick para que el input ya esté montado
     setTimeout(() => inputRef.current?.select(), 0);
   }
 
@@ -121,11 +147,15 @@ export function BudgetListItem({ budget, projectId, total }: BudgetListItemProps
 
   return (
     <>
-      <Card padding="md" className="flex flex-col gap-1">
+      <Card
+        padding="md"
+        className="relative flex flex-col gap-2 hover:border-[#D95510]/40 transition-colors"
+      >
+        {/* Fila principal: título + controles */}
         <div className="flex items-center justify-between">
           {/* Título: modo edición vs. modo lectura */}
           {editing ? (
-            <div className="flex-1 min-w-0 flex items-center gap-1 mr-2">
+            <div className="flex-1 min-w-0 flex items-center gap-1 mr-2" onClick={e => e.stopPropagation()}>
               <input
                 ref={inputRef}
                 autoFocus
@@ -155,18 +185,16 @@ export function BudgetListItem({ budget, projectId, total }: BudgetListItemProps
             </div>
           ) : (
             <div className="flex-1 min-w-0 flex items-center gap-1.5 group/title">
-              <button
-                className="flex-1 min-w-0 text-left"
-                onClick={() => router.push(`/presupuestos/${budget.id}`)}
+              {/* Stretch link: ::before cubre toda la card; permite right-click → abrir en pestaña */}
+              <Link
+                href={`/presupuestos/${budget.id}`}
+                className="flex-1 min-w-0 block truncate font-semibold text-sm text-neutral-800 before:absolute before:inset-0 before:content-[''] before:rounded-[12px]"
               >
-                <p className="font-semibold text-sm text-neutral-800 truncate">
-                  {budget.titulo || 'Presupuesto'}
-                </p>
-                <p className="text-xs text-neutral-400 mt-0.5">{formatDate(budget.updated_at)}</p>
-              </button>
+                {budget.titulo || 'Presupuesto'}
+              </Link>
               <button
                 onClick={e => { e.stopPropagation(); startEditing(); }}
-                className="p-1 rounded text-neutral-300 hover:text-primary-600 hover:bg-primary-50 opacity-0 group-hover/title:opacity-100 transition-all shrink-0"
+                className="relative z-[1] p-1 rounded text-neutral-300 hover:text-primary-600 hover:bg-primary-50 opacity-0 group-hover/title:opacity-100 transition-all shrink-0"
                 title="Renombrar"
               >
                 <Pencil className="h-3 w-3" />
@@ -174,9 +202,11 @@ export function BudgetListItem({ budget, projectId, total }: BudgetListItemProps
             </div>
           )}
 
-          {/* Controles derecha */}
-          <div className="flex items-center gap-2 shrink-0 ml-4" onClick={e => e.stopPropagation()}>
-            <span className="text-sm font-bold text-neutral-900">{formatCurrency(total)}</span>
+          {/* Controles derecha: total + estado + eliminar */}
+          <div className="relative z-[1] flex items-center gap-2 shrink-0 ml-4" onClick={e => e.stopPropagation()}>
+            <span className="text-sm font-bold text-neutral-900 tabular-nums">
+              {total > 0 ? formatCurrency(total) : '—'}
+            </span>
 
             {/* Estado: si hay transiciones → dropdown; si no → badge estático */}
             {transiciones.length > 0 ? (
@@ -225,6 +255,36 @@ export function BudgetListItem({ budget, projectId, total }: BudgetListItemProps
             )}
           </div>
         </div>
+
+        {/* Fila de metadatos */}
+        {(fechaModificacion || fechaVigencia || tipoObraLabel || areaM2) && (
+          <div className="flex items-center justify-between pt-1.5 border-t border-neutral-100">
+            <div className="flex flex-wrap items-center gap-3 text-[11px] text-neutral-400">
+              {fechaModificacion && (
+                <span className="flex items-center gap-1">
+                  <Calendar className="h-3 w-3 shrink-0" />
+                  Modificado: {fechaModificacion}
+                </span>
+              )}
+              {fechaVigencia && (
+                <span className="flex items-center gap-1">
+                  <Calendar className="h-3 w-3 shrink-0" />
+                  Válido hasta: {fechaVigencia}
+                </span>
+              )}
+              {tipoObraLabel && (
+                <span className="px-1.5 py-0.5 rounded bg-[#F5F0EA] text-[#5A5248] font-medium">
+                  {tipoObraLabel}
+                </span>
+              )}
+              {areaM2 && (
+                <span className="px-1.5 py-0.5 rounded bg-[#EBF2FA] text-[#1E4D8C] font-medium">
+                  {areaM2} m²
+                </span>
+              )}
+            </div>
+          </div>
+        )}
 
         {errorMsg && (
           <p className="text-[11px] text-red-600 text-right">{errorMsg}</p>

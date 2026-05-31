@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   Search,
   Home, Store, Route, BedDouble, Cog, GraduationCap, Building2,
-  MoreVertical, Eye, FilePlus2, Archive,
+  MoreVertical, Eye, FilePlus2, Archive, RotateCcw,
   ChevronLeft, ChevronRight, List, LayoutGrid,
 } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
@@ -28,14 +28,13 @@ import {
 
 const PAGE_SIZE = 10;
 
-type Filtro = 'todos' | 'borrador' | 'en_progreso' | 'finalizado' | 'archivado';
+type Filtro = 'todos' | 'borrador' | 'en_progreso' | 'finalizado';
 
 const FILTROS: { id: Filtro; label: string }[] = [
   { id: 'todos',       label: 'Todos'       },
   { id: 'borrador',    label: 'Borrador'    },
   { id: 'en_progreso', label: 'En progreso' },
   { id: 'finalizado',  label: 'Finalizado'  },
-  { id: 'archivado',   label: 'Archivado'   },
 ];
 
 const ESTADO_BADGE: Record<string, { label: string; bg: string; text: string; border: string }> = {
@@ -52,6 +51,16 @@ const TIPO_OBRA_CONFIG: Record<string, { Icon: React.ElementType; bg: string; fg
   hotelero:        { Icon: BedDouble,     bg: '#F4F0FA', fg: '#6B4FA8' },
   industrial:      { Icon: Cog,           bg: '#FEF9EC', fg: '#8C5E00' },
   institucional:   { Icon: GraduationCap, bg: '#E8F4F8', fg: '#1A6080' },
+};
+
+const TIPO_OBRA_LABEL: Record<string, string> = {
+  residencial:     'Residencial',
+  comercial:       'Comercial',
+  infraestructura: 'Infraestructura',
+  hotelero:        'Hotelero',
+  industrial:      'Industrial',
+  institucional:   'Institucional',
+  otro:            'Otro',
 };
 
 function filtrarPorEstado(projects: any[], filtro: Filtro): any[] {
@@ -131,14 +140,20 @@ interface ProyectosGridProps {
 
 export function ProyectosGrid({ projects }: ProyectosGridProps) {
   const router = useRouter();
-  const [filtro,   setFiltro]   = useState<Filtro>('todos');
-  const [busqueda, setBusqueda] = useState('');
-  const [periodo,  setPeriodo]  = useState<PeriodoPicker>('todo');
-  const [pagina,   setPagina]   = useState(1);
-  const [vista,    setVista]    = useState<'lista' | 'grilla'>('lista');
+  const [filtro,            setFiltro]            = useState<Filtro>('todos');
+  const [busqueda,          setBusqueda]          = useState('');
+  const [periodo,           setPeriodo]           = useState<PeriodoPicker>('todo');
+  const [pagina,            setPagina]            = useState(1);
+  const [vista,             setVista]             = useState<'lista' | 'grilla'>('lista');
+  const [mostrarArchivados, setMostrarArchivados] = useState(false);
+
+  // Pre-filtro: ocultar archivados salvo que el toggle esté activo
+  const baseProjects = mostrarArchivados
+    ? projects
+    : projects.filter(p => p.estado !== 'archivado');
 
   // Aplicar filtros en cascada: período → estado → búsqueda
-  const porPeriodo = filtrarPorPeriodo(projects, periodo);
+  const porPeriodo = filtrarPorPeriodo(baseProjects, periodo);
   const porEstado  = filtrarPorEstado(porPeriodo, filtro);
   const filtrados  = filtrarPorBusqueda(porEstado, busqueda);
 
@@ -147,24 +162,32 @@ export function ProyectosGrid({ projects }: ProyectosGridProps) {
   const inicio       = (paginaActual - 1) * PAGE_SIZE;
   const paginaItems  = filtrados.slice(inicio, inicio + PAGE_SIZE);
 
-  // Los contadores de tabs siempre sobre el total, independiente del período
+  // Contadores de tabs sobre baseProjects (independiente del período)
   const contadores: Record<Filtro, number> = {
-    todos:       projects.length,
-    borrador:    projects.filter(p => p.estado === 'borrador').length,
-    en_progreso: projects.filter(p => p.estado === 'en_progreso').length,
-    finalizado:  projects.filter(p => p.estado === 'finalizado').length,
-    archivado:   projects.filter(p => p.estado === 'archivado').length,
+    todos:       baseProjects.length,
+    borrador:    baseProjects.filter(p => p.estado === 'borrador').length,
+    en_progreso: baseProjects.filter(p => p.estado === 'en_progreso').length,
+    finalizado:  baseProjects.filter(p => p.estado === 'finalizado').length,
   };
+  const contadorArchivados = projects.filter(p => p.estado === 'archivado').length;
 
   function cambiarFiltro(f: Filtro)   { setFiltro(f);   setPagina(1); }
   function cambiarBusqueda(v: string) { setBusqueda(v); setPagina(1); }
   function cambiarPeriodo(p: PeriodoPicker) { setPeriodo(p); setPagina(1); }
+  function toggleArchivados() { setMostrarArchivados(v => !v); setPagina(1); }
 
   async function archivar(id: string, e: React.MouseEvent) {
     e.stopPropagation();
     const res = await cambiarEstadoProyecto(id, 'archivado');
     if (res.success) { toast.success('Proyecto archivado'); router.refresh(); }
     else toast.error(res.error ?? 'No se pudo archivar el proyecto');
+  }
+
+  async function desarchivar(id: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    const res = await cambiarEstadoProyecto(id, 'en_progreso');
+    if (res.success) { toast.success('Proyecto desarchivado'); router.refresh(); }
+    else toast.error(res.error ?? 'No se pudo desarchivar el proyecto');
   }
 
   const paginasVisibles = Math.min(totalPaginas, 5);
@@ -181,7 +204,6 @@ export function ProyectosGrid({ projects }: ProyectosGridProps) {
         : `No hay proyectos con estado "${FILTROS.find(f => f.id === filtro)?.label}" en ${periodoLabel}.`;
     }
     if (filtro === 'finalizado')  return 'No tienes proyectos finalizados.';
-    if (filtro === 'archivado')   return 'No tienes proyectos archivados.';
     if (filtro === 'en_progreso') return 'No tienes proyectos en progreso.';
     if (filtro === 'borrador')    return 'No tienes proyectos en borrador.';
     return 'Crea tu primer proyecto para empezar a presupuestar.';
@@ -234,26 +256,22 @@ export function ProyectosGrid({ projects }: ProyectosGridProps) {
       <div className="flex items-center border-b border-[#E8E4DE] mb-5 overflow-x-auto">
         {FILTROS.map(f => {
           const active = filtro === f.id;
-          const isArchivado = f.id === 'archivado';
           return (
             <button
               key={f.id}
               onClick={() => cambiarFiltro(f.id)}
               className={cn(
                 'inline-flex items-center gap-2 px-4 py-2.5 text-[13px] font-medium whitespace-nowrap transition-all border-b-2 -mb-px shrink-0',
-                active && !isArchivado  ? 'border-[#C84B1A] text-[#C84B1A]'
-                : active && isArchivado ? 'border-[#A89F96] text-[#7A7265]'
-                : isArchivado           ? 'border-transparent text-[#A89F96] hover:text-[#7A7265] hover:border-[#C8C0B5]'
-                :                        'border-transparent text-[#7A7265] hover:text-[#3D3530] hover:border-[#C8C0B5]'
+                active
+                  ? 'border-[#C84B1A] text-[#C84B1A]'
+                  : 'border-transparent text-[#7A7265] hover:text-[#3D3530] hover:border-[#C8C0B5]'
               )}
             >
               {f.label}
               <span
                 className={cn(
                   'inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded text-[10px] font-bold',
-                  active && !isArchivado  ? 'bg-[#C84B1A] text-white'
-                  : active && isArchivado ? 'bg-[#A89F96] text-white'
-                  :                        'bg-[#EAE6E0] text-[#7A7265]'
+                  active ? 'bg-[#C84B1A] text-white' : 'bg-[#EAE6E0] text-[#7A7265]'
                 )}
                 style={{ fontFamily: 'var(--font-mono)' }}
               >
@@ -262,6 +280,30 @@ export function ProyectosGrid({ projects }: ProyectosGridProps) {
             </button>
           );
         })}
+
+        {/* Toggle archivados */}
+        <div className="ml-auto pl-3 shrink-0 flex items-center pb-px">
+          <button
+            onClick={toggleArchivados}
+            className={cn(
+              'inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium whitespace-nowrap rounded-lg border transition-all',
+              mostrarArchivados
+                ? 'border-[#C8C0B5] bg-[#EAE6E0] text-[#5A5248]'
+                : 'border-[#E8E4DE] bg-white text-[#A89F96] hover:text-[#7A7265] hover:border-[#C8C0B5]'
+            )}
+          >
+            <Archive className="h-3.5 w-3.5" />
+            Archivados
+            {contadorArchivados > 0 && (
+              <span
+                className="inline-flex items-center justify-center min-w-[1.1rem] h-4 px-1 rounded text-[10px] font-bold bg-[#D1D5DB] text-[#6B7280]"
+                style={{ fontFamily: 'var(--font-mono)' }}
+              >
+                {contadorArchivados}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* ── Contenido ── */}
@@ -287,7 +329,7 @@ export function ProyectosGrid({ projects }: ProyectosGridProps) {
                   Estado
                 </th>
                 <th className="text-left px-4 py-3 text-[10px] font-bold text-[#A89F96] uppercase tracking-[0.12em]">
-                  Creado
+                  Modificado
                 </th>
                 <th className="text-left px-4 py-3 text-[10px] font-bold text-[#A89F96] uppercase tracking-[0.12em]">
                   Presupuestos
@@ -304,7 +346,8 @@ export function ProyectosGrid({ projects }: ProyectosGridProps) {
                 const tipoCfg    = TIPO_OBRA_CONFIG[p.tipo_obra ?? ''];
                 const TipoIcon   = tipoCfg?.Icon ?? Building2;
                 const clienteNom = p.clientes?.nombre_razon_social ?? p.cliente_nombre;
-                const subtitulo  = [p.ubicacion, clienteNom].filter(Boolean).join(' · ');
+                const tipoLabel  = p.tipo_obra ? (TIPO_OBRA_LABEL[p.tipo_obra] ?? p.tipo_obra) : null;
+                const subtitulo  = [tipoLabel, p.ubicacion, clienteNom].filter(Boolean).join(' · ');
                 const fechaLabel = formatearFechaProyecto(p.created_at, periodo);
 
                 return (
@@ -330,6 +373,11 @@ export function ProyectosGrid({ projects }: ProyectosGridProps) {
                           </p>
                           {subtitulo && (
                             <p className="text-[11px] text-[#A89F96] truncate mt-0.5">{subtitulo}</p>
+                          )}
+                          {tipoLabel && (
+                            <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#F5F0EA] text-[#5A5248]">
+                              {tipoLabel}
+                            </span>
                           )}
                         </div>
                       </div>
@@ -399,7 +447,7 @@ export function ProyectosGrid({ projects }: ProyectosGridProps) {
                             <FilePlus2 className="h-4 w-4" />
                             Nuevo presupuesto
                           </DropdownMenuItem>
-                          {p.estado !== 'archivado' && (
+                          {p.estado !== 'archivado' ? (
                             <>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
@@ -408,6 +456,17 @@ export function ProyectosGrid({ projects }: ProyectosGridProps) {
                               >
                                 <Archive className="h-4 w-4" />
                                 Archivar
+                              </DropdownMenuItem>
+                            </>
+                          ) : (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={(e: React.MouseEvent) => desarchivar(p.id, e)}
+                                className="text-neutral-500"
+                              >
+                                <RotateCcw className="h-4 w-4" />
+                                Desarchivar
                               </DropdownMenuItem>
                             </>
                           )}
@@ -474,8 +533,9 @@ export function ProyectosGrid({ projects }: ProyectosGridProps) {
               const tipoCfg    = TIPO_OBRA_CONFIG[p.tipo_obra ?? ''];
               const TipoIcon   = tipoCfg?.Icon ?? Building2;
               const clienteNom = p.clientes?.nombre_razon_social ?? p.cliente_nombre;
+              const tipoLabel  = p.tipo_obra ? (TIPO_OBRA_LABEL[p.tipo_obra] ?? p.tipo_obra) : null;
               const subtitulo  = [p.ubicacion, clienteNom].filter(Boolean).join(' · ');
-              const fechaLabel = formatearFechaProyecto(p.created_at, periodo);
+              const fechaLabel = formatearFechaProyecto(p.updated_at, periodo);
 
               return (
                 <div
@@ -508,10 +568,17 @@ export function ProyectosGrid({ projects }: ProyectosGridProps) {
                     </span>
                   </div>
 
-                  <p className="font-semibold text-[#1C1814] truncate text-[13px] mb-0.5">{p.nombre}</p>
-                  {subtitulo && (
-                    <p className="text-[11px] text-[#A89F96] truncate mb-3">{subtitulo}</p>
-                  )}
+                  <div className="mb-3">
+                    <p className="font-semibold text-[#1C1814] truncate text-[13px] mb-0.5">{p.nombre}</p>
+                    {subtitulo && (
+                      <p className="text-[11px] text-[#A89F96] truncate mt-0.5">{subtitulo}</p>
+                    )}
+                    {tipoLabel && (
+                      <span className="inline-flex mt-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#F5F0EA] text-[#5A5248]">
+                        {tipoLabel}
+                      </span>
+                    )}
+                  </div>
 
                   <div className="flex items-center justify-between pt-2.5 border-t border-[#EAE6E0]">
                     <div className="flex flex-col gap-0.5">
@@ -521,7 +588,7 @@ export function ProyectosGrid({ projects }: ProyectosGridProps) {
                       </span>
                       {fechaLabel && (
                         <span className="text-[10px] text-[#C8C0B5]" style={{ fontFamily: 'var(--font-mono)' }}>
-                          {fechaLabel}
+                          Modif. {fechaLabel}
                         </span>
                       )}
                     </div>

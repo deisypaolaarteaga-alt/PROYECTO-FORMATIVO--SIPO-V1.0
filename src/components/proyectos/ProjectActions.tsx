@@ -2,9 +2,16 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Trash2, Pencil, CheckCircle2, Archive, Play } from 'lucide-react';
+import { Plus, Trash2, Pencil, CheckCircle2, Archive, Play, RotateCcw, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/shared/Button';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from '@/components/shared/DropdownMenu';
 import { ModalNuevoPresupuesto } from '@/components/presupuestos/ModalNuevoPresupuesto';
 import { EditarProyectoModal } from '@/components/proyectos/EditarProyectoModal';
 import { deleteProject, cambiarEstadoProyecto } from '@/actions/proyectos';
@@ -19,6 +26,7 @@ interface ProjectActionsProps {
   projectUbicacion?: string | null;
   projectClienteId?: string | null;
   projectClienteNombre?: string | null;
+  projectAreaM2?: number | null;
 }
 
 export function ProjectActions({
@@ -30,14 +38,16 @@ export function ProjectActions({
   projectUbicacion,
   projectClienteId,
   projectClienteNombre,
+  projectAreaM2,
 }: ProjectActionsProps) {
   const router = useRouter();
   const [showModal,        setShowModal]        = useState(false);
   const [showEdit,         setShowEdit]         = useState(false);
-  const [confirmDelete,    setConfirmDelete]    = useState(false);
-  const [confirmIniciar,   setConfirmIniciar]   = useState(false);
-  const [confirmFinalizar, setConfirmFinalizar] = useState(false);
-  const [confirmArchivar,  setConfirmArchivar]  = useState(false);
+  const [confirmDelete,      setConfirmDelete]      = useState(false);
+  const [confirmIniciar,     setConfirmIniciar]     = useState(false);
+  const [confirmFinalizar,   setConfirmFinalizar]   = useState(false);
+  const [confirmArchivar,    setConfirmArchivar]    = useState(false);
+  const [confirmDesarchivar, setConfirmDesarchivar] = useState(false);
   const [deleting,         setDeleting]         = useState(false);
   const [loadingEstado,    setLoadingEstado]    = useState(false);
 
@@ -59,6 +69,7 @@ export function ProjectActions({
     setConfirmIniciar(false);
     setConfirmFinalizar(false);
     setConfirmArchivar(false);
+    setConfirmDesarchivar(false);
     if (result.success) {
       router.refresh();
     }
@@ -116,24 +127,42 @@ export function ProjectActions({
           </Button>
         )}
 
-        <Button
-          variant="ghost"
-          size="sm"
-          icon={<Pencil className="h-4 w-4" />}
-          onClick={() => setShowEdit(true)}
-        >
-          Editar proyecto
-        </Button>
+        {projectEstado === 'archivado' && (
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<RotateCcw className="h-4 w-4 text-[--color-sipo-ember]" />}
+            className="text-[--color-sipo-ember] hover:bg-[--color-sipo-ember-dim]"
+            onClick={() => setConfirmDesarchivar(true)}
+            disabled={loadingEstado}
+          >
+            Desarchivar
+          </Button>
+        )}
 
-        <Button
-          variant="ghost"
-          size="sm"
-          icon={<Trash2 className="h-4 w-4 text-[--color-sipo-danger]" />}
-          className="text-[--color-sipo-danger] hover:bg-[--color-sipo-danger-bg]"
-          onClick={() => setConfirmDelete(true)}
-        >
-          Eliminar proyecto
-        </Button>
+        {/* Menú de tres puntos: Editar + Eliminar */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" icon={<MoreHorizontal className="h-4 w-4" />} />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-[160px]">
+            <DropdownMenuItem
+              onSelect={() => setShowEdit(true)}
+              className="gap-2 cursor-pointer"
+            >
+              <Pencil className="h-4 w-4 text-[#6B7A8D]" />
+              Editar proyecto
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onSelect={() => setConfirmDelete(true)}
+              className="gap-2 cursor-pointer text-[#991B1B] focus:text-[#991B1B] focus:bg-[#FEF0F0]"
+            >
+              <Trash2 className="h-4 w-4" />
+              Eliminar proyecto
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <ModalNuevoPresupuesto
@@ -156,6 +185,7 @@ export function ProjectActions({
           tipo_obra:      projectTipoObra,
           cliente_id:     projectClienteId,
           cliente_nombre: projectClienteNombre,
+          area_m2:        projectAreaM2,
         }}
       />
 
@@ -190,6 +220,17 @@ export function ProjectActions({
         variant="warning"
         onConfirm={() => handleCambiarEstado('archivado')}
         onCancel={() => setConfirmArchivar(false)}
+      />
+
+      <ConfirmDialog
+        open={confirmDesarchivar}
+        title="¿Desarchivar proyecto?"
+        description="El proyecto volverá al estado En progreso y reaparecerá en la vista principal."
+        confirmLabel={loadingEstado ? 'Desarchivando…' : 'Sí, desarchivar'}
+        cancelLabel="Cancelar"
+        variant="warning"
+        onConfirm={() => handleCambiarEstado('en_progreso')}
+        onCancel={() => setConfirmDesarchivar(false)}
       />
 
       <ConfirmDialog

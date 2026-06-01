@@ -203,7 +203,7 @@ Always use `decimal.js` for these computations. Fiscal rates by city live in `sr
 
 | Path | Purpose |
 |------|---------|
-| `src/actions/` | All data mutations as `'use server'` Server Actions; validate with Zod, then Supabase. Archivos: `analytics.ts`, `apariencia.ts` (persiste `preferences` JSONB en profiles), `auth.ts` (18 exports: `signIn`, `sendOtp`, `verifyOtp`, `signUp`, `signInWithGoogle`, `signOut`, `resetPassword`, `cambiarContrasena`, `updatePassword`), `catalogo.ts`, `clientes.ts`, `configuracion-fiscal.ts` (params IVA/AIU/retenciones del presupuesto), `cuadrillas.ts`, `insumos.ts`, `mano-obra.ts`, `onboarding.ts`, `pdf.ts`, `perfil.ts`, `presupuesto-estados.ts` (máquina de estados: enviar/aprobar/rechazar/reabrir), `presupuestos.ts`, `proveedores.ts`, `proyectos.ts` |
+| `src/actions/` | All data mutations as `'use server'` Server Actions; validate with Zod, then Supabase. Archivos: `analytics.ts`, `apariencia.ts` (persiste `preferences` JSONB en profiles), `auth.ts` (9 exports: `signIn`, `sendOtp`, `verifyOtp`, `signUp`, `signInWithGoogle`, `signOut`, `resetPassword`, `cambiarContrasena`, `updatePassword`), `catalogo.ts` (17 exports — CRUD completo de capítulos, actividades y APU items del catálogo; ver detalle abajo), `clientes.ts`, `configuracion-fiscal.ts` (params IVA/AIU/retenciones del presupuesto), `cuadrillas.ts`, `insumos.ts`, `mano-obra.ts`, `onboarding.ts`, `pdf.ts`, `perfil.ts`, `presupuesto-estados.ts` (máquina de estados: enviar/aprobar/rechazar/reabrir), `presupuestos.ts`, `proveedores.ts`, `proyectos.ts` |
 | `src/app/(auth)/` | Public routes: `login` (2FA: paso 1 credenciales → paso 2 OTP 6 dígitos), `registro` (nombre+email+contraseña), `recuperar-contrasena`, `nueva-contrasena` |
 | `src/app/(dashboard)/` | Protected routes behind sidebar layout |
 | `src/lib/utils/periodos.ts` | `PeriodoPicker`, `RangoPeriodo`, `OPCIONES_PERIODO`, `getRangoPeriodo(periodo)` — calcula rangos de fecha con timezone `America/Bogota`. Retorna `null` para `'todo'` (sin filtro). |
@@ -218,6 +218,9 @@ Always use `decimal.js` for these computations. Fiscal rates by city live in `sr
 | `src/lib/excel/exportarPresupuestoExcel.ts` | Genera `.xlsx` en browser: 4 hojas (Resumen, Presupuesto, APUs, Insumos). Usa SheetJS `XLSX.write` + Blob. Mismos cálculos con `decimal.js` que el PDF — nunca floats nativos. |
 | `src/components/pdf/` | `PresupuestoPDF.tsx`, `APUDetallePDF.tsx`, `PresupuestoCompletoConAPU.tsx`, `BotonExportarPDF.tsx`, `BotonExportarExcel.tsx` (import dinámico del helper Excel) |
 | `src/lib/supabase/` | `client.ts` (browser), `server.ts` (server + `createAdminClient()`), `middleware.ts` (session + route guard) |
+| `src/lib/auth/roles.ts` | `isSuperAdmin(userId)` — consulta `profiles.rol` vía admin client, retorna `true` si `rol === 'super_admin'`. Usar en Server Actions del catálogo para autorizar CRUD. |
+| `src/components/catalogo/` | `CatalogoView.tsx` (tabla principal con tabs tipo_obra), `CatalogoActividadDrawer.tsx` (drawer de detalle/APU items), `ModalCrearCapitulo.tsx`, `ModalEditarCapitulo.tsx`, `ModalCrearActividad.tsx`, `ModalEditarActividad.tsx` — CRUD visual solo visible para `super_admin` |
+| `src/app/(dashboard)/catalogo/` | Página `/catalogo` — tabla editable del catálogo de referencia; acceso restringido a `super_admin` vía `isSuperAdmin()` en el Server Component |
 | `src/lib/validations/schemas.ts` | Single source of truth for all Zod schemas — edit here first |
 | `src/types/index.ts` | All TypeScript interfaces |
 | `supabase/migrations/` | Tracked SQL migrations (timestamped, idempotent) |
@@ -245,7 +248,7 @@ Always use `decimal.js` for these computations. Fiscal rates by city live in `sr
 
 ### Authentication & Routing
 
-Cookie-based Supabase Auth. `src/lib/supabase/middleware.ts` refreshes tokens and redirects unauthenticated users away from `(dashboard)` routes. `src/proxy.ts` adapts Next.js 16 middleware conventions.
+Cookie-based Supabase Auth. `src/middleware.ts` (Next.js middleware entry point) llama a `updateSession` en `src/lib/supabase/middleware.ts`, que refresca tokens y protege rutas `(dashboard)`. `src/proxy.ts` fue eliminado (conflicto con `middleware.ts` en Next.js 16).
 
 ## Feature Implementation Workflow
 
@@ -264,7 +267,7 @@ Token reference: `src/lib/design-tokens.ts`. User accent color stored in `profil
 
 ## Known Remaining Tasks
 
-> **Snapshot:** 2026-06-01 — `tsc --noEmit --skipLibCheck` limpio (0 errores). **45 migraciones en `migrate.js`** (todas rastreadas). Rama `rama-deisy`. 16 archivos de Server Actions (auth.ts exporta 9 funciones incluye `sendOtp`+`verifyOtp`), 5 componentes PDF, motor de cálculo `motor-presupuesto.ts` (219 líneas) con tests Vitest (110 líneas). Login con 2FA por OTP implementado. `fn_duplicar_presupuesto` atómica DB-side. hCaptcha eliminado. Formulario de registro simplificado (4 campos: nombre, email, contraseña, confirmar). **30 tablas + 5 vistas en BD** (nuevas: `user_material_precios`, `user_equipment_precios`; `trabajadores` ahora soporta propios por `user_id`). Filtros de período en dashboard y proyectos. Responsive fixes en tablas de Clientes/Proveedores y headers de Insumos/Mano de Obra (mobile-first, columnas ocultas con `hidden sm/md:table-cell`, botones con `w-full sm:w-auto`). Registro con confirmación de email (no redirige al dashboard automáticamente). Sidebar muestra rol correcto: `super_admin`→"Administrador", `usuario`→empresa o "Usuario".
+> **Snapshot:** 2026-06-01 — `tsc --noEmit --skipLibCheck` limpio (0 errores). `pnpm build` exitoso. **45 migraciones en `migrate.js`** (todas rastreadas). Rama `desarrollo`. 16 archivos de Server Actions (`catalogo.ts` con 17 exports de CRUD catálogo; `auth.ts` exporta 9 funciones incluyendo `sendOtp`+`verifyOtp`), 5 componentes PDF, motor de cálculo `motor-presupuesto.ts` (219 líneas) con **9 tests Vitest pasando** (110 líneas). `src/middleware.ts` existe y activo (`proxy.ts` eliminado). **Sistema de roles** implementado: `profiles.rol` (`usuario` | `super_admin`) con RLS en catálogo; `isSuperAdmin()` en `src/lib/auth/roles.ts`. **Módulo Catálogo editable** para `super_admin`: CatalogoView + 4 modales CRUD + CatalogoActividadDrawer. Login con 2FA por OTP implementado. `fn_duplicar_presupuesto` atómica DB-side. hCaptcha eliminado. Formulario de registro simplificado (4 campos). **30 tablas + 5 vistas en BD**. Filtros de período en dashboard y proyectos. Responsive fixes. Registro con confirmación de email. Sidebar muestra rol correcto: `super_admin`→"Administrador", `usuario`→empresa o "Usuario".
 
 ### Pendiente — acción manual requerida
 - Presupuestos creados antes del fix de admin client (2026-05-07) tienen 0 actividades — deben eliminarse y recrearse con "Plantilla Sugerida"
@@ -285,7 +288,7 @@ Token reference: `src/lib/design-tokens.ts`. User accent color stored in `profil
 ### Pendiente — deuda técnica
 ~~- **`ResumenFinancieroModal.tsx` en disco sin importar**~~ ✅ 2026-05-18 — archivo ya no existe en el proyecto.
 ~~- **`old_sidebar.tsx` en raíz del proyecto**~~ ✅ 2026-05-18 — archivo ya no existe en el proyecto.
-~~- **`src/proxy.ts` reemplazado pero no eliminado**~~ ✅ 2026-05-18 — eliminado junto con `middleware.ts.bak`.
+~~- **`src/proxy.ts` conflicto con `middleware.ts`**~~ ✅ 2026-06-01 — `src/proxy.ts` eliminado definitivamente. `src/middleware.ts` es el único archivo de middleware activo. Next.js 16 muestra warning de deprecación (`middleware → proxy`) pero el build pasa sin errores.
 
 ~~### Pendiente — errores TypeScript (5 archivos, descubiertos 2026-05-13)~~ ✅ 2026-05-13 — todos resueltos. **Estado actual (2026-05-19): `tsc --noEmit --skipLibCheck` sin errores (0 líneas de output).**
 
@@ -296,6 +299,8 @@ Token reference: `src/lib/design-tokens.ts`. User accent color stored in `profil
 ~~- `ResumenFinancieroModal.tsx` líneas 416-425 — fragmento huérfano de versión anterior causaba 14 errores TS1005/TS1109 parse errors~~ ✅ 2026-05-13
 
 ### Completado ✅
+- ~~**Sistema de roles `super_admin` / `usuario`**~~ ✅ 2026-06-01 — `profiles.rol TEXT DEFAULT 'usuario' CHECK (IN 'usuario','super_admin')` + políticas RLS en `catalogo_capitulos/actividades/apu_items` (SELECT público, INSERT/UPDATE/DELETE solo `super_admin`). Migraciones `20260601100000_roles_usuario.sql` + `20260601110000_fix_rol_default.sql` (resetea todos a `usuario` excepto Deisy). Helper `src/lib/auth/roles.ts` → `isSuperAdmin(userId)`. Sidebar muestra "Administrador" para `super_admin`.
+- ~~**Módulo Catálogo editable para `super_admin`**~~ ✅ 2026-06-01 — `/catalogo` página con `CatalogoView.tsx` (tabs por tipo_obra, tabla de capítulos + actividades), `CatalogoActividadDrawer.tsx` (detalle con APU items inline), 4 modales CRUD: `ModalCrearCapitulo`, `ModalEditarCapitulo`, `ModalCrearActividad`, `ModalEditarActividad`. `catalogo.ts` ampliado a 17 exports: CRUD de capítulos, actividades y `catalogo_apu_items` + `sugerirCorreccionPrecio`. Acceso restringido a `super_admin` vía `isSuperAdmin()` en el Server Component.
 - ~~**Responsive móvil — tablas y headers**~~ ✅ 2026-05-31 — (1) `ClientesList.tsx`: columnas CONTACTO ocultas con `hidden sm:table-cell`, PROYECTOS e INVERSIÓN TOTAL con `hidden md:table-cell`; pills de filtro tipo con `flex-wrap`. (2) `ProveedoresList.tsx`: botón "Nuevo Proveedor" con `w-full sm:w-auto justify-center`. (3) `insumos/page.tsx` + `mano-obra/page.tsx`: header refactorizado a `flex flex-col gap-2`; contenedor de botones a `flex flex-wrap gap-2 w-full`; cada botón con `w-full sm:w-auto`.
 - ~~**Catálogo de Insumos — precios propios por usuario**~~ ✅ 2026-05-27 — Módulo Insumos reescrito con override de precios por usuario para materiales y equipos del catálogo (tablas `user_material_precios` + `user_equipment_precios`). `toggleMaterialActivo`/`toggleEquipoActivo` en `insumos.ts`; lápiz inline para editar precio; botón reset restaura precio de catálogo. Columna `activo` permite inhabilitar ítems sin perder la personalización.
 - ~~**Trabajadores propios por usuario**~~ ✅ 2026-05-26 — `trabajadores.user_id` agrega soporte multi-tenant: catálogo sistema (`user_id IS NULL`) público + trabajadores propios (`user_id = auth.uid()`) con CRUD completo. Índices parciales para garantizar unicidad por scope. `ModalTrabajador.tsx` para crear/editar propios. `mano-obra/page.tsx` ampliado con toggle activo/inactivo, editar y eliminar propios.

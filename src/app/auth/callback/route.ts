@@ -16,7 +16,8 @@ export async function GET(request: Request) {
       type: type as 'recovery' | 'email' | 'signup' | 'invite' | 'magiclink' | 'email_change',
     });
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
+      const destination = type === 'recovery' ? '/nueva-contrasena' : next;
+      return NextResponse.redirect(`${origin}${destination}`);
     }
   }
 

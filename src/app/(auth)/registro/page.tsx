@@ -8,6 +8,50 @@ import { Input } from '@/components/shared/Input';
 import { ErrorMessage } from '@/components/shared/ErrorMessage';
 import { signUp, signInWithGoogle } from '@/actions/auth';
 
+function ConfirmacionEmail({ email }: { email: string }) {
+  return (
+    <div className="text-center">
+      <div className="mb-7">
+        <h1 className="text-[24px] font-semibold text-[#1C1814] tracking-tight">
+          Revisa tu correo
+        </h1>
+        <p className="mt-1.5 text-[14px] text-[#7A7265]">
+          Ya casi terminas
+        </p>
+      </div>
+
+      <div className="bg-white border border-[#E8E4DE] rounded-2xl p-8 shadow-sm">
+        <div className="flex justify-center mb-5">
+          <div className="flex items-center justify-center w-16 h-16 rounded-full bg-[#FEF3ED] border border-[#F5C7B0]">
+            <Mail className="h-8 w-8 text-[#C84B1A]" />
+          </div>
+        </div>
+
+        <p className="text-[15px] text-[#1C1814] font-medium mb-2">
+          Te enviamos un enlace a{' '}
+          <span className="text-[#C84B1A] font-semibold">{email}</span>.
+        </p>
+        <p className="text-[14px] text-[#7A7265] mb-4">
+          Confírmalo para activar tu cuenta en SIPO.
+        </p>
+
+        <p className="text-[12px] text-[#9A9288] bg-[#F8F7F5] rounded-lg px-4 py-3">
+          Si no ves el correo revisa tu carpeta de spam.
+        </p>
+      </div>
+
+      <div className="mt-5">
+        <Link
+          href="/login"
+          className="inline-flex items-center justify-center w-full rounded-xl bg-[#1C1814] text-white text-[14px] font-medium py-2.5 hover:bg-[#2C2820] transition-colors"
+        >
+          Volver al inicio
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 function IndicadorPassword({ password }: { password: string }) {
   const criterios = [
     { label: 'Mínimo 8 caracteres',   ok: password.length >= 8 },
@@ -36,6 +80,7 @@ export default function RegistroPage() {
   const [loading, setLoading]         = useState(false);
   const [error, setError]             = useState<string | null>(null);
   const [showRecoverLink, setShowRecoverLink] = useState(false);
+  const [emailConfirmacion, setEmailConfirmacion] = useState<string | null>(null);
   const [nombre,   setNombre]         = useState('');
   const [email,    setEmail]          = useState('');
   const [password, setPassword]       = useState('');
@@ -67,6 +112,7 @@ export default function RegistroPage() {
         setShowRecoverLink(msg.includes('Ya existe una cuenta'));
         return;
       }
+      setEmailConfirmacion(result.data?.email ?? email);
     } catch (err: unknown) {
       const digest = (err as { digest?: string })?.digest ?? '';
       if (digest.startsWith('NEXT_REDIRECT')) return;
@@ -82,6 +128,10 @@ export default function RegistroPage() {
     } catch {
       // redirect esperado
     }
+  }
+
+  if (emailConfirmacion) {
+    return <ConfirmacionEmail email={emailConfirmacion} />;
   }
 
   return (

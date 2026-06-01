@@ -24,7 +24,7 @@ export async function signIn(formData: FormData): Promise<ActionResult<{ email: 
 
   const supabase = await createClient();
 
-  // Verificar credenciales
+  // Paso 1: verificar credenciales
   const { error: signInError } = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
     password: parsed.data.password,
@@ -43,7 +43,21 @@ export async function signIn(formData: FormData): Promise<ActionResult<{ email: 
     return { success: false, error: 'Error al iniciar sesión. Intenta de nuevo.' };
   }
 
-  redirect('/dashboard');
+  // Paso 2: destruir la sesión temporal antes de enviar el OTP
+  await supabase.auth.signOut();
+
+  // Paso 3: enviar OTP al correo
+  const { error: otpError } = await supabase.auth.signInWithOtp({
+    email: parsed.data.email,
+    options: { shouldCreateUser: false },
+  });
+
+  if (otpError) {
+    console.error('[signIn] signInWithOtp error:', otpError);
+    return { success: false, error: 'No se pudo enviar el código OTP. Intenta de nuevo.' };
+  }
+
+  return { success: true, data: { email: parsed.data.email } };
 }
 
 /**
@@ -95,9 +109,11 @@ export async function verifyOtp(email: string, token: string): Promise<ActionRes
 }
 
 /**
- * Registrar nuevo usuario
+ * Registrar nuevo usuario.
+ * Retorna { success: true, data: { email } } para que el cliente muestre
+ * la pantalla de confirmación — NO redirige al dashboard.
  */
-export async function signUp(formData: FormData): Promise<ActionResult> {
+export async function signUp(formData: FormData): Promise<ActionResult<{ email: string }>> {
   try {
     const raw = {
       nombre_completo: formData.get('nombre_completo') as string,
@@ -144,13 +160,13 @@ export async function signUp(formData: FormData): Promise<ActionResult> {
       return { success: false, error: 'Ya existe una cuenta con este correo electrónico.' };
     }
 
+    return { success: true, data: { email: parsed.data.email } };
+
   } catch (e) {
     if (isRedirectError(e)) throw e;
     console.error('[signUp] error:', e);
     return { success: false, error: 'Error al crear la cuenta. Intenta de nuevo.' };
   }
-
-  redirect('/dashboard');
 }
 
 /**

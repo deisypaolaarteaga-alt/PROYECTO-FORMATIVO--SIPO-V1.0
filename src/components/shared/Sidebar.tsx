@@ -47,6 +47,7 @@ interface NavGroup {
 interface UserProfile {
   nombre: string;
   empresa: string;
+  rol: 'usuario' | 'super_admin';
 }
 
 // ── Estructura de navegación ──────────────────────────────────────────────────
@@ -240,7 +241,7 @@ function UserProfileFooter({
             {user.nombre}
           </p>
           <p className="text-[11px] text-white/35 truncate leading-tight mt-0.5">
-            {user.empresa || 'Administrador'}
+            {user.rol === 'super_admin' ? 'Administrador' : (user.empresa || 'Usuario')}
           </p>
         </div>
         <ChevronDown
@@ -345,7 +346,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed]   = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [user, setUser] = useState<UserProfile>({ nombre: 'Usuario', empresa: '' });
+  const [user, setUser] = useState<UserProfile>({ nombre: 'Usuario', empresa: '', rol: 'usuario' });
 
   useEffect(() => {
     setMobileOpen(false);
@@ -357,7 +358,7 @@ export function Sidebar() {
       if (!authUser) return;
       supabase
         .from('profiles')
-        .select('nombre_completo, empresa')
+        .select('nombre_completo, empresa, rol')
         .eq('id', authUser.id)
         .maybeSingle()
         .then(({ data: profile }) => {
@@ -368,6 +369,7 @@ export function Sidebar() {
               authUser.email ||
               'Usuario',
             empresa: profile?.empresa || authUser.user_metadata?.empresa || '',
+            rol: (profile?.rol as 'usuario' | 'super_admin') ?? 'usuario',
           });
         });
     });

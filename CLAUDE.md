@@ -82,7 +82,7 @@ NEXT_PUBLIC_HCAPTCHA_SITE_KEY # Site key de hCaptcha — requerida en login y re
 - Triggers: `DROP TRIGGER IF EXISTS name ON table; CREATE TRIGGER ...`
 - Functions: `CREATE OR REPLACE FUNCTION`
 
-### Applied migrations (40 total, in order)
+### Applied migrations (45 total, in order)
 
 | File | Content | Status |
 |------|---------|--------|
@@ -125,15 +125,20 @@ NEXT_PUBLIC_HCAPTCHA_SITE_KEY # Site key de hCaptcha — requerida en login y re
 | `20260519110000_fix_cuadrillas_trabajadores.sql` | **Fix**: Completa los trabajadores de 6 cuadrillas que fallaron por mismatch de tildes (`albañil`, `Topógrafo`, `Ayudante construcción`) en los ILIKE del seed anterior. Usa nombres exactos con tildes. | ✅ applied |
 | `20260520100000_security_rls_audit.sql` | **Security audit**: Corrige 5 vulnerabilidades RLS: (1) `v_resumen_presupuesto` recreada con `security_invoker = true` — sin el flag, la vista bypasseaba RLS y exponía presupuestos de otros usuarios; (2) elimina `budgets_update_own` que anulaba el bloqueo de `aprobado` vía OR lógico; (3) agrega políticas INSERT/DELETE faltantes en `budget_snapshots`; (4) elimina `cuadrillas_usuario_crud` (FOR ALL sin `deleted_at`) que rompía el soft-delete; (5) limpia políticas duplicadas en `ai_conversations/ai_usage/ai_messages`. | ✅ applied |
 | `20260521100000_fn_duplicar_presupuesto.sql` | **Función atómica**: `fn_duplicar_presupuesto(p_budget_id, p_user_id)` — duplica presupuesto completo (capítulos + actividades + APUs + apu_items) en una sola transacción. SECURITY DEFINER con verificación de ownership. Reemplaza loop de INSERTs individuales en el Server Action. | ✅ applied |
-| `20260522100000_seed_municipios_completo.sql` | **Seed**: Todos los municipios de Colombia con tasas ReteICA por ciudad. Aplicado manualmente en BD — **aún no rastreado en `migrate.js`** (pendiente agregar al array `migrationFiles`). | ✅ applied (manual, no en migrate.js) |
+| `20260522100000_seed_municipios_completo.sql` | **Seed**: Todos los municipios de Colombia con tasas ReteICA por ciudad. | ✅ applied |
+| `20260526100000_trabajadores_usuario.sql` | **Schema + RLS**: Agrega `user_id UUID` a `trabajadores`; reemplaza índice único de `especialidad` por dos índices parciales (`IS NULL` para sistema, `(especialidad, user_id)` para propios); 4 políticas RLS CRUD por `user_id` — catálogo sistema siempre legible, modificaciones solo sobre propios. | ✅ applied |
+| `20260527100000_user_precios_insumos.sql` | **Schema**: Tablas `user_material_precios` y `user_equipment_precios` — override de precio por usuario para materiales y equipos del catálogo. Cada tabla tiene `UNIQUE(user_id, material/equipment_id)` + RLS FOR ALL. | ✅ applied |
+| `20260527200000_insumos_activo.sql` | **Schema**: Agrega columna `activo BOOLEAN DEFAULT true` a `user_material_precios` y `user_equipment_precios`; hace `precio_unitario`/`precio_diario` nullable para permitir cambiar solo el estado activo sin personalizar precio. | ✅ applied |
+| `20260601100000_roles_usuario.sql` | **Sistema de roles Fase 1**: `profiles.rol TEXT DEFAULT 'usuario' CHECK (IN 'usuario','super_admin')` + políticas RLS en `catalogo_capitulos/actividades/apu_items` — SELECT público, INSERT/UPDATE/DELETE solo `super_admin`. | ✅ applied |
+| `20260601110000_fix_rol_default.sql` | **Security fix**: Corrige DEFAULT de `profiles.rol` a `'usuario'`; resetea a `'usuario'` todos los perfiles incorrectamente asignados como `super_admin` excepto el de Deisy (`deisypaolaarteaga@gmail.com`). | ✅ applied |
 
 ### Loose SQL files at root (already applied manually — do NOT re-run)
 
 `cuadrillas_schema.sql`, `ai-tables.sql`, `migration_motor_calculo.sql`, `migration_motor_2026.sql`, `preferences_column.sql`, `trigger-profiles.sql`, `seed.sql`, `seed_cuadrillas.sql`, `seed_data.sql` — these were executed directly in Supabase Dashboard and are **already reflected in the database**. Their triggers and functions are now superseded by `20260507100000_fix_trigger_chain.sql`. Do not add them to `migrate.js`.
 
-## Current Database State (as of 2026-05-25)
+## Current Database State (as of 2026-06-01)
 
-**28 tables + 5 views** in `public` schema. Jornales en `trabajadores` actualizados a SMMLV 2026 ($1.423.500/mes). Tabla `materials` deduplicada (46 filas, índice único en `nombre+categoria`). Key tables and their non-obvious columns:
+**30 tables + 5 views** in `public` schema. Jornales en `trabajadores` actualizados a SMMLV 2026 ($1.423.500/mes). Tabla `materials` deduplicada (46 filas, índice único en `nombre+categoria`). `profiles.rol` DEFAULT corregido a `'usuario'` (migración `20260601110000`). Key tables and their non-obvious columns:
 
 | Table | Key columns beyond the obvious |
 |-------|-------------------------------|
@@ -141,12 +146,15 @@ NEXT_PUBLIC_HCAPTCHA_SITE_KEY # Site key de hCaptcha — requerida en login y re
 | `apus` | `costo_herramienta_menor`, `costo_epp`, `pct_herramienta_menor` (default 3%), `pct_epp` (default 1%), `rendimiento` |
 | `apu_items` | `tipo` IN ('material','mano_obra','equipo','herramienta_menor','epp'); `cuadrilla_id` UUID nullable; `proveedor_id` UUID nullable (FK futura a `proveedores`) |
 | `activities` | `precio_desde_apu` BOOLEAN — when true, `precio_unitario` is read from the linked APU |
-| `profiles` | `preferences` JSONB (accentColor, density, showCompanyName, defaultCity), `nivel_riesgo_arl` (1-5), `municipio`, `telefono`, `direccion`, `email_empresa`, AIU defaults |
+| `profiles` | `preferences` JSONB (accentColor, density, showCompanyName, defaultCity), `nivel_riesgo_arl` (1-5), `municipio`, `telefono`, `direccion`, `email_empresa`, AIU defaults, `rol TEXT DEFAULT 'usuario' CHECK (IN 'usuario','super_admin')` |
 | `catalogo_capitulos` | Reference catalog — 28 chapters across residencial/comercial/infraestructura |
 | `catalogo_actividades` | 164 reference activities with `precio_referencia_nacional`, `rango_min`, `rango_max` (COP 2025) |
 | `catalogo_apu_items` | APU reference items per activity — tipo, nombre, unidad, cantidad, precio_unitario, orden (public read) |
 | `clientes` | `tipo` ('persona_natural'\|'empresa'), `nombre_razon_social`, `nit_cedula`, `nombre_contacto`, `cargo_contacto`, `ciudad`, `email`, `telefono`; soft-delete via `activo BOOLEAN` |
 | `proveedores` | `tipo` ('persona'\|'empresa'), `nombre_razon_social`, `nit_cedula`, `categoria` IN (ferreteria/contratista/equipos/laboratorio/transporte/servicios/otro), `ciudad`, `email`, `telefono`, `sitio_web`; soft-delete via `deleted_at TIMESTAMPTZ` |
+| `trabajadores` | `user_id UUID` nullable — `NULL` = catálogo sistema (público), `auth.uid()` = propio del usuario. Índices parciales: `idx_trabajadores_esp_sistema` (único por especialidad cuando `user_id IS NULL`), `idx_trabajadores_esp_usuario` (único por `(especialidad, user_id)` cuando `user_id IS NOT NULL`). |
+| `user_material_precios` | Override de precio de materiales del catálogo por usuario: `user_id`, `material_id`, `precio_unitario NUMERIC(15,2)` nullable, `activo BOOLEAN DEFAULT true`. `UNIQUE(user_id, material_id)`. RLS FOR ALL. |
+| `user_equipment_precios` | Override de precio diario de equipos del catálogo por usuario: `user_id`, `equipment_id`, `precio_diario NUMERIC(15,2)` nullable, `activo BOOLEAN DEFAULT true`. `UNIQUE(user_id, equipment_id)`. RLS FOR ALL. |
 
 ## Architecture
 
@@ -205,7 +213,7 @@ Always use `decimal.js` for these computations. Fiscal rates by city live in `sr
 | `src/components/clientes/` | `ClientesList.tsx`, `ClientesNewButton.tsx`, `ModalCliente.tsx`, `MunicipioCombobox.tsx`, `ClienteSelector.tsx`, `ClienteDetailActions.tsx` |
 | `src/components/proveedores/` | `ProveedoresList.tsx` (grid con filtros tipo/categoría), `ProveedoresNewButton.tsx`, `ModalProveedor.tsx` (form con 7 categorías + ciudad select) |
 | `src/app/(dashboard)/parametros-fiscales/` | Página de configuración de parámetros AIU/IVA globales (cliente); usa `src/components/configuracion/FiscalForm.tsx` |
-| `src/components/presupuestos/` | Editor principal (`EditorPresupuesto.tsx`), `PanelAPU.tsx`, `ExplosionInsumosView.tsx`, `ResumenFinancieroTab.tsx` (pestaña activa), `ResumenFinanciero.tsx` (colapsible), `ResumenFinancieroVisual.tsx` (tarjetas KPI), `BotonEnviarRevision.tsx` (enviar a revisión), `ModalValidacionExport.tsx` (validación pre-PDF), `EstadoBadge.tsx`, `ResumenFinancieroModal.tsx` (**deprecated** — en disco pero sin importar) |
+| `src/components/presupuestos/` | Editor principal (`EditorPresupuesto.tsx`), `PanelAPU.tsx`, `ExplosionInsumosView.tsx`, `ResumenFinancieroTab.tsx` (pestaña activa), `ResumenFinanciero.tsx` (colapsible), `ResumenFinancieroVisual.tsx` (tarjetas KPI), `BotonEnviarRevision.tsx` (enviar a revisión), `ModalValidacionExport.tsx` (validación pre-PDF), `EstadoBadge.tsx`, `ModalVistaPrevia.tsx` + `ModalVistaPreviaInner.tsx` (vista previa PDF), `ModalCuadrillaAPU.tsx` (selector cuadrilla en Panel APU), `PresupuestosClientList.tsx` + `PresupuestosTable.tsx` (lista de presupuestos con filtros) |
 | `src/lib/calculos/` | Budget calculation engine + tests |
 | `src/lib/excel/exportarPresupuestoExcel.ts` | Genera `.xlsx` en browser: 4 hojas (Resumen, Presupuesto, APUs, Insumos). Usa SheetJS `XLSX.write` + Blob. Mismos cálculos con `decimal.js` que el PDF — nunca floats nativos. |
 | `src/components/pdf/` | `PresupuestoPDF.tsx`, `APUDetallePDF.tsx`, `PresupuestoCompletoConAPU.tsx`, `BotonExportarPDF.tsx`, `BotonExportarExcel.tsx` (import dinámico del helper Excel) |
@@ -256,12 +264,12 @@ Token reference: `src/lib/design-tokens.ts`. User accent color stored in `profil
 
 ## Known Remaining Tasks
 
-> **Snapshot:** 2026-05-26 — `tsc --noEmit --skipLibCheck` limpio (0 errores). **40 migraciones aplicadas en BD** (39 rastreadas en `migrate.js` + `20260522100000_seed_municipios_completo.sql` aplicada manualmente, pendiente agregar a migrate.js). Rama `rama-deisy`. 16 archivos de Server Actions (auth.ts exporta 9 funciones incluye `sendOtp`+`verifyOtp`), 5 componentes PDF, motor de cálculo `motor-presupuesto.ts` (219 líneas) con tests Vitest (110 líneas). Login con 2FA por OTP implementado. `fn_duplicar_presupuesto` atómica DB-side. hCaptcha eliminado. Formulario de registro simplificado (4 campos: nombre, email, contraseña, confirmar). 28 tablas + 5 vistas en BD. Filtros de período implementados en dashboard y proyectos (5 opciones, timezone Bogotá).
+> **Snapshot:** 2026-06-01 — `tsc --noEmit --skipLibCheck` limpio (0 errores). **45 migraciones en `migrate.js`** (todas rastreadas). Rama `rama-deisy`. 16 archivos de Server Actions (auth.ts exporta 9 funciones incluye `sendOtp`+`verifyOtp`), 5 componentes PDF, motor de cálculo `motor-presupuesto.ts` (219 líneas) con tests Vitest (110 líneas). Login con 2FA por OTP implementado. `fn_duplicar_presupuesto` atómica DB-side. hCaptcha eliminado. Formulario de registro simplificado (4 campos: nombre, email, contraseña, confirmar). **30 tablas + 5 vistas en BD** (nuevas: `user_material_precios`, `user_equipment_precios`; `trabajadores` ahora soporta propios por `user_id`). Filtros de período en dashboard y proyectos. Responsive fixes en tablas de Clientes/Proveedores y headers de Insumos/Mano de Obra (mobile-first, columnas ocultas con `hidden sm/md:table-cell`, botones con `w-full sm:w-auto`). Registro con confirmación de email (no redirige al dashboard automáticamente). Sidebar muestra rol correcto: `super_admin`→"Administrador", `usuario`→empresa o "Usuario".
 
 ### Pendiente — acción manual requerida
 - Presupuestos creados antes del fix de admin client (2026-05-07) tienen 0 actividades — deben eliminarse y recrearse con "Plantilla Sugerida"
 - ~~Reimportar capítulos del catálogo que existan en BD sin `apu_items`~~ — Scripts listos: `pnpm run diagnostico:huerfanos` (identifica) + `pnpm run reimportar:huerfanos` (corrige). Correr en ese orden. Scripts: `scripts/diagnostico-capitulos-huerfanos.ts` y `scripts/reimportar-capitulos-huerfanos.ts`.
-- **`20260522100000_seed_municipios_completo.sql` no está en `migrate.js`** — la migración YA está aplicada en BD (aparece en `schema_migrations` como la #40), pero NO está en el array `migrationFiles` de `scripts/migrate.js`. Agregar la línea `'supabase/migrations/20260522100000_seed_municipios_completo.sql'` al final del array en `migrate.js` para que quede rastreada (el runner la saltará con SKIP porque ya está en `schema_migrations`).
+- ~~**`20260522100000_seed_municipios_completo.sql` no está en `migrate.js`**~~ ✅ 2026-05-31 — ya agregado al array `migrationFiles` en `scripts/migrate.js` (posición 41). El runner la salta con SKIP porque ya estaba en `schema_migrations`.
 
 ### Pendiente — próximas features (prioridad alta)
 ~~- **Panel APU — fix duplicados en apu_items**~~ ✅ 2026-05-18 — `guardarAPU` en `presupuestos.ts`: cuando `payload.id` no viene del cliente, ahora busca primero un APU existente para la actividad (`maybeSingle()` con filtro `activity_id + user_id + deleted_at IS NULL`) antes de insertar uno nuevo. Elimina la condición de carrera que creaba APUs duplicados al guardar dos veces sin recargar.
@@ -288,6 +296,9 @@ Token reference: `src/lib/design-tokens.ts`. User accent color stored in `profil
 ~~- `ResumenFinancieroModal.tsx` líneas 416-425 — fragmento huérfano de versión anterior causaba 14 errores TS1005/TS1109 parse errors~~ ✅ 2026-05-13
 
 ### Completado ✅
+- ~~**Responsive móvil — tablas y headers**~~ ✅ 2026-05-31 — (1) `ClientesList.tsx`: columnas CONTACTO ocultas con `hidden sm:table-cell`, PROYECTOS e INVERSIÓN TOTAL con `hidden md:table-cell`; pills de filtro tipo con `flex-wrap`. (2) `ProveedoresList.tsx`: botón "Nuevo Proveedor" con `w-full sm:w-auto justify-center`. (3) `insumos/page.tsx` + `mano-obra/page.tsx`: header refactorizado a `flex flex-col gap-2`; contenedor de botones a `flex flex-wrap gap-2 w-full`; cada botón con `w-full sm:w-auto`.
+- ~~**Catálogo de Insumos — precios propios por usuario**~~ ✅ 2026-05-27 — Módulo Insumos reescrito con override de precios por usuario para materiales y equipos del catálogo (tablas `user_material_precios` + `user_equipment_precios`). `toggleMaterialActivo`/`toggleEquipoActivo` en `insumos.ts`; lápiz inline para editar precio; botón reset restaura precio de catálogo. Columna `activo` permite inhabilitar ítems sin perder la personalización.
+- ~~**Trabajadores propios por usuario**~~ ✅ 2026-05-26 — `trabajadores.user_id` agrega soporte multi-tenant: catálogo sistema (`user_id IS NULL`) público + trabajadores propios (`user_id = auth.uid()`) con CRUD completo. Índices parciales para garantizar unicidad por scope. `ModalTrabajador.tsx` para crear/editar propios. `mano-obra/page.tsx` ampliado con toggle activo/inactivo, editar y eliminar propios.
 - ~~**Filtros de período en dashboard y proyectos**~~ — 5 opciones (Todo el tiempo / Este mes / Mes pasado / Este trimestre / Este año) con timezone `America/Bogota`. **Dashboard:** `page.tsx` se redujo a wrapper Server Component; `DashboardClient.tsx` (client) tiene el selector en el header y re-fetcha `getKPIsGlobales` + `getDistribucionCD` vía `useTransition` al cambiar período — la UI se atenúa sin bloquear; `proximos_a_vencer` siempre sin filtro de período (métrica de futuro). **Proyectos:** `SelectorPeriodo` en barra de búsqueda; filtro cascada período→estado→búsqueda sobre filas; contadores de pills siempre sobre `projects` completo (no cambian con el período); empty state contextual según período + estado activos. Archivos nuevos: `src/lib/utils/periodos.ts`, `src/components/shared/SelectorPeriodo.tsx`, `src/components/dashboard/DashboardClient.tsx`. Modificados: `analytics.ts` (acepta `RangoOpts { desde?, hasta? }`), `dashboard/page.tsx`, `ProyectosGrid.tsx`. `tsc` limpio ✅ 2026-05-26
 - ~~**2FA por OTP al correo en login**~~ — `login/page.tsx` reescrito con flujo 2 pasos: (1) email+contraseña → `signIn` verifica credenciales con `signInWithPassword`, destruye sesión temporal con `signOut()`, envía OTP con `signInWithOtp({ shouldCreateUser: false })`, devuelve `{ email }`. (2) Pantalla OTP: 6 inputs individuales con auto-avance/backspace/paste, countdown 60s, botón "Reenviar código", botón "Volver". Verificación con `verifyOtp` establece sesión real y redirige al dashboard. Nuevas acciones en `auth.ts`: `sendOtp(email)` y `verifyOtp(email, token)`. `tsc` limpio ✅ 2026-05-25
 - ~~**Formulario de registro simplificado**~~ — `registro/page.tsx`: eliminados campos `empresa` y `ciudad` (se recopilan en onboarding). Eliminados imports `Building2`, `MapPin`, `CIUDADES_COLOMBIA`. Quedan 4 campos: nombre completo, email, contraseña, confirmar contraseña ✅ 2026-05-25

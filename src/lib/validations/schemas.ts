@@ -194,6 +194,64 @@ export type NuevaContrasenaInput = z.infer<typeof nuevaContrasenaSchema>;
 export type OnboardingEmpresaInput = z.infer<typeof onboardingEmpresaSchema>;
 export type OnboardingProyectoInput = z.infer<typeof onboardingProyectoSchema>;
 
+// ============ Catálogo editable — schemas super_admin ============
+
+const TIPO_OBRA_CATALOGO = ['residencial', 'comercial', 'industrial', 'infraestructura', 'institucional', 'hotelero'] as const;
+const TIPO_APU_ITEM = ['material', 'mano_obra', 'equipo', 'herramienta_menor', 'epp'] as const;
+
+export const crearCapituloSchema = z.object({
+  nombre:    z.string().min(2, 'El nombre es obligatorio').max(200),
+  tipo_obra: z.enum(TIPO_OBRA_CATALOGO, { message: 'Tipo de obra inválido' }),
+  codigo:    z.string().max(20).optional(),
+});
+
+export const actualizarCapituloSchema = z.object({
+  nombre:    z.string().min(2, 'El nombre es obligatorio').max(200).optional(),
+  tipo_obra: z.enum(TIPO_OBRA_CATALOGO, { message: 'Tipo de obra inválido' }).optional(),
+});
+
+export const crearActividadCatalogoSchema = z.object({
+  capitulo_id:                z.uuid({ message: 'ID de capítulo inválido' }),
+  nombre:                     z.string().min(2, 'El nombre es obligatorio').max(300),
+  unidad:                     z.string().min(1, 'La unidad es obligatoria').max(20),
+  precio_referencia_nacional: z.coerce.number().min(0).default(0),
+  rango_min:                  z.coerce.number().min(0).default(0),
+  rango_max:                  z.coerce.number().min(0).default(0),
+});
+
+export const actualizarActividadCatalogoSchema = z.object({
+  nombre:                     z.string().min(2, 'El nombre es obligatorio').max(300).optional(),
+  unidad:                     z.string().min(1, 'La unidad es obligatoria').max(20).optional(),
+  precio_referencia_nacional: z.coerce.number().min(0).optional(),
+  rango_min:                  z.coerce.number().min(0).optional(),
+  rango_max:                  z.coerce.number().min(0).optional(),
+});
+
+export const crearCatalogoAPUItemSchema = z.object({
+  actividad_id:   z.uuid({ message: 'ID de actividad inválido' }),
+  nombre:         z.string().min(2, 'El nombre es obligatorio').max(200),
+  unidad:         z.string().min(1, 'La unidad es obligatoria').max(20),
+  cantidad:       z.coerce.number().min(0, 'La cantidad debe ser ≥ 0'),
+  precio_unitario:z.coerce.number().min(0, 'El precio debe ser ≥ 0'),
+  tipo:           z.enum(TIPO_APU_ITEM, { message: 'Tipo de ítem inválido' }),
+  orden:          z.coerce.number().min(0).default(0),
+});
+
+export const actualizarCatalogoAPUItemSchema = z.object({
+  nombre:         z.string().min(2, 'El nombre es obligatorio').max(200).optional(),
+  unidad:         z.string().min(1).max(20).optional(),
+  cantidad:       z.coerce.number().min(0).optional(),
+  precio_unitario:z.coerce.number().min(0).optional(),
+  tipo:           z.enum(TIPO_APU_ITEM).optional(),
+});
+
+export type CrearCapituloInput              = z.infer<typeof crearCapituloSchema>;
+export type ActualizarCapituloInput         = z.infer<typeof actualizarCapituloSchema>;
+export type CrearActividadCatalogoInput     = z.infer<typeof crearActividadCatalogoSchema>;
+export type ActualizarActividadCatalogoInput= z.infer<typeof actualizarActividadCatalogoSchema>;
+export type CrearCatalogoAPUItemInput       = z.infer<typeof crearCatalogoAPUItemSchema>;
+export type ActualizarCatalogoAPUItemInput  = z.infer<typeof actualizarCatalogoAPUItemSchema>;
+
 // ============ Backwards compatibility aliases ============
 export const presupuestoSchema = updateBudgetSchema;
 export const capituloSchema = createChapterSchema;

@@ -463,6 +463,7 @@ export interface Profile {
   cargo_firma: string | null;
   firma_url: string | null;
   suscripcion: 'gratis' | 'pro';
+  rol: 'usuario' | 'super_admin';
   preferences?: UserPreferences | null;
   created_at: string;
   updated_at: string;
@@ -543,6 +544,30 @@ export interface CatalogoApuItem {
   cantidad: number;
   precio_unitario: number;
   orden: number;
+}
+
+// ── Búsqueda de insumos del catálogo ──
+export interface ResultadoBusquedaInsumo {
+  id: string;
+  nombre: string;
+  unidad: string;
+  precio_unitario: number;
+  origen: 'material' | 'trabajador' | 'equipo';
+}
+
+export interface TrabajadorCuadrilla {
+  nombre: string;
+  cantidad: number;
+  jornal: number;
+  unidad: string;
+}
+
+export interface ResultadoBusquedaCuadrilla {
+  id: string;
+  nombre: string;
+  costo_total_dia: number;
+  es_sistema: boolean;
+  trabajadores: TrabajadorCuadrilla[];
 }
 
 // ── Ciudades de Colombia ──

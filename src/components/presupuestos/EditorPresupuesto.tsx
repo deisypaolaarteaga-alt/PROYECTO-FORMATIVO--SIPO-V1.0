@@ -700,6 +700,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                                 value={act.unidad ?? 'un'}
                                 onChange={(e) => handleUpdateAct(act.id, ch.id, { unidad: e.target.value })}
                                 className="bg-transparent border-none focus:ring-0 p-0 text-stone text-xs font-medium cursor-pointer hover:text-[#1C1814] transition-colors"
+                                suppressHydrationWarning
                               >
                                 {['m²', 'ml', 'm³', 'kg', 'gl', 'un', 'pza', 'glb'].map(u => (
                                   <option key={u} value={u}>{u}</option>

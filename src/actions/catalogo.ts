@@ -3,7 +3,16 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { checkRateLimit } from '@/lib/security/rate-limit';
-import type { ActionResult, CatalogoCapitulo, CatalogoActividad } from '@/types';
+import { isSuperAdmin } from '@/lib/auth/roles';
+import {
+  crearCapituloSchema,
+  actualizarCapituloSchema,
+  crearActividadCatalogoSchema,
+  actualizarActividadCatalogoSchema,
+  crearCatalogoAPUItemSchema,
+  actualizarCatalogoAPUItemSchema,
+} from '@/lib/validations/schemas';
+import type { ActionResult, CatalogoCapitulo, CatalogoActividad, CatalogoApuItem, ResultadoBusquedaInsumo, ResultadoBusquedaCuadrilla } from '@/types';
 
 type TipoCatalogo = 'residencial' | 'comercial' | 'industrial' | 'infraestructura' | 'institucional' | 'hotelero';
 
@@ -496,6 +505,521 @@ export async function importarActividadAInsumos(
   } catch (error: any) {
     console.error('importarActividadAInsumos:', error);
     return { success: false, error: 'No se pudo importar el insumo.' };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Edición de catálogo — solo super_admin
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function verificarAdmin(): Promise<{ userId: string } | { error: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: 'No autorizado.' };
+  const esAdmin = await isSuperAdmin(user.id);
+  if (!esAdmin) return { error: 'No tienes permisos para realizar esta acción.' };
+  return { userId: user.id };
+}
+
+// ── Capítulos ────────────────────────────────────────────────────────────────
+
+const PREFIJO_TIPO_OBRA: Record<string, string> = {
+  residencial:     'RES',
+  comercial:       'COM',
+  industrial:      'IND',
+  infraestructura: 'INF',
+  institucional:   'INS',
+  hotelero:        'HOT',
+};
+
+export async function crearCapitulo(
+  input: unknown
+): Promise<ActionResult<{ id: string }>> {
+  try {
+    const auth = await verificarAdmin();
+    if ('error' in auth) return { success: false, error: auth.error };
+
+    const parsed = crearCapituloSchema.safeParse(input);
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? 'Datos inválidos.' };
+    }
+    const { nombre, tipo_obra, codigo } = parsed.data;
+
+    const admin = createAdminClient();
+    const { data: ultimo } = await admin
+      .from('catalogo_capitulos')
+      .select('numero')
+      .eq('tipo_obra', tipo_obra)
+      .order('numero', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const siguienteNumero = (ultimo?.numero ?? 0) + 1;
+
+    const prefijo = PREFIJO_TIPO_OBRA[tipo_obra] ?? tipo_obra.toUpperCase().slice(0, 3);
+    const codigoFinal = codigo?.trim() || `${prefijo}-${siguienteNumero.toString().padStart(2, '0')}`;
+
+    const { data, error } = await admin
+      .from('catalogo_capitulos')
+      .insert({ nombre: nombre.trim(), tipo_obra, codigo: codigoFinal, numero: siguienteNumero })
+      .select('id')
+      .single();
+
+    if (error) throw error;
+    revalidatePath('/catalogo');
+    return { success: true, data: { id: data.id } };
+  } catch (error: any) {
+    console.error('crearCapitulo:', error);
+    return { success: false, error: 'No se pudo crear el capítulo.' };
+  }
+}
+
+export async function actualizarCapitulo(
+  id: string,
+  input: unknown
+): Promise<ActionResult> {
+  try {
+    const auth = await verificarAdmin();
+    if ('error' in auth) return { success: false, error: auth.error };
+
+    const parsed = actualizarCapituloSchema.safeParse(input);
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? 'Datos inválidos.' };
+    }
+
+    const admin = createAdminClient();
+    const { error } = await admin
+      .from('catalogo_capitulos')
+      .update(parsed.data)
+      .eq('id', id);
+
+    if (error) throw error;
+    revalidatePath('/catalogo');
+    return { success: true };
+  } catch (error: any) {
+    console.error('actualizarCapitulo:', error);
+    return { success: false, error: 'No se pudo actualizar el capítulo.' };
+  }
+}
+
+export async function eliminarCapitulo(id: string): Promise<ActionResult> {
+  try {
+    const auth = await verificarAdmin();
+    if ('error' in auth) return { success: false, error: auth.error };
+
+    const admin = createAdminClient();
+
+    const { count, error: cntErr } = await admin
+      .from('catalogo_actividades')
+      .select('id', { count: 'exact', head: true })
+      .eq('catalogo_capitulo_id', id);
+
+    if (cntErr) throw cntErr;
+
+    if ((count ?? 0) > 0) {
+      return {
+        success: false,
+        error: `Este capítulo tiene ${count} actividad${count === 1 ? '' : 'es'}. Elimínalas primero.`,
+      };
+    }
+
+    const { error } = await admin.from('catalogo_capitulos').delete().eq('id', id);
+    if (error) throw error;
+    revalidatePath('/catalogo');
+    return { success: true };
+  } catch (error: any) {
+    console.error('eliminarCapitulo:', error);
+    return { success: false, error: 'No se pudo eliminar el capítulo.' };
+  }
+}
+
+// ── Actividades ───────────────────────────────────────────────────────────────
+
+export async function crearActividad(
+  input: unknown
+): Promise<ActionResult<CatalogoActividad>> {
+  try {
+    const auth = await verificarAdmin();
+    if ('error' in auth) return { success: false, error: auth.error };
+
+    const parsed = crearActividadCatalogoSchema.safeParse(input);
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? 'Datos inválidos.' };
+    }
+
+    const { capitulo_id, nombre, unidad, precio_referencia_nacional, rango_min, rango_max } = parsed.data;
+
+    const admin = createAdminClient();
+
+    const { data: cap, error: capErr } = await admin
+      .from('catalogo_capitulos')
+      .select('tipo_obra, codigo')
+      .eq('id', capitulo_id)
+      .single();
+
+    if (capErr || !cap) return { success: false, error: 'Capítulo no encontrado.' };
+
+    const { count: actCount } = await admin
+      .from('catalogo_actividades')
+      .select('id', { count: 'exact', head: true })
+      .eq('catalogo_capitulo_id', capitulo_id);
+
+    const siguienteNumero = (actCount ?? 0) + 1;
+    const codigoActividad = `${cap.codigo}-${siguienteNumero.toString().padStart(3, '0')}`;
+
+    const { data, error } = await admin
+      .from('catalogo_actividades')
+      .insert({
+        catalogo_capitulo_id: capitulo_id,
+        tipo_obra: cap.tipo_obra,
+        codigo: codigoActividad,
+        nombre: nombre.trim(),
+        unidad: unidad.trim().toLowerCase(),
+        precio_referencia_nacional,
+        rango_min,
+        rango_max,
+      })
+      .select('id, catalogo_capitulo_id, tipo_obra, codigo, nombre, unidad, precio_referencia_nacional, rango_min, rango_max, descripcion')
+      .single();
+
+    if (error) throw error;
+    revalidatePath('/catalogo');
+    return { success: true, data: data as CatalogoActividad };
+  } catch (error: any) {
+    console.error('crearActividad:', error);
+    return { success: false, error: 'No se pudo crear la actividad.' };
+  }
+}
+
+export async function actualizarActividad(
+  id: string,
+  input: unknown
+): Promise<ActionResult> {
+  try {
+    const auth = await verificarAdmin();
+    if ('error' in auth) return { success: false, error: auth.error };
+
+    const parsed = actualizarActividadCatalogoSchema.safeParse(input);
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? 'Datos inválidos.' };
+    }
+
+    const campos: Record<string, unknown> = { ...parsed.data };
+    if (campos.nombre) campos.nombre = (campos.nombre as string).trim();
+    if (campos.unidad) campos.unidad = (campos.unidad as string).trim().toLowerCase();
+
+    const admin = createAdminClient();
+    const { error } = await admin
+      .from('catalogo_actividades')
+      .update(campos)
+      .eq('id', id);
+
+    if (error) throw error;
+    revalidatePath('/catalogo');
+    return { success: true };
+  } catch (error: any) {
+    console.error('actualizarActividad:', error);
+    return { success: false, error: 'No se pudo actualizar la actividad.' };
+  }
+}
+
+export async function eliminarActividad(id: string): Promise<ActionResult> {
+  try {
+    const auth = await verificarAdmin();
+    if ('error' in auth) return { success: false, error: auth.error };
+
+    const admin = createAdminClient();
+
+    // Verificar si alguna activity en presupuestos hace referencia a esta actividad
+    // La actividad del catálogo no tiene FK directa a activities, pero sí se podría
+    // verificar que no haya catalogo_apu_items — en ese caso los advertimos también.
+    // La restricción principal es eliminar apu_items primero si existen.
+    const { count: itemCount, error: itemErr } = await admin
+      .from('catalogo_apu_items')
+      .select('id', { count: 'exact', head: true })
+      .eq('catalogo_actividad_id', id);
+
+    if (itemErr) throw itemErr;
+
+    // Eliminar en cascada los apu_items primero
+    if ((itemCount ?? 0) > 0) {
+      const { error: delItemsErr } = await admin
+        .from('catalogo_apu_items')
+        .delete()
+        .eq('catalogo_actividad_id', id);
+      if (delItemsErr) throw delItemsErr;
+    }
+
+    const { error } = await admin.from('catalogo_actividades').delete().eq('id', id);
+    if (error) throw error;
+    revalidatePath('/catalogo');
+    return { success: true };
+  } catch (error: any) {
+    console.error('eliminarActividad:', error);
+    return { success: false, error: 'No se pudo eliminar la actividad.' };
+  }
+}
+
+// ── Ítems APU del catálogo ────────────────────────────────────────────────────
+
+export async function crearCatalogoAPUItem(
+  input: unknown
+): Promise<ActionResult<{ id: string }>> {
+  try {
+    const auth = await verificarAdmin();
+    if ('error' in auth) return { success: false, error: auth.error };
+
+    const parsed = crearCatalogoAPUItemSchema.safeParse(input);
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? 'Datos inválidos.' };
+    }
+    const { actividad_id, nombre, unidad, cantidad, precio_unitario, tipo, orden } = parsed.data;
+
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from('catalogo_apu_items')
+      .insert({
+        catalogo_actividad_id: actividad_id,
+        nombre: nombre.trim(),
+        unidad: unidad.trim().toLowerCase(),
+        cantidad,
+        precio_unitario,
+        tipo,
+        orden,
+      })
+      .select('id')
+      .single();
+
+    if (error) throw error;
+    revalidatePath('/catalogo');
+    return { success: true, data: { id: data.id } };
+  } catch (error: any) {
+    console.error('crearCatalogoAPUItem:', error);
+    return { success: false, error: 'No se pudo crear el ítem APU.' };
+  }
+}
+
+export async function actualizarCatalogoAPUItem(
+  id: string,
+  input: unknown
+): Promise<ActionResult> {
+  try {
+    const auth = await verificarAdmin();
+    if ('error' in auth) return { success: false, error: auth.error };
+
+    const parsed = actualizarCatalogoAPUItemSchema.safeParse(input);
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? 'Datos inválidos.' };
+    }
+
+    const campos: Record<string, unknown> = { ...parsed.data };
+    if (campos.nombre) campos.nombre = (campos.nombre as string).trim();
+    if (campos.unidad) campos.unidad = (campos.unidad as string).trim().toLowerCase();
+
+    const admin = createAdminClient();
+    const { error } = await admin
+      .from('catalogo_apu_items')
+      .update(campos)
+      .eq('id', id);
+
+    if (error) throw error;
+    revalidatePath('/catalogo');
+    return { success: true };
+  } catch (error: any) {
+    console.error('actualizarCatalogoAPUItem:', error);
+    return { success: false, error: 'No se pudo actualizar el ítem APU.' };
+  }
+}
+
+export async function eliminarCatalogoAPUItem(id: string): Promise<ActionResult> {
+  try {
+    const auth = await verificarAdmin();
+    if ('error' in auth) return { success: false, error: auth.error };
+
+    const admin = createAdminClient();
+    const { error } = await admin.from('catalogo_apu_items').delete().eq('id', id);
+    if (error) throw error;
+    revalidatePath('/catalogo');
+    return { success: true };
+  } catch (error: any) {
+    console.error('eliminarCatalogoAPUItem:', error);
+    return { success: false, error: 'No se pudo eliminar el ítem APU.' };
+  }
+}
+
+export async function obtenerAPUItemsActividad(
+  actividadId: string
+): Promise<ActionResult<CatalogoApuItem[]>> {
+  try {
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from('catalogo_apu_items')
+      .select('id, catalogo_actividad_id, tipo, nombre, descripcion, unidad, cantidad, precio_unitario, orden')
+      .eq('catalogo_actividad_id', actividadId)
+      .order('orden', { ascending: true });
+
+    if (error) throw error;
+    return { success: true, data: (data ?? []) as CatalogoApuItem[] };
+  } catch (error: any) {
+    console.error('obtenerAPUItemsActividad:', error);
+    return { success: false, error: 'No se pudieron cargar los ítems APU.' };
+  }
+}
+
+// ── Búsqueda de insumos del catálogo (materials / trabajadores / equipment) ──
+
+export async function buscarInsumosCatalogo(
+  query: string,
+  tipo: string
+): Promise<ActionResult<ResultadoBusquedaInsumo[]>> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'No autorizado.' };
+
+    const q = query.trim();
+    const LIMIT = 10;
+
+    if (tipo === 'material') {
+      const { data, error } = await supabase
+        .from('materials')
+        .select('id, nombre, unidad, precio_referencia')
+        .ilike('nombre', `%${q}%`)
+        .limit(LIMIT);
+      if (error) throw error;
+      return {
+        success: true,
+        data: (data ?? []).map(m => ({
+          id: m.id,
+          nombre: m.nombre ?? '',
+          unidad: m.unidad ?? 'und',
+          precio_unitario: Number(m.precio_referencia ?? 0),
+          origen: 'material' as const,
+        })),
+      };
+    }
+
+    if (tipo === 'mano_obra') {
+      const { data, error } = await supabase
+        .from('trabajadores')
+        .select('id, especialidad, jornal_con_prestaciones')
+        .ilike('especialidad', `%${q}%`)
+        .eq('activo', true)
+        .limit(LIMIT);
+      if (error) throw error;
+      return {
+        success: true,
+        data: (data ?? []).map(t => ({
+          id: t.id,
+          nombre: t.especialidad ?? '',
+          unidad: 'jor',
+          precio_unitario: Number(t.jornal_con_prestaciones ?? 0),
+          origen: 'trabajador' as const,
+        })),
+      };
+    }
+
+    if (tipo === 'equipo') {
+      const { data, error } = await supabase
+        .from('equipment')
+        .select('id, nombre, unidad, precio_diario')
+        .ilike('nombre', `%${q}%`)
+        .limit(LIMIT);
+      if (error) throw error;
+      return {
+        success: true,
+        data: (data ?? []).map(e => ({
+          id: e.id,
+          nombre: e.nombre ?? '',
+          unidad: e.unidad ?? 'día',
+          precio_unitario: Number(e.precio_diario ?? 0),
+          origen: 'equipo' as const,
+        })),
+      };
+    }
+
+    // herramienta_menor y epp — busca en materials filtrando por categoria
+    const categoriaFiltro = tipo === 'epp' ? '%epp%' : '%herramienta%';
+    const { data, error } = await supabase
+      .from('materials')
+      .select('id, nombre, unidad, precio_referencia')
+      .ilike('nombre', `%${q}%`)
+      .ilike('categoria', categoriaFiltro)
+      .limit(LIMIT);
+    if (error) throw error;
+    return {
+      success: true,
+      data: (data ?? []).map(m => ({
+        id: m.id,
+        nombre: m.nombre ?? '',
+        unidad: m.unidad ?? 'und',
+        precio_unitario: Number(m.precio_referencia ?? 0),
+        origen: 'material' as const,
+      })),
+    };
+  } catch (error: any) {
+    console.error('buscarInsumosCatalogo:', error);
+    return { success: false, error: 'Error al buscar insumos.' };
+  }
+}
+
+export async function buscarCuadrillas(
+  query: string
+): Promise<ActionResult<ResultadoBusquedaCuadrilla[]>> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'No autorizado.' };
+
+    const { data, error } = await supabase
+      .from('cuadrillas')
+      .select(`
+        id,
+        nombre,
+        es_sistema,
+        cuadrilla_trabajadores (
+          cantidad,
+          trabajadores (
+            especialidad,
+            jornal_con_prestaciones
+          )
+        )
+      `)
+      .ilike('nombre', `%${query.trim()}%`)
+      .eq('activa', true)
+      .limit(5);
+
+    if (error) throw error;
+
+    return {
+      success: true,
+      data: (data ?? []).map((c: any) => {
+        const trabajadores = (c.cuadrilla_trabajadores ?? [])
+          .map((ct: any) => ({
+            nombre: ct.trabajadores?.especialidad ?? '',
+            cantidad: Number(ct.cantidad ?? 1),
+            jornal: Number(ct.trabajadores?.jornal_con_prestaciones ?? 0),
+            unidad: 'jor',
+          }))
+          .filter((t: any) => t.nombre);
+
+        const costo_total_dia = trabajadores.reduce(
+          (sum: number, t: any) => sum + t.jornal * t.cantidad,
+          0
+        );
+
+        return {
+          id: c.id,
+          nombre: c.nombre ?? '',
+          costo_total_dia,
+          es_sistema: c.es_sistema ?? false,
+          trabajadores,
+        };
+      }),
+    };
+  } catch (error: any) {
+    console.error('buscarCuadrillas:', error);
+    return { success: false, error: 'Error al buscar cuadrillas.' };
   }
 }
 

@@ -262,27 +262,23 @@ export async function cambiarContrasena(
  * Actualizar contraseña (desde link de recuperación — usuario ya tiene sesión via callback)
  */
 export async function updatePassword(formData: FormData): Promise<ActionResult> {
-  const raw = {
-    password: formData.get('password') as string,
-    confirmar_password: formData.get('confirmar_password') as string,
-  };
-
+  const raw = Object.fromEntries(formData);
   const parsed = nuevaContrasenaSchema.safeParse(raw);
   if (!parsed.success) {
-    return { success: false, error: parsed.error.issues[0].message };
+    return { success: false, error: parsed.error.issues[0]?.message ?? 'Datos inválidos' };
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.updateUser({
-    password: parsed.data.password,
-  });
+  let updateError: string | null = null;
 
-  if (error) {
-    return {
-      success: false,
-      error: 'Error al actualizar la contraseña. El enlace puede haber expirado.',
-    };
+  try {
+    const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
+    if (error) updateError = 'El enlace expiró o es inválido. Solicita uno nuevo.';
+  } catch {
+    updateError = 'Error inesperado. Intenta de nuevo.';
   }
+
+  if (updateError) return { success: false, error: updateError };
 
   redirect('/login');
 }

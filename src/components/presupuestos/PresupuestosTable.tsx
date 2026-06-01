@@ -76,6 +76,9 @@ export function PresupuestosTable({ rows, filtro }: { rows: any[]; filtro: strin
         <p className="flex-1 min-w-0 text-[10px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF] leading-none">
           Presupuesto
         </p>
+        <p className="w-[150px] shrink-0 text-[10px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF] leading-none">
+          Proyecto
+        </p>
         <p className="w-[110px] shrink-0 text-[10px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF] leading-none">
           Estado
         </p>
@@ -136,6 +139,13 @@ export function PresupuestosTable({ rows, filtro }: { rows: any[]; filtro: strin
                 </p>
               </div>
 
+              {/* Proyecto */}
+              <div className="hidden md:block w-[150px] shrink-0">
+                <p className="text-[12px] text-[#6B7280] truncate leading-tight">
+                  {r.proyecto_nombre ?? '—'}
+                </p>
+              </div>
+
               {/* Estado */}
               <div className="hidden md:flex w-[110px] shrink-0">
                 <StatusBadge estado={r.estado} />
@@ -172,7 +182,7 @@ export function PresupuestosTable({ rows, filtro }: { rows: any[]; filtro: strin
       </div>
 
       {/* Paginación */}
-      <div className="px-5 py-3 border-t border-[#F3F4F6] flex items-center justify-between bg-[#FAFAFA]">
+      <div className="px-5 py-3 border-t border-[#F3F4F6] flex items-center justify-between flex-wrap gap-y-2 bg-[#FAFAFA]">
         <p className="text-xs text-neutral-400">
           Mostrando {inicio + 1} a {Math.min(inicio + PAGE_SIZE, rows.length)} de{' '}
           {rows.length} resultado{rows.length !== 1 ? 's' : ''}

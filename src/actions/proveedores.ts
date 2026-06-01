@@ -170,6 +170,28 @@ export async function eliminarProveedor(proveedorId: string): Promise<ActionResu
   }
 }
 
+export async function toggleProveedorActivo(proveedorId: string, activo: boolean): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'No autorizado' };
+
+    const { error } = await supabase
+      .from('proveedores')
+      .update({ activo, updated_at: new Date().toISOString() })
+      .eq('id', proveedorId)
+      .eq('user_id', user.id);
+
+    if (error) throw error;
+
+    revalidatePath('/proveedores');
+    return { success: true };
+  } catch (error: any) {
+    console.error('[toggleProveedorActivo] error:', error);
+    return { success: false, error: 'No se pudo actualizar el proveedor.' };
+  }
+}
+
 // Asigna (o quita) un proveedor a todos los apu_items con ese nombre/unidad/tipo
 // dentro de un presupuesto dado. Un mass-update es correcto aquí porque la vista de
 // explosión agrega ítems idénticos de distintos APUs — conceptualmente es el mismo insumo.
@@ -288,6 +310,7 @@ export async function buscarProveedores(
       .select('id, nombre_razon_social, nit_cedula, ciudad, categoria')
       .eq('user_id', user.id)
       .is('deleted_at', null)
+      .eq('activo', true)
       .or(`nombre_razon_social.ilike.%${query}%,nit_cedula.ilike.%${query}%`)
       .limit(10);
 

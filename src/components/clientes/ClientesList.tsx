@@ -404,7 +404,7 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
                     <th className="px-5 py-3.5 text-left text-[10px] font-bold text-stone uppercase tracking-widest">
                       Cliente
                     </th>
-                    <th className="px-4 py-3.5 text-left text-[10px] font-bold text-stone uppercase tracking-widest">
+                    <th className="hidden sm:table-cell px-4 py-3.5 text-left text-[10px] font-bold text-stone uppercase tracking-widest">
                       Tipo
                     </th>
                     <th className="hidden sm:table-cell px-4 py-3.5 text-left text-[10px] font-bold text-stone uppercase tracking-widest">
@@ -454,7 +454,7 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
                         </td>
 
                         {/* Tipo */}
-                        <td className="px-4 py-3.5 whitespace-nowrap">
+                        <td className="hidden sm:table-cell px-4 py-3.5 whitespace-nowrap">
                           {cliente.tipo === 'empresa' ? (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-[#E8F0F8] text-[#2D5F8A] border border-[#C1D8EE]">
                               <Building2 className="h-3 w-3 flex-shrink-0" />

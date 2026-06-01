@@ -100,7 +100,7 @@ function BudgetRowItem({ row }: { row: BudgetRow }) {
         </div>
 
         {/* Estado */}
-        <span className={cn('inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium shrink-0 w-[100px] justify-center', badge.badge)}>
+        <span className={cn('hidden sm:inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium shrink-0 w-[100px] justify-center', badge.badge)}>
           {badge.label}
         </span>
 

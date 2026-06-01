@@ -5,9 +5,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Search, Building2, User, MoreVertical,
-  Edit, Trash2, ExternalLink, Plus, Download,
+  Edit, Ban, CheckCircle, ExternalLink, Plus, Download,
   ChevronLeft, ChevronRight,
-  ChevronDown, Truck, Phone, Mail, Globe,
+  ChevronDown, Truck, Phone, Mail, Globe, EyeOff,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -16,7 +16,7 @@ import {
   DropdownMenuItem,
 } from '@/components/shared/DropdownMenu';
 import { ModalProveedor } from './ModalProveedor';
-import { eliminarProveedor } from '@/actions/proveedores';
+import { toggleProveedorActivo } from '@/actions/proveedores';
 import { toast } from 'sonner';
 import type { Proveedor, CategoriaProveedor } from '@/types';
 import { CATEGORIA_PROVEEDOR_LABELS } from '@/types';
@@ -103,6 +103,7 @@ export function ProveedoresList({ initialProveedores }: ProveedoresListProps) {
   const [pagina, setPagina] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [proveedorAEditar, setProveedorAEditar] = useState<Proveedor | undefined>(undefined);
+  const [ocultarInactivos, setOcultarInactivos] = useState(false);
 
   const router = useRouter();
 
@@ -115,9 +116,10 @@ export function ProveedoresList({ initialProveedores }: ProveedoresListProps) {
         (p.ciudad || '').toLowerCase().includes(q);
       const matchTipo = filtroTipo === 'todos' || p.tipo === filtroTipo;
       const matchCat = filtroCategoria === 'todos' || p.categoria === filtroCategoria;
-      return matchBusqueda && matchTipo && matchCat;
+      const matchActivo = !ocultarInactivos || p.activo !== false;
+      return matchBusqueda && matchTipo && matchCat && matchActivo;
     });
-  }, [proveedores, busqueda, filtroTipo, filtroCategoria]);
+  }, [proveedores, busqueda, filtroTipo, filtroCategoria, ocultarInactivos]);
 
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / PAGE_SIZE));
   const paginaActual = Math.min(pagina, totalPaginas);
@@ -153,14 +155,15 @@ export function ProveedoresList({ initialProveedores }: ProveedoresListProps) {
   function handleFiltroCat(v: string) { setFiltroCategoria(v); setPagina(1); }
   function handleBusqueda(q: string) { setBusqueda(q); setPagina(1); }
 
-  async function handleEliminar(id: string, nombre: string) {
-    if (!confirm(`¿Eliminar a "${nombre}"? El proveedor dejará de aparecer en el listado.`)) return;
-    const res = await eliminarProveedor(id);
+  async function handleToggleActivo(id: string, esActivo: boolean, nombre: string) {
+    if (!confirm(`¿${esActivo ? 'Inhabilitar' : 'Habilitar'} a "${nombre}"?`)) return;
+    const nuevoActivo = !esActivo;
+    const res = await toggleProveedorActivo(id, nuevoActivo);
     if (res.success) {
-      toast.success('Proveedor eliminado');
-      setProveedores(prev => prev.filter(p => p.id !== id));
+      toast.success(`Proveedor ${nuevoActivo ? 'habilitado' : 'inhabilitado'}`);
+      setProveedores(prev => prev.map(p => p.id === id ? { ...p, activo: nuevoActivo } : p));
     } else {
-      toast.error(res.error || 'Error al eliminar');
+      toast.error(res.error || 'Error al actualizar');
     }
   }
 
@@ -250,6 +253,21 @@ export function ProveedoresList({ initialProveedores }: ProveedoresListProps) {
             </DropdownMenuContent>
           </DropdownMenu>
 
+          {proveedores.some(p => p.activo === false) && (
+            <button
+              type="button"
+              onClick={() => { setOcultarInactivos(v => !v); setPagina(1); }}
+              className={`h-10 px-3.5 flex items-center gap-2 border rounded-lg text-sm transition-colors whitespace-nowrap ${
+                ocultarInactivos
+                  ? 'border-[#C84B1A] bg-[#FEF0EB] text-[#C84B1A]'
+                  : 'border-[#E8E4DE] bg-white text-[#6B7280] hover:border-[#C84B1A] hover:text-[#C84B1A]'
+              }`}
+            >
+              <EyeOff className="h-3.5 w-3.5" />
+              {ocultarInactivos ? 'Mostrar inactivos' : 'Ocultar inactivos'}
+            </button>
+          )}
+
           <div className="flex-1" />
 
           <button
@@ -326,6 +344,12 @@ export function ProveedoresList({ initialProveedores }: ProveedoresListProps) {
                               <p className="text-xs text-[#9CA3AF] mt-0.5 truncate" style={{ fontFamily: 'var(--font-mono)' }}>
                                 {p.nit_cedula || 'Sin NIT/Cédula'}
                               </p>
+                              <div className="flex items-center gap-1 mt-1">
+                                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${p.activo !== false ? 'bg-emerald-500' : 'bg-[#9CA3AF]'}`} />
+                                <span className={`text-[10px] font-medium ${p.activo !== false ? 'text-emerald-600' : 'text-[#9CA3AF]'}`}>
+                                  {p.activo !== false ? 'Activo' : 'Inactivo'}
+                                </span>
+                              </div>
                             </div>
                           </div>
                         </td>
@@ -396,11 +420,22 @@ export function ProveedoresList({ initialProveedores }: ProveedoresListProps) {
                                 Editar
                               </DropdownMenuItem>
                               <DropdownMenuItem
-                                onClick={() => handleEliminar(p.id, p.nombre_razon_social)}
-                                className="text-red-600 focus:bg-red-50 focus:text-red-700"
+                                onClick={() => handleToggleActivo(p.id, p.activo !== false, p.nombre_razon_social)}
+                                className={p.activo !== false
+                                  ? 'text-amber-700 focus:bg-amber-50 focus:text-amber-900'
+                                  : 'text-emerald-700 focus:bg-emerald-50 focus:text-emerald-900'}
                               >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Eliminar
+                                {p.activo !== false ? (
+                                  <>
+                                    <Ban className="h-4 w-4 mr-2" />
+                                    Inhabilitar
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle className="h-4 w-4 mr-2" />
+                                    Habilitar
+                                  </>
+                                )}
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>

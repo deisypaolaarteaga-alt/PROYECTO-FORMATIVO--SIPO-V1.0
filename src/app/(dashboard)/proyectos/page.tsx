@@ -25,7 +25,7 @@ export default async function ProyectosPage() {
             <p className="text-sm text-[#6B7280] mt-0.5">Administra y organiza tus proyectos de obra.</p>
           </div>
         </div>
-        <Link href="/proyectos/nuevo">
+        <Link href="/proyectos/nuevo" className="w-full sm:w-auto">
           <Button icon={<Plus className="h-4 w-4" />}>Nuevo proyecto</Button>
         </Link>
       </div>

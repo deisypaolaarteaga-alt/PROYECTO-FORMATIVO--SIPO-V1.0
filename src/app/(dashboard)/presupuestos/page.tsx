@@ -82,7 +82,7 @@ export default async function PresupuestosPage({
 
   let query = supabase
     .from('budgets')
-    .select('id, titulo, estado, created_at, vigencia_dias, projects(tipo_obra)')
+    .select('id, titulo, estado, created_at, vigencia_dias, projects(tipo_obra, nombre)')
     .eq('user_id', user.id)
     .is('deleted_at', null)
     .order('created_at', { ascending: false });
@@ -114,7 +114,8 @@ export default async function PresupuestosPage({
       ? Math.ceil((new Date(b.created_at).getTime() + b.vigencia_dias * 86400000 - ahora) / 86400000)
       : null;
     const tipo_obra = (b.projects as any)?.tipo_obra ?? null;
-    return { ...b, ...resumen, diasRestantes, tipo_obra };
+    const proyecto_nombre = (b.projects as any)?.nombre ?? null;
+    return { ...b, ...resumen, diasRestantes, tipo_obra, proyecto_nombre };
   });
 
   const estadoActivo = estadoParam ?? 'todos';

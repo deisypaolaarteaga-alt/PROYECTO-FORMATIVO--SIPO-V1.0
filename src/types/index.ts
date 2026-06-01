@@ -55,6 +55,7 @@ export interface Proveedor {
   telefono?: string
   sitio_web?: string
   notas?: string
+  activo?: boolean
   deleted_at?: string | null
   created_at: string
   updated_at: string

@@ -93,6 +93,7 @@ const migrationFiles = [
   'supabase/migrations/20260527200000_insumos_activo.sql',
   'supabase/migrations/20260601100000_roles_usuario.sql',
   'supabase/migrations/20260601110000_fix_rol_default.sql',
+  'supabase/migrations/20260601120000_proveedores_activo.sql',
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

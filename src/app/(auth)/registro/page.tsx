@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Mail, Lock, User, Globe } from 'lucide-react';
+import { Mail, Lock, User } from 'lucide-react';
 import { Button } from '@/components/shared/Button';
 import { Input } from '@/components/shared/Input';
 import { ErrorMessage } from '@/components/shared/ErrorMessage';
-import { signUp, signInWithGoogle } from '@/actions/auth';
+import { signUp } from '@/actions/auth';
 
 function ConfirmacionEmail({ email }: { email: string }) {
   return (
@@ -122,14 +122,6 @@ export default function RegistroPage() {
     }
   }
 
-  async function handleGoogle() {
-    try {
-      await signInWithGoogle();
-    } catch {
-      // redirect esperado
-    }
-  }
-
   if (emailConfirmacion) {
     return <ConfirmacionEmail email={emailConfirmacion} />;
   }
@@ -222,20 +214,6 @@ export default function RegistroPage() {
           </Button>
         </form>
 
-        <div className="my-5 flex items-center gap-3">
-          <div className="h-px flex-1 bg-[#E8E4DE]" />
-          <span className="text-[11px] text-[#7A7265]">o continúa con</span>
-          <div className="h-px flex-1 bg-[#E8E4DE]" />
-        </div>
-
-        <Button
-          variant="secondary"
-          fullWidth
-          onClick={handleGoogle}
-          icon={<Globe className="h-4 w-4" />}
-        >
-          Continuar con Google
-        </Button>
       </div>
 
       <p className="mt-5 text-center text-[13px] text-[#7A7265]">

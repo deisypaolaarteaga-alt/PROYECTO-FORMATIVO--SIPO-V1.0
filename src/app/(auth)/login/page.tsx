@@ -2,18 +2,17 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { Mail, Lock, Globe, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/shared/Button';
 import { Input } from '@/components/shared/Input';
 import { ErrorMessage } from '@/components/shared/ErrorMessage';
-import { signIn, signInWithGoogle, sendOtp, verifyOtp } from '@/actions/auth';
+import { signIn, sendOtp, verifyOtp } from '@/actions/auth';
 
 export default function LoginPage() {
   const [step, setStep]               = useState<1 | 2>(1);
   const [emailForOtp, setEmailForOtp] = useState('');
 
   const [loading, setLoading]           = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
   const [verifyLoading, setVerifyLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
 
@@ -46,17 +45,6 @@ export default function LoginPage() {
       // redirect no llega aquí — solo errores inesperados
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function handleGoogle() {
-    setGoogleLoading(true);
-    try {
-      await signInWithGoogle();
-    } catch {
-      // redirect esperado
-    } finally {
-      setGoogleLoading(false);
     }
   }
 
@@ -234,21 +222,6 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        <div className="my-5 flex items-center gap-3">
-          <div className="h-px flex-1 bg-[#E8E4DE]" />
-          <span className="text-[11px] text-[#7A7265]">o continúa con</span>
-          <div className="h-px flex-1 bg-[#E8E4DE]" />
-        </div>
-
-        <Button
-          variant="secondary"
-          fullWidth
-          loading={googleLoading}
-          onClick={handleGoogle}
-          icon={<Globe className="h-4 w-4" />}
-        >
-          Continuar con Google
-        </Button>
       </div>
 
       <p className="mt-5 text-center text-[13px] text-[#7A7265]">

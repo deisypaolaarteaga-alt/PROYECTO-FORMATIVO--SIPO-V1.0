@@ -13,6 +13,7 @@ export default function RecuperarContrasenaPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+  const [emailEnviado, setEmailEnviado] = useState('');
 
   async function handleSubmit(formData: FormData) {
     setLoading(true);
@@ -20,6 +21,7 @@ export default function RecuperarContrasenaPage() {
     try {
       const result = await resetPassword(formData);
       if (result.success) {
+        setEmailEnviado(formData.get('email') as string);
         setSent(true);
       } else {
         setError(result.error || 'Error al enviar el correo.');
@@ -39,8 +41,9 @@ export default function RecuperarContrasenaPage() {
         </div>
         <h2 className="text-xl font-bold text-neutral-900">Correo enviado</h2>
         <p className="mt-2 text-sm text-neutral-500 leading-relaxed">
-          Si existe una cuenta con ese correo, recibirás un enlace para
-          restablecer tu contraseña. Revisa también tu carpeta de spam.
+          Te enviamos un enlace a{' '}
+          <span className="font-medium text-neutral-700">{emailEnviado}</span>.{' '}
+          Revisa tu correo para restablecer tu contraseña.
         </p>
         <Link href="/login">
           <Button variant="secondary" className="mt-6">

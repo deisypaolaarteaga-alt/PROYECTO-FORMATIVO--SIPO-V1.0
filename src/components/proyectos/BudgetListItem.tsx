@@ -76,13 +76,23 @@ export function BudgetListItem({ budget, projectId, total, tipoObra, areaM2 }: B
   const tipoObraLabel = tipoObra ? (TIPO_OBRA_LABELS[tipoObra] ?? tipoObra) : null;
 
   const vigenciaDias = Number(budget.vigencia_dias ?? 0);
-  const fechaVigencia = budget.created_at && vigenciaDias > 0 ? (() => {
+  const fechaVigenciaInfo = budget.created_at && vigenciaDias > 0 ? (() => {
     const d = new Date(budget.created_at);
     d.setDate(d.getDate() + vigenciaDias);
-    return new Intl.DateTimeFormat('es-CO', {
+    const diasRestantes = Math.floor((d.getTime() - Date.now()) / 86400000);
+    const label = new Intl.DateTimeFormat('es-CO', {
       day: '2-digit', month: 'short', year: 'numeric', timeZone: 'America/Bogota',
     }).format(d);
+    const color = diasRestantes < 0
+      ? 'text-red-600'
+      : diasRestantes < 7
+        ? 'text-red-500'
+        : diasRestantes < 30
+          ? 'text-amber-500'
+          : 'text-emerald-600';
+    return { label, color };
   })() : null;
+  const fechaVigencia = fechaVigenciaInfo?.label ?? null;
 
   const fechaModificacion = budget.updated_at
     ? new Intl.DateTimeFormat('es-CO', {
@@ -204,9 +214,13 @@ export function BudgetListItem({ budget, projectId, total, tipoObra, areaM2 }: B
 
           {/* Controles derecha: total + estado + eliminar */}
           <div className="relative z-[1] flex items-center gap-2 shrink-0 ml-4" onClick={e => e.stopPropagation()}>
-            <span className="text-sm font-bold text-neutral-900 tabular-nums">
-              {total > 0 ? formatCurrency(total) : '—'}
-            </span>
+            {total > 0 ? (
+              <span className="text-sm font-bold text-neutral-900 tabular-nums">
+                {formatCurrency(total)}
+              </span>
+            ) : (
+              <span className="text-[11px] font-medium text-neutral-400 italic">Sin valorar</span>
+            )}
 
             {/* Estado: si hay transiciones → dropdown; si no → badge estático */}
             {transiciones.length > 0 ? (
@@ -266,8 +280,8 @@ export function BudgetListItem({ budget, projectId, total, tipoObra, areaM2 }: B
                   Modificado: {fechaModificacion}
                 </span>
               )}
-              {fechaVigencia && (
-                <span className="flex items-center gap-1">
+              {fechaVigencia && fechaVigenciaInfo && (
+                <span className={`flex items-center gap-1 ${fechaVigenciaInfo.color}`}>
                   <Calendar className="h-3 w-3 shrink-0" />
                   Válido hasta: {fechaVigencia}
                 </span>

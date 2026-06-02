@@ -99,6 +99,7 @@ const migrationFiles = [
   'supabase/migrations/20260601400000_plantillas_tipo_obra.sql',
   'supabase/migrations/20260602100000_eliminar_archivar_proyectos_presupuestos.sql',
   'supabase/migrations/20260602200000_profiles_tipo_persona.sql',
+  'supabase/migrations/20260602300000_fix_security_advisor.sql',
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

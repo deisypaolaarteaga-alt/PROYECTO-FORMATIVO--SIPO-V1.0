@@ -1024,6 +1024,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
       <ModalGuardarPlantilla
         budgetId={budget.id}
         budgetNombre={budget.titulo ?? ''}
+        tipoObra={budget.projects?.tipo_obra ?? null}
         isOpen={guardarPlantillaOpen}
         onClose={() => setGuardarPlantillaOpen(false)}
       />

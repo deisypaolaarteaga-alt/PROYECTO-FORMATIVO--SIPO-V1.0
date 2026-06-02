@@ -412,58 +412,105 @@ export function ModalNuevoPresupuesto({
                       <div className="flex items-center justify-center py-4">
                         <Loader2 className="h-5 w-5 text-burn-orange animate-spin" />
                       </div>
-                    ) : (
-                      <div className="grid grid-cols-1 gap-2">
-                        {(mostrarTodasPlantillas ? misPlantillas : misPlantillas.slice(0, 3)).map(pt => (
-                          <button
-                            key={pt.id}
-                            onClick={() => {
-                              setSelectedPlantillaId(pt.id);
-                              setStartingPoint('plantilla_propia');
-                            }}
-                            className={cn(
-                              "flex items-center gap-3 p-3 rounded-xl border text-left transition-all",
-                              selectedPlantillaId === pt.id
-                                ? "border-burn-orange bg-burn-orange/5 ring-1 ring-burn-orange shadow-md"
-                                : "border-concrete hover:border-steel-light hover:bg-steel-fog/30"
-                            )}
-                          >
-                            <div className={cn(
-                              "h-9 w-9 rounded-xl flex items-center justify-center shrink-0",
-                              selectedPlantillaId === pt.id ? "bg-burn-orange text-white" : "bg-steel-fog text-stone"
-                            )}>
-                              <BookmarkCheck className="h-4 w-4" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-[13px] font-bold text-ink truncate">{pt.nombre}</p>
-                              <p className="text-[11px] text-stone">
-                                {pt._count?.capitulos ?? 0} capítulos
-                                {pt.tipo_obra ? ` · ${pt.tipo_obra}` : ''}
-                              </p>
-                            </div>
-                          </button>
-                        ))}
+                    ) : (() => {
+                      const tipoCtx = selectedProject?.tipo_obra as string | undefined | null;
+                      const recomendadas = tipoCtx
+                        ? misPlantillas.filter(p => p.tipo_obra === tipoCtx)
+                        : [];
+                      const otras = tipoCtx
+                        ? misPlantillas.filter(p => p.tipo_obra !== tipoCtx)
+                        : misPlantillas;
 
-                        {misPlantillas.length > 3 && (
-                          <button
-                            onClick={() => setMostrarTodasPlantillas(prev => !prev)}
-                            className="flex items-center justify-center gap-1.5 text-[12px] font-semibold text-burn-orange hover:bg-burn-orange/5 py-2 rounded-xl border border-dashed border-burn-orange/30 transition-all"
-                          >
-                            {mostrarTodasPlantillas ? (
-                              <>
-                                <ChevronUp className="h-3.5 w-3.5" />
-                                Ver menos ▲
-                              </>
-                            ) : (
-                              <>
-                                <ChevronDown className="h-3.5 w-3.5" />
-                                Ver todas ({misPlantillas.length - 3} más) ▼
-                              </>
+                      const renderPlantillaBtn = (pt: UserPlantilla) => (
+                        <button
+                          key={pt.id}
+                          onClick={() => {
+                            setSelectedPlantillaId(pt.id);
+                            setStartingPoint('plantilla_propia');
+                          }}
+                          className={cn(
+                            "flex items-center gap-3 p-3 rounded-xl border text-left transition-all",
+                            selectedPlantillaId === pt.id
+                              ? "border-burn-orange bg-burn-orange/5 ring-1 ring-burn-orange shadow-md"
+                              : "border-concrete hover:border-steel-light hover:bg-steel-fog/30"
+                          )}
+                        >
+                          <div className={cn(
+                            "h-9 w-9 rounded-xl flex items-center justify-center shrink-0",
+                            selectedPlantillaId === pt.id ? "bg-burn-orange text-white" : "bg-steel-fog text-stone"
+                          )}>
+                            <BookmarkCheck className="h-4 w-4" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[13px] font-bold text-ink truncate">{pt.nombre}</p>
+                            <p className="text-[11px] text-stone">
+                              {pt._count?.capitulos ?? 0} capítulos
+                              {pt.tipo_obra ? ` · ${pt.tipo_obra}` : ''}
+                            </p>
+                          </div>
+                        </button>
+                      );
+
+                      if (recomendadas.length > 0) {
+                        const otrasVisible = mostrarTodasPlantillas ? otras : otras.slice(0, 2);
+                        return (
+                          <div className="space-y-3">
+                            {/* Recomendadas */}
+                            <div className="space-y-1.5">
+                              <p className="text-[10px] font-bold text-burn-orange uppercase tracking-wider flex items-center gap-1">
+                                <Tag className="h-3 w-3" /> Recomendadas
+                              </p>
+                              <div className="grid grid-cols-1 gap-2">
+                                {recomendadas.map(renderPlantillaBtn)}
+                              </div>
+                            </div>
+                            {/* Otras */}
+                            {otras.length > 0 && (
+                              <div className="space-y-1.5">
+                                <p className="text-[10px] font-bold text-stone uppercase tracking-wider">
+                                  Otras plantillas
+                                </p>
+                                <div className="grid grid-cols-1 gap-2">
+                                  {otrasVisible.map(renderPlantillaBtn)}
+                                </div>
+                                {otras.length > 2 && (
+                                  <button
+                                    onClick={() => setMostrarTodasPlantillas(prev => !prev)}
+                                    className="flex items-center justify-center gap-1.5 text-[12px] font-semibold text-burn-orange hover:bg-burn-orange/5 py-2 rounded-xl border border-dashed border-burn-orange/30 transition-all w-full"
+                                  >
+                                    {mostrarTodasPlantillas ? (
+                                      <><ChevronUp className="h-3.5 w-3.5" /> Ver menos</>
+                                    ) : (
+                                      <><ChevronDown className="h-3.5 w-3.5" /> Ver todas ({otras.length - 2} más)</>
+                                    )}
+                                  </button>
+                                )}
+                              </div>
                             )}
-                          </button>
-                        )}
-                      </div>
-                    )}
+                          </div>
+                        );
+                      }
+
+                      // Sin agrupación (sin contexto de tipo_obra o sin recomendadas)
+                      const visible = mostrarTodasPlantillas ? otras : otras.slice(0, 3);
+                      return (
+                        <div className="grid grid-cols-1 gap-2">
+                          {visible.map(renderPlantillaBtn)}
+                          {otras.length > 3 && (
+                            <button
+                              onClick={() => setMostrarTodasPlantillas(prev => !prev)}
+                              className="flex items-center justify-center gap-1.5 text-[12px] font-semibold text-burn-orange hover:bg-burn-orange/5 py-2 rounded-xl border border-dashed border-burn-orange/30 transition-all"
+                            >
+                              {mostrarTodasPlantillas ? (
+                                <><ChevronUp className="h-3.5 w-3.5" /> Ver menos</>
+                              ) : (
+                                <><ChevronDown className="h-3.5 w-3.5" /> Ver todas ({otras.length - 3} más)</>
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {/* Selector de modo — aparece al seleccionar una plantilla propia */}
                     {selectedPlantillaId && (

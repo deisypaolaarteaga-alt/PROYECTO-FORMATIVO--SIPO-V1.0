@@ -17,10 +17,13 @@ import type {
 /**
  * Guarda el presupuesto actual como plantilla personal del usuario.
  * Lee capítulos → actividades → APUs → apu_items y los copia a user_plantillas_*.
+ * tipoObraParam: se recibe desde el editor (que ya tiene la relación cargada);
+ * si no viene, hace un JOIN fallback budgets → projects para obtenerlo.
  */
 export async function guardarComoPlantilla(
   budgetId: string,
-  nombre: string
+  nombre: string,
+  tipoObraParam?: string | null
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = await createClient();
@@ -30,16 +33,27 @@ export async function guardarComoPlantilla(
     const parsed = guardarPlantillaSchema.safeParse({ nombre });
     if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message };
 
-    // Verificar ownership del budget y leer tipo_obra del proyecto origen
+    // Verificar ownership del budget
     const { data: budget, error: budgetErr } = await supabase
       .from('budgets')
-      .select('id, user_id, projects(tipo_obra)')
+      .select('id, user_id, project_id')
       .eq('id', budgetId)
       .eq('user_id', user.id)
       .single();
     if (budgetErr || !budget) return { success: false, error: 'Presupuesto no encontrado' };
 
-    const tipoObra: string | null = (budget as any).projects?.tipo_obra ?? null;
+    const admin = createAdminClient();
+
+    // Resolver tipo_obra: usa el parámetro explícito si viene, si no busca en projects
+    let tipoObra: string | null = tipoObraParam ?? null;
+    if (tipoObra === null || tipoObra === undefined) {
+      const { data: proyecto } = await admin
+        .from('projects')
+        .select('tipo_obra')
+        .eq('id', (budget as any).project_id)
+        .single();
+      tipoObra = proyecto?.tipo_obra ?? null;
+    }
 
     // Leer estructura completa del presupuesto — apus en query separada porque
     // tiene dos FK (activity_id + budget_id) y PostgREST entraría en ambigüedad
@@ -73,8 +87,6 @@ export async function guardarComoPlantilla(
     for (const apu of apusData ?? []) {
       apuByActivity[apu.activity_id] = apu;
     }
-
-    const admin = createAdminClient();
 
     // Insertar plantilla raíz
     const { data: plantilla, error: pErr } = await admin
@@ -542,5 +554,36 @@ export async function actualizarEstructuraPlantilla(
   } catch (err: any) {
     console.error('[actualizarEstructuraPlantilla]', err);
     return { success: false, error: 'No se pudo actualizar la plantilla' };
+  }
+}
+
+/**
+ * Actualiza el tipo_obra de una plantilla existente del usuario.
+ * Permite reclasificar plantillas que quedaron con tipo_obra = NULL.
+ */
+export async function actualizarTipoObraPlantilla(
+  plantillaId: string,
+  tipoObra: string | null
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'No autenticado' };
+
+    const tiposValidos = ['residencial', 'comercial', 'institucional', 'industrial', 'hotelero', 'infraestructura'];
+    if (tipoObra !== null && !tiposValidos.includes(tipoObra)) {
+      return { success: false, error: 'Tipo de obra no válido' };
+    }
+
+    const { error } = await supabase
+      .from('user_plantillas')
+      .update({ tipo_obra: tipoObra })
+      .eq('id', plantillaId)
+      .eq('user_id', user.id);
+
+    if (error) throw error;
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: 'No se pudo actualizar el tipo de obra' };
   }
 }

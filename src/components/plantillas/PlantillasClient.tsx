@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  BookmarkCheck, Layers, MoreVertical, Trash2, FileText, Plus, Pencil, Eye, Search, X,
+  BookmarkCheck, Layers, MoreVertical, Trash2, FileText, Plus, Pencil, Eye, Search, X, Tag,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -12,7 +12,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from '@/components/shared/DropdownMenu';
-import { eliminarPlantilla } from '@/actions/plantillas';
+import { eliminarPlantilla, actualizarTipoObraPlantilla } from '@/actions/plantillas';
 import { toast } from 'sonner';
 import { ModalRenombrarPlantilla } from './ModalRenombrarPlantilla';
 import { DrawerDetallePlantilla } from './DrawerDetallePlantilla';
@@ -76,6 +76,8 @@ export function PlantillasClient({ initialPlantillas }: PlantillasClientProps) {
   const [tipoFilter, setTipoFilter] = useState('todas');
   const [plantillaRenombrar, setPlantillaRenombrar] = useState<UserPlantilla | null>(null);
   const [plantillaDetalle, setPlantillaDetalle]     = useState<UserPlantilla | null>(null);
+  const [plantillaEditarTipo, setPlantillaEditarTipo] = useState<UserPlantilla | null>(null);
+  const [guardandoTipo, setGuardandoTipo] = useState(false);
 
   const filtered = useMemo(() => {
     return plantillas.filter(pt => {
@@ -91,6 +93,23 @@ export function PlantillasClient({ initialPlantillas }: PlantillasClientProps) {
       return matchSearch && matchTipo;
     });
   }, [plantillas, search, tipoFilter]);
+
+  async function handleGuardarTipo(tipo: string | null) {
+    if (!plantillaEditarTipo) return;
+    setGuardandoTipo(true);
+    const res = await actualizarTipoObraPlantilla(plantillaEditarTipo.id, tipo);
+    setGuardandoTipo(false);
+    if (res.success) {
+      toast.success('Tipo de obra actualizado');
+      setPlantillas(prev => prev.map(p =>
+        p.id === plantillaEditarTipo.id ? { ...p, tipo_obra: tipo ?? undefined } : p
+      ));
+      setPlantillaEditarTipo(null);
+      router.refresh();
+    } else {
+      toast.error(res.error ?? 'No se pudo actualizar el tipo de obra');
+    }
+  }
 
   async function handleEliminar(id: string, nombre: string) {
     if (!confirm(`¿Eliminar la plantilla "${nombre}"? Esta acción no se puede deshacer.`)) return;
@@ -254,6 +273,10 @@ export function PlantillasClient({ initialPlantillas }: PlantillasClientProps) {
                           <Eye className="h-4 w-4 mr-2 text-[#6B7280]" />
                           Ver / Editar
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setPlantillaEditarTipo(pt)}>
+                          <Tag className="h-4 w-4 mr-2 text-[#6B7280]" />
+                          Cambiar tipo de obra
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => handleEliminar(pt.id, pt.nombre)}
                           className="text-red-600 focus:bg-red-50 focus:text-red-700"
@@ -290,6 +313,72 @@ export function PlantillasClient({ initialPlantillas }: PlantillasClientProps) {
         isOpen={!!plantillaDetalle}
         onClose={() => setPlantillaDetalle(null)}
       />
+
+      {/* Modal cambiar tipo de obra */}
+      {plantillaEditarTipo && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-[#1C1917]/60 backdrop-blur-sm"
+            onClick={() => setPlantillaEditarTipo(null)}
+          />
+          <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-[#E8E4DE] flex items-center justify-between bg-[#F5F4F0]/50">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-[#C84B1A]/10 flex items-center justify-center">
+                  <Tag className="h-4 w-4 text-[#C84B1A]" />
+                </div>
+                <h3 className="text-[15px] font-bold text-[#1C1917]">Tipo de obra</h3>
+              </div>
+              <button
+                onClick={() => setPlantillaEditarTipo(null)}
+                className="p-1.5 hover:bg-[#E8E4DE] rounded-full transition-colors"
+              >
+                <X className="h-4 w-4 text-[#78716C]" />
+              </button>
+            </div>
+            <div className="p-5 space-y-3">
+              <p className="text-[12px] text-[#78716C]">
+                Plantilla: <span className="font-semibold text-[#1C1917]">{plantillaEditarTipo.nombre}</span>
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { value: 'residencial',     label: 'Residencial'     },
+                  { value: 'comercial',       label: 'Comercial'       },
+                  { value: 'institucional',   label: 'Institucional'   },
+                  { value: 'industrial',      label: 'Industrial'      },
+                  { value: 'hotelero',        label: 'Hotelero'        },
+                  { value: 'infraestructura', label: 'Infraestructura' },
+                ] as const).map(opt => {
+                  const activo = plantillaEditarTipo.tipo_obra === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      disabled={guardandoTipo}
+                      onClick={() => handleGuardarTipo(opt.value)}
+                      className={`h-10 px-3 rounded-xl border text-[12px] font-semibold transition-all disabled:opacity-50 ${
+                        activo
+                          ? 'border-[#C84B1A] bg-[#C84B1A]/5 text-[#C84B1A] ring-1 ring-[#C84B1A]'
+                          : 'border-[#E8E4DE] bg-white text-[#374151] hover:border-[#C84B1A]/40 hover:bg-[#FFF7F4]'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {plantillaEditarTipo.tipo_obra && (
+                <button
+                  disabled={guardandoTipo}
+                  onClick={() => handleGuardarTipo(null)}
+                  className="w-full h-9 text-[12px] text-[#78716C] border border-dashed border-[#D4CFC8] rounded-xl hover:bg-[#F5F4F0] transition-colors disabled:opacity-50"
+                >
+                  Quitar clasificación
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

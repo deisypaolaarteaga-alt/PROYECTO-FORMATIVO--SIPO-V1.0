@@ -468,6 +468,35 @@ export async function eliminarPresupuesto(budgetId: string): Promise<ActionResul
 }
 
 /**
+ * Asigna o desvincula un cliente de un proyecto.
+ */
+export async function asignarClienteAProyecto(
+  projectId: string,
+  clienteId: string | null,
+): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'Sesión expirada o no válida.' };
+
+    const { error } = await supabase
+      .from('projects')
+      .update({ cliente_id: clienteId, updated_at: new Date().toISOString() })
+      .eq('id', projectId)
+      .eq('user_id', user.id)
+      .is('deleted_at', null);
+
+    if (error) throw error;
+
+    revalidatePath(`/proyectos/${projectId}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error('[asignarClienteAProyecto]', error);
+    return { success: false, error: 'No se pudo asignar el cliente al proyecto.' };
+  }
+}
+
+/**
  * Soft Delete de un proyecto
  */
 export async function deleteProject(id: string): Promise<ActionResult> {

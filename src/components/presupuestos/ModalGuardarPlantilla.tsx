@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 interface ModalGuardarPlantillaProps {
   budgetId: string;
   budgetNombre: string;
+  tipoObra?: string | null;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -15,6 +16,7 @@ interface ModalGuardarPlantillaProps {
 export function ModalGuardarPlantilla({
   budgetId,
   budgetNombre,
+  tipoObra,
   isOpen,
   onClose,
 }: ModalGuardarPlantillaProps) {
@@ -33,7 +35,7 @@ export function ModalGuardarPlantilla({
   const handleGuardar = async () => {
     if (!nombre.trim()) return;
     setGuardando(true);
-    const res = await guardarComoPlantilla(budgetId, nombre.trim());
+    const res = await guardarComoPlantilla(budgetId, nombre.trim(), tipoObra ?? null);
     setGuardando(false);
     if (res.success) {
       setGuardado(true);

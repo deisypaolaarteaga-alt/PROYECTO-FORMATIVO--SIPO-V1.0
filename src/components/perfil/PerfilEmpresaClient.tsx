@@ -58,15 +58,15 @@ export function PerfilEmpresaClient({ profile, email }: Props) {
 
   // ── Formulario info comercial ─────────────────────────────────────
   const [formData, setFormData] = useState({
-    empresa:            profile.empresa            || '',
-    nit:                profile.nit                || '',
-    ciudad:             profile.ciudad             || '',
-    direccion:          profile.direccion           || '',
-    telefono:           profile.telefono            || '',
-    email_empresa:      profile.email_empresa       || '',
-    regimen_tributario: profile.regimen_tributario  || 'no_responsable',
-    nombre_completo:    profile.nombre_completo     || '',
-    cargo_firma:        profile.cargo_firma         || '',
+    empresa:         profile.empresa         || '',
+    nit:             profile.nit             || '',
+    ciudad:          profile.ciudad          || '',
+    direccion:       profile.direccion        || '',
+    telefono:        profile.telefono         || '',
+    email_empresa:   profile.email_empresa    || '',
+    tipo_persona:    (profile.tipo_persona as 'natural' | 'juridica') || 'juridica',
+    nombre_completo: profile.nombre_completo  || '',
+    cargo_firma:     profile.cargo_firma      || '',
   });
 
   const [empresaError, setEmpresaError] = useState('');
@@ -424,14 +424,14 @@ export function PerfilEmpresaClient({ profile, email }: Props) {
               </div>
 
               <div className="space-y-1.5">
-                <label className={labelCls}>Régimen tributario</label>
+                <label className={labelCls}>Tipo de persona</label>
                 <select
-                  value={formData.regimen_tributario}
-                  onChange={field('regimen_tributario')}
+                  value={formData.tipo_persona}
+                  onChange={field('tipo_persona')}
                   className={inputBase}
                 >
-                  <option value="no_responsable">No responsable de IVA</option>
-                  <option value="responsable_iva">Responsable de IVA</option>
+                  <option value="juridica">Persona Jurídica (responsable IVA)</option>
+                  <option value="natural">Persona Natural (no responsable IVA)</option>
                 </select>
               </div>
 
@@ -503,8 +503,8 @@ export function PerfilEmpresaClient({ profile, email }: Props) {
               <CheckCircle2 className="h-4 w-4 text-[#1E4D8C] mt-0.5 shrink-0" />
               <p className="text-[11px] text-[#1E4D8C] leading-relaxed">
                 El <strong>NIT</strong> y la <strong>razón social</strong> aparecen en el encabezado
-                de cada PDF exportado. El <strong>régimen tributario</strong> determina si se aplica
-                IVA en tus presupuestos.
+                de cada PDF exportado. El <strong>tipo de persona</strong> determina el método IVA
+                por defecto al crear nuevos presupuestos.
               </p>
             </div>
           </section>

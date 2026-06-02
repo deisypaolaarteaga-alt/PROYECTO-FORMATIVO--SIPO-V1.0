@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/shared/Button';
 import { InputPrecio } from '@/components/shared/InputPrecio';
 import { InputEditable } from '@/components/shared/InputEditable';
+import { InputCantidad } from '@/components/shared/InputCantidad';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
@@ -725,12 +726,9 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                             {/* Cantidad */}
                             <td className="hidden md:table-cell px-3 py-2.5">
                               <div className="rounded hover:bg-[#EDE6DC] focus-within:ring-1 focus-within:ring-[#C84B1A]/20 transition-colors px-1 -mx-1 cursor-text">
-                                <input
-                                  type="number"
-                                  value={act.cantidad}
-                                  onFocus={(e) => e.target.select()}
-                                  onChange={(e) => handleUpdateAct(act.id, ch.id, { cantidad: parseFloat(e.target.value) || 0 })}
-                                  className="w-full bg-transparent border-none focus:ring-0 p-0 text-right text-stone text-sm"
+                                <InputCantidad
+                                  value={Number(act.cantidad) || 0}
+                                  onChange={(val) => handleUpdateAct(act.id, ch.id, { cantidad: val })}
                                 />
                               </div>
                             </td>

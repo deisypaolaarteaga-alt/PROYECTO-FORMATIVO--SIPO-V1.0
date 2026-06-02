@@ -283,7 +283,7 @@ export async function crearPresupuestoConPlantilla(
     const admin = createAdminClient();
 
     const [{ data: profile }, { data: proyectoData }] = await Promise.all([
-      supabase.from('profiles').select('municipio, ciudad').eq('id', user.id).single(),
+      supabase.from('profiles').select('municipio, ciudad, tipo_persona').eq('id', user.id).single(),
       supabase.from('projects').select('ubicacion').eq('id', projectId).single(),
     ]);
 
@@ -294,6 +294,10 @@ export async function crearPresupuestoConPlantilla(
       .eq('nombre', ciudadFinal)
       .maybeSingle();
     const icaPct = munData?.reteica_pct != null ? Number(munData.reteica_pct) : 0;
+
+    const esJuridica = (profile?.tipo_persona ?? 'juridica') !== 'natural';
+    const metodIva = esJuridica ? 'sobre_utilidad' : 'no_aplica';
+    const ivaPct   = esJuridica ? 19 : 0;
 
     // ── 1. Crear el presupuesto ───────────────────────────────────────────────
     const { data: budget, error: budgetErr } = await admin
@@ -306,7 +310,8 @@ export async function crearPresupuestoConPlantilla(
         administracion_pct: 10,
         imprevistos_pct: 5,
         utilidad_pct: 10,
-        iva_porcentaje: 19,
+        metodo_iva: metodIva,
+        iva_porcentaje: ivaPct,
         retefuente_pct: 2,
         ica_pct: icaPct,
         ciudad_ica: ciudadFinal,

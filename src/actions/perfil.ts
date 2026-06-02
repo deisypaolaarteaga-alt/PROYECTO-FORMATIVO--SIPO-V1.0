@@ -10,7 +10,7 @@ export interface PerfilEmpresaData {
   direccion:        string;
   telefono:         string;
   email_empresa:    string;
-  regimen_tributario: string;
+  tipo_persona:     'natural' | 'juridica';
   nombre_completo?: string;
   cargo_firma?:     string;
 }
@@ -25,15 +25,15 @@ export async function guardarPerfilEmpresa(data: PerfilEmpresaData) {
   const { error } = await supabase
     .from('profiles')
     .update({
-      empresa:            data.empresa || null,
-      nit:                data.nit || null,
-      ciudad:             data.ciudad || null,
-      direccion:          data.direccion || null,
-      telefono:           data.telefono || null,
-      email_empresa:      data.email_empresa || null,
-      regimen_tributario: data.regimen_tributario || 'no_responsable',
-      nombre_completo:    data.nombre_completo || null,
-      cargo_firma:        data.cargo_firma || null,
+      empresa:         data.empresa || null,
+      nit:             data.nit || null,
+      ciudad:          data.ciudad || null,
+      direccion:       data.direccion || null,
+      telefono:        data.telefono || null,
+      email_empresa:   data.email_empresa || null,
+      tipo_persona:    data.tipo_persona || 'juridica',
+      nombre_completo: data.nombre_completo || null,
+      cargo_firma:     data.cargo_firma || null,
     })
     .eq('id', user.id);
 

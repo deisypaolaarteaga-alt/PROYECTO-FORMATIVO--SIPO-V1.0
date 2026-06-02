@@ -35,12 +35,16 @@ export async function crearPresupuesto(
     if (!rateLimit.success) return { success: false, error: 'Límite de solicitudes excedido.' };
 
     const [{ data: profile }, { data: proyectoData }] = await Promise.all([
-      supabase.from('profiles').select('municipio, ciudad').eq('id', user.id).single(),
+      supabase.from('profiles').select('municipio, ciudad, tipo_persona').eq('id', user.id).single(),
       supabase.from('projects').select('ubicacion').eq('id', projectId).single(),
     ]);
 
     const ciudadFinal = proyectoData?.ubicacion || ciudadObra || profile?.municipio || profile?.ciudad || 'Bogotá D.C.';
     const icaPct = (await lookupReteICA(supabase, ciudadFinal)) ?? 0;
+
+    const esJuridica = (profile?.tipo_persona ?? 'juridica') !== 'natural';
+    const metodIva = esJuridica ? 'sobre_utilidad' : 'no_aplica';
+    const ivaPct   = esJuridica ? 19 : 0;
 
     const validated = presupuestoSchema.parse({
       titulo,
@@ -48,7 +52,8 @@ export async function crearPresupuesto(
       administracion_pct: 10,
       imprevistos_pct: 5,
       utilidad_pct: 10,
-      iva_porcentaje: 19,
+      metodo_iva: metodIva,
+      iva_porcentaje: ivaPct,
       retefuente_pct: 2,
       ica_pct: icaPct,
     });

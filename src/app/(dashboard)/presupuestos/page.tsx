@@ -1,3 +1,5 @@
+export const maxDuration = 60;
+
 import { createClient } from '@/lib/supabase/server';
 import { formatCurrency, cn } from '@/lib/utils';
 import { PresupuestosNewButton } from '@/components/presupuestos/PresupuestosNewButton';

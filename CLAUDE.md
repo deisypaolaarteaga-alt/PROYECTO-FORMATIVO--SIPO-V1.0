@@ -82,7 +82,7 @@ NEXT_PUBLIC_HCAPTCHA_SITE_KEY # Site key de hCaptcha — requerida en login y re
 - Triggers: `DROP TRIGGER IF EXISTS name ON table; CREATE TRIGGER ...`
 - Functions: `CREATE OR REPLACE FUNCTION`
 
-### Applied migrations (50 total, in order)
+### Applied migrations (51 total, in order)
 
 | File | Content | Status |
 |------|---------|--------|
@@ -136,6 +136,7 @@ NEXT_PUBLIC_HCAPTCHA_SITE_KEY # Site key de hCaptcha — requerida en login y re
 | `20260601300000_activities_catalogo_ref.sql` | **Trazabilidad**: Columna `catalogo_actividad_id UUID` nullable en `activities` — indica de qué actividad del catálogo proviene la actividad del presupuesto (NULL si fue creada manualmente). | ✅ applied |
 | `20260601400000_plantillas_tipo_obra.sql` | **Idempotente**: Asegura que `user_plantillas.tipo_obra TEXT NULL` exista — guard para entornos que aplicaron la tabla sin esa columna antes del 2026-06-01. | ✅ applied |
 | `20260602100000_eliminar_archivar_proyectos_presupuestos.sql` | Flujo eliminación/archivado: `fn_archivar_proyecto` + `fn_eliminar_proyecto` SECURITY DEFINER con cascada en budgets. Soft-delete en proyectos (projects ya tenía deleted_at desde migración 104000). | ✅ applied |
+| `20260602200000_profiles_tipo_persona.sql` | **Schema**: `profiles.tipo_persona TEXT DEFAULT 'juridica' CHECK (IN 'natural','juridica')` — determina `metodo_iva` por defecto al crear presupuestos: `juridica→sobre_utilidad`, `natural→no_aplica`. | ✅ applied |
 
 ### Loose SQL files at root (already applied manually — do NOT re-run)
 
@@ -151,7 +152,7 @@ NEXT_PUBLIC_HCAPTCHA_SITE_KEY # Site key de hCaptcha — requerida en login y re
 | `apus` | `costo_herramienta_menor`, `costo_epp`, `pct_herramienta_menor` (default 3%), `pct_epp` (default 1%), `rendimiento` |
 | `apu_items` | `tipo` IN ('material','mano_obra','equipo','herramienta_menor','epp'); `cuadrilla_id` UUID nullable; `proveedor_id` UUID nullable (FK futura a `proveedores`) |
 | `activities` | `precio_desde_apu` BOOLEAN — when true, `precio_unitario` is read from the linked APU; `catalogo_actividad_id UUID` nullable — trazabilidad hacia `catalogo_actividades` |
-| `profiles` | `preferences` JSONB (accentColor, density, showCompanyName, defaultCity), `nivel_riesgo_arl` (1-5), `municipio`, `telefono`, `direccion`, `email_empresa`, AIU defaults, `rol TEXT DEFAULT 'usuario' CHECK (IN 'usuario','super_admin')` |
+| `profiles` | `preferences` JSONB (accentColor, density, showCompanyName, defaultCity), `nivel_riesgo_arl` (1-5), `municipio`, `telefono`, `direccion`, `email_empresa`, AIU defaults, `rol TEXT DEFAULT 'usuario' CHECK (IN 'usuario','super_admin')`, `tipo_persona TEXT DEFAULT 'juridica' CHECK (IN 'natural','juridica')` |
 | `catalogo_capitulos` | Reference catalog — 28 chapters across residencial/comercial/infraestructura |
 | `catalogo_actividades` | 164 reference activities with `precio_referencia_nacional`, `rango_min`, `rango_max` (COP 2025) |
 | `catalogo_apu_items` | APU reference items per activity — tipo, nombre, unidad, cantidad, precio_unitario, orden (public read) |
@@ -273,7 +274,7 @@ Token reference: `src/lib/design-tokens.ts`. User accent color stored in `profil
 
 ## Known Remaining Tasks
 
-> **Snapshot:** 2026-06-02 (actualizado) — `tsc --noEmit --skipLibCheck` limpio (0 errores). `pnpm build` exitoso. **50 migraciones en `migrate.js`** (todas rastreadas). Rama `rama-deisy`. **17 archivos de Server Actions** (`catalogo.ts` con 17 exports; `auth.ts` con 9 exports; `plantillas.ts` con 7 exports; `proyectos.ts` ampliado con 5 nuevas acciones: `archivarProyecto`, `eliminarProyecto`, `desArchivarProyecto`, `archivarPresupuesto`, `eliminarPresupuesto`). 5 componentes PDF. Motor `motor-presupuesto.ts` (219 líneas) con **9 tests Vitest pasando** (110 líneas). `src/middleware.ts` activo (`proxy.ts` eliminado). Sistema de roles `usuario`/`super_admin` con RLS. Módulo Catálogo editable para `super_admin`. Login 2FA por OTP. `fn_duplicar_presupuesto` atómica. hCaptcha eliminado. **34 tablas + 5 vistas en BD**. Filtros de período. Módulo Plantillas personales completo (`/plantillas` + DrawerDetalle + Renombrar). `proveedores.activo` + `activities.catalogo_actividad_id` añadidos. `ProyectosAsociadosCliente` sin botón eliminar proyecto. Flujo completo eliminar/archivar proyectos y presupuestos con ConfirmDialog, validaciones en BD y mensajes claros en español.
+> **Snapshot:** 2026-06-02 (actualizado) — `tsc --noEmit --skipLibCheck` limpio (0 errores). `pnpm build` exitoso. **51 migraciones en `migrate.js`** (todas rastreadas). Rama `rama-deisy`. **17 archivos de Server Actions** (`catalogo.ts` con 17 exports; `auth.ts` con 9 exports; `plantillas.ts` con 7 exports; `proyectos.ts` ampliado con 5 nuevas acciones: `archivarProyecto`, `eliminarProyecto`, `desArchivarProyecto`, `archivarPresupuesto`, `eliminarPresupuesto`). 5 componentes PDF. Motor `motor-presupuesto.ts` (219 líneas) con **9 tests Vitest pasando** (110 líneas). `src/middleware.ts` activo (`proxy.ts` eliminado). Sistema de roles `usuario`/`super_admin` con RLS. Módulo Catálogo editable para `super_admin`. Login 2FA por OTP. `fn_duplicar_presupuesto` atómica. hCaptcha eliminado. **34 tablas + 5 vistas en BD**. Filtros de período. Módulo Plantillas personales completo (`/plantillas` + DrawerDetalle + Renombrar). `proveedores.activo` + `activities.catalogo_actividad_id` añadidos. `ProyectosAsociadosCliente` sin botón eliminar proyecto. Flujo completo eliminar/archivar proyectos y presupuestos con ConfirmDialog, validaciones en BD y mensajes claros en español.
 
 ### Pendiente — acción manual requerida
 - Presupuestos creados antes del fix de admin client (2026-05-07) tienen 0 actividades — deben eliminarse y recrearse con "Plantilla Sugerida"

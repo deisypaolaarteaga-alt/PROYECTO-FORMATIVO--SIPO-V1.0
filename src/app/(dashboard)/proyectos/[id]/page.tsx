@@ -1,13 +1,15 @@
+export const maxDuration = 60;
+
 import { getProject } from '@/actions/proyectos';
 import { createClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { Card } from '@/components/shared/Card';
 import { Button } from '@/components/shared/Button';
-import { EmptyState } from '@/components/shared/EmptyState';
 import { ArrowLeft, MapPin, User, Calendar, Building2 } from 'lucide-react';
 import { ProjectActions } from '@/components/proyectos/ProjectActions';
 import { BudgetListItem } from '@/components/proyectos/BudgetListItem';
+import { NuevoPresupuestoEnProyecto } from '@/components/proyectos/NuevoPresupuestoEnProyecto';
 
 interface Props { params: Promise<{ id: string }> }
 
@@ -130,12 +132,11 @@ export default async function ProjectDetailPage({ params }: Props) {
         <h2 className="text-base font-semibold text-[#1F2937] mb-4">Presupuestos</h2>
 
         {!budgets || budgets.length === 0 ? (
-          <EmptyState
-            icon="file"
-            title="Sin presupuestos"
-            description="Crea el primer presupuesto para este proyecto."
-            actionLabel="Nuevo presupuesto"
-            actionHref={`/proyectos/${id}/presupuesto-nuevo`}
+          <NuevoPresupuestoEnProyecto
+            proyectoId={id}
+            proyectoNombre={project.nombre}
+            proyectoTipoObra={project.tipo_obra}
+            proyectoUbicacion={project.ubicacion}
           />
         ) : (
           <div className="space-y-3">

@@ -3,21 +3,13 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import {
   Building2, User, MapPin, Phone, Mail,
-  ChevronLeft, ArrowRight,
-  AlertTriangle, FileText,
+  ChevronLeft,
+  AlertTriangle,
 } from 'lucide-react';
 import { ProyectosAsociadosCliente } from '@/components/clientes/ProyectosAsociadosCliente';
 import { formatCurrency } from '@/lib/utils/format';
 import { ClienteDetailActions } from '@/components/clientes/ClienteDetailActions';
 import { cn } from '@/lib/utils';
-
-const ESTADO_BUDGET_MAP: Record<string, { label: string; cls: string }> = {
-  borrador:    { label: 'Borrador',    cls: 'bg-[#F3F4F6] text-[#6B7280] border-[#E5E7EB]'   },
-  en_revision: { label: 'En revisión', cls: 'bg-[#FFF7ED] text-[#D97706] border-[#FDE68A]'   },
-  aprobado:    { label: 'Aprobado',    cls: 'bg-[#F0FDF4] text-[#16A34A] border-[#BBF7D0]'   },
-  rechazado:   { label: 'Rechazado',   cls: 'bg-[#FEF2F2] text-[#DC2626] border-[#FECACA]'   },
-  archivado:   { label: 'Archivado',   cls: 'bg-[#F3F4F6] text-[#6B7280] border-[#E5E7EB]'   },
-};
 
 // ── KPI Card ───────────────────────────────────────────────────────────────────
 // Tres métricas clave escaneables en el tope de la página — patrón Stripe Analytics.
@@ -96,35 +88,17 @@ export default async function ClienteDetailPage({
   const proyectos = ((cliente as any).projects ?? []).filter((p: any) => !p.deleted_at);
   console.log('[ClienteDetailPage] proyectos recibidos:', (cliente as any).projects?.length ?? 0, '→ activos:', proyectos.length);
 
-  // Inversión acumulada = suma de costo_directo de todos los presupuestos
+  // Inversión acumulada = suma de total_oferta de todos los presupuestos
   let inversionTotal = 0;
   proyectos.forEach((p: any) => {
     (p.budgets ?? []).forEach((b: any) => {
-      inversionTotal += Number(b.costo_directo ?? 0);
+      inversionTotal += Number(b.total_oferta ?? 0);
     });
   });
 
   const totalPresupuestos: number = proyectos.reduce(
     (acc: number, p: any) => acc + (p.budgets?.length ?? 0),
     0,
-  );
-
-  const presupuestosFlatten: Array<{
-    id: string;
-    titulo: string;
-    costo_directo: number;
-    estado: string;
-    proyecto_nombre: string;
-    proyecto_id: string;
-  }> = proyectos.flatMap((p: any) =>
-    (p.budgets ?? []).map((b: any) => ({
-      id: b.id,
-      titulo: b.titulo || 'Sin título',
-      costo_directo: Number(b.costo_directo ?? 0),
-      estado: b.estado || 'borrador',
-      proyecto_nombre: p.nombre,
-      proyecto_id: p.id,
-    })),
   );
 
   const esEmpresa = cliente.tipo === 'empresa';
@@ -192,7 +166,7 @@ export default async function ClienteDetailPage({
                   'inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide border leading-none',
                   esEmpresa
                     ? 'bg-[#EFF6FF] text-[#1D4ED8] border-[#BFDBFE]'
-                    : 'bg-[#FFF7ED] text-[#D97706] border-[#FDE68A]',
+                    : 'bg-[#F0FDF4] text-[#16A34A] border-[#BBF7D0]',
                 )}
               >
                 {esEmpresa ? 'Empresa' : 'Persona natural'}
@@ -340,95 +314,6 @@ export default async function ClienteDetailPage({
         {/* ── Right column: projects + presupuestos ────────────────────────── */}
         <div className="lg:col-span-2 space-y-4">
           <ProyectosAsociadosCliente initialProyectos={proyectos} />
-
-          {/* ── Presupuestos table ─────────────────────────────────────────── */}
-          {presupuestosFlatten.length > 0 && (
-            <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] overflow-hidden">
-
-              <div className="flex items-center justify-between px-5 py-3 border-b border-[#F3F4F6]">
-                <div className="flex items-center gap-2">
-                  <p className="text-[13px] font-bold text-[#111827]">Presupuestos</p>
-                  <span className="inline-flex items-center justify-center h-[18px] min-w-[18px] px-1 rounded-full bg-[#F3F4F6] text-[#6B7280] text-[10px] font-bold tabular-nums leading-none">
-                    {presupuestosFlatten.length}
-                  </span>
-                </div>
-              </div>
-
-              {/* Column headers */}
-              <div className="flex items-center gap-4 px-5 py-2 bg-[#F8F9FA] border-b border-[#F3F4F6]">
-                <div className="hidden sm:block w-8 shrink-0" />
-                <p className="flex-1 min-w-0 text-[10px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF] leading-none">
-                  Presupuesto
-                </p>
-                <p className="hidden md:block w-[140px] shrink-0 text-[10px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF] leading-none">
-                  Estado
-                </p>
-                <p className="w-[130px] shrink-0 text-right text-[10px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF] leading-none">
-                  Costo Directo
-                </p>
-                <div className="w-8 shrink-0" />
-              </div>
-
-              <div className="divide-y divide-[#F3F4F6]">
-                {presupuestosFlatten.map(b => {
-                  const estadoCfg = ESTADO_BUDGET_MAP[b.estado] ?? {
-                    label: b.estado,
-                    cls: 'bg-[#F3F4F6] text-[#6B7280] border-[#E5E7EB]',
-                  };
-                  return (
-                    <div
-                      key={b.id}
-                      className="flex items-center gap-4 px-5 py-3 hover:bg-[#FAFAFA] transition-colors duration-100 group"
-                    >
-                      <div className="hidden sm:flex h-8 w-8 items-center justify-center rounded-xl bg-[#F3F4F6] shrink-0 group-hover:bg-[#FFF4EE] transition-colors duration-150">
-                        <FileText className="h-3.5 w-3.5 text-[#9CA3AF] group-hover:text-[#D95510] transition-colors duration-150" />
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-semibold text-[#111827] truncate leading-snug">
-                          {b.titulo}
-                        </p>
-                        <p className="text-[11px] text-[#9CA3AF] truncate mt-0.5 leading-none">
-                          {b.proyecto_nombre}
-                        </p>
-                      </div>
-
-                      <div className="hidden md:flex w-[140px] shrink-0">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold tracking-wide border whitespace-nowrap ${estadoCfg.cls}`}>
-                          {estadoCfg.label}
-                        </span>
-                      </div>
-
-                      <div className="w-[130px] shrink-0 text-right">
-                        <p className="text-[13px] font-bold text-[#111827] tabular-nums leading-tight">
-                          {formatCurrency(b.costo_directo)}
-                        </p>
-                      </div>
-
-                      <Link
-                        href={`/proyectos/${b.proyecto_id}`}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#F3F4F6] text-[#9CA3AF] hover:bg-[#D95510] hover:text-white transition-all duration-150 shrink-0"
-                        title="Ver proyecto"
-                      >
-                        <ArrowRight className="h-3.5 w-3.5" />
-                      </Link>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="px-5 py-2.5 bg-[#F8F9FA] border-t border-[#F3F4F6] flex items-center justify-between">
-                <p className="text-[11px] text-[#9CA3AF]">
-                  {presupuestosFlatten.length} {presupuestosFlatten.length === 1 ? 'presupuesto' : 'presupuestos'}
-                  {' en '}
-                  {proyectos.length} {proyectos.length === 1 ? 'proyecto' : 'proyectos'}
-                </p>
-                <p className="text-[12px] font-bold text-[#374151] tabular-nums">
-                  {formatCurrency(inversionTotal)}
-                </p>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>

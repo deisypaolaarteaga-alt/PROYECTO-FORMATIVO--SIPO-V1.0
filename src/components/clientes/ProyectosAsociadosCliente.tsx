@@ -38,7 +38,7 @@ interface ProyectoItem {
   tipo_obra: string | null;
   ubicacion: string | null;
   created_at: string;
-  budgets: Array<{ id: string; costo_directo: number | null }>;
+  budgets: Array<{ id: string; costo_directo: number | null; total_oferta: number | null }>;
 }
 
 interface ProyectosAsociadosClienteProps {
@@ -50,7 +50,7 @@ export function ProyectosAsociadosCliente({ initialProyectos }: ProyectosAsociad
   const [proyectos] = useState<ProyectoItem[]>(initialProyectos);
 
   const inversionTotal = proyectos.reduce(
-    (acc, p) => acc + (p.budgets ?? []).reduce((s, b) => s + Number(b.costo_directo ?? 0), 0),
+    (acc, p) => acc + (p.budgets ?? []).reduce((s, b) => s + Number(b.total_oferta ?? 0), 0),
     0,
   );
   const totalPresupuestos = proyectos.reduce((acc, p) => acc + (p.budgets?.length ?? 0), 0);
@@ -103,7 +103,7 @@ export function ProyectosAsociadosCliente({ initialProyectos }: ProyectosAsociad
                 Tipo de obra
               </p>
               <p className="w-[136px] shrink-0 text-right text-[10px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF] leading-none">
-                Costo directo
+                Total oferta
               </p>
               {/* spacer for action buttons */}
               <div className="w-[72px] shrink-0" />
@@ -113,7 +113,7 @@ export function ProyectosAsociadosCliente({ initialProyectos }: ProyectosAsociad
             <div className="divide-y divide-[#F3F4F6]">
               {proyectos.map((proyecto) => {
                 const totalProyecto = (proyecto.budgets ?? []).reduce(
-                  (acc, b) => acc + Number(b.costo_directo ?? 0),
+                  (acc, b) => acc + Number(b.total_oferta ?? 0),
                   0,
                 );
                 const numPresupuestos = proyecto.budgets?.length ?? 0;
@@ -156,9 +156,13 @@ export function ProyectosAsociadosCliente({ initialProyectos }: ProyectosAsociad
                     </div>
 
                     <div className="w-[136px] shrink-0 text-right">
-                      <p className="text-[14px] font-bold text-[#111827] tabular-nums leading-tight">
-                        {formatCurrency(totalProyecto)}
-                      </p>
+                      {totalProyecto > 0 ? (
+                        <p className="text-[14px] font-bold text-[#111827] tabular-nums leading-tight">
+                          {formatCurrency(totalProyecto)}
+                        </p>
+                      ) : (
+                        <p className="text-[13px] text-[#9CA3AF] italic leading-tight">Sin valorar</p>
+                      )}
                       <p className="text-[11px] text-[#9CA3AF] mt-0.5 leading-none">
                         {numPresupuestos} {numPresupuestos === 1 ? 'presupuesto' : 'presupuestos'}
                       </p>

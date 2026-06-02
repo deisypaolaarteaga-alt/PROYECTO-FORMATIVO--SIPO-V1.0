@@ -113,7 +113,36 @@ export async function getCliente(clienteId: string): Promise<Cliente | null> {
       .single();
 
     if (error || !data) return null;
-    return data as unknown as Cliente;
+
+    // Enriquecer budgets con total_oferta desde la vista
+    const projects = (data as any).projects ?? [];
+    const allBudgetIds = projects
+      .flatMap((p: any) => (p.budgets ?? []).map((b: any) => b.id))
+      .filter(Boolean) as string[];
+
+    const resumenMap: Record<string, number> = {};
+    if (allBudgetIds.length > 0) {
+      const { data: resumenes } = await supabase
+        .from('v_resumen_presupuesto')
+        .select('budget_id, total_oferta')
+        .in('budget_id', allBudgetIds);
+      for (const r of resumenes ?? []) {
+        resumenMap[r.budget_id] = Number(r.total_oferta ?? 0);
+      }
+    }
+
+    const enriched = {
+      ...data,
+      projects: projects.map((p: any) => ({
+        ...p,
+        budgets: (p.budgets ?? []).map((b: any) => ({
+          ...b,
+          total_oferta: resumenMap[b.id] ?? 0,
+        })),
+      })),
+    };
+
+    return enriched as unknown as Cliente;
   } catch (error) {
     console.error('[getCliente] error:', error);
     return null;

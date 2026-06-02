@@ -4,7 +4,7 @@ import { useState, useMemo, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-  Search, ChevronDown, ChevronRight, FileText,
+  Search, ChevronDown, FileText, FolderOpen,
   MoreVertical, ExternalLink, Archive, Trash2, Copy,
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
@@ -31,11 +31,21 @@ export type BudgetRow = {
   vigencia_dias: number;
   diasRestantes: number | null;
   proyecto_nombre: string | null;
+  project_id: string;
+  tipo_obra?: string | null;
   costo_directo: number;
   total_oferta: number;
   administracion_pct: number;
   imprevistos_pct: number;
   utilidad_pct: number;
+};
+
+type Grupo = {
+  project_id: string;
+  proyecto_nombre: string;
+  tipo_obra: string | null;
+  rows: BudgetRow[];
+  totalOferta: number;
 };
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -49,23 +59,34 @@ const TABS = [
   { key: 'archivado',   ...ESTADO_PRESUPUESTO_CONFIG.archivado   },
 ] as const;
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// Color del ícono de carpeta y fondo del header según tipo_obra
+const TIPO_FOLDER: Record<string, { icon: string; header: string }> = {
+  residencial:     { icon: 'text-[#D97706]', header: 'bg-[#FFFBEB]' },
+  comercial:       { icon: 'text-[#2563EB]', header: 'bg-[#EFF6FF]' },
+  infraestructura: { icon: 'text-[#64748B]', header: 'bg-[#F8FAFC]' },
+  hotelero:        { icon: 'text-[#7C3AED]', header: 'bg-[#F5F3FF]' },
+  industrial:      { icon: 'text-[#EA580C]', header: 'bg-[#FFF7ED]' },
+  institucional:   { icon: 'text-[#059669]', header: 'bg-[#F0FDF4]' },
+  otro:            { icon: 'text-[#9CA3AF]', header: 'bg-[#F9FAFB]' },
+};
 
-function pct(n: number) {
-  return `${Number.isInteger(n) ? n : n.toFixed(1)}%`;
+function tipoFolder(tipoObra: string | null | undefined) {
+  return TIPO_FOLDER[tipoObra ?? ''] ?? { icon: 'text-[#D97706]', header: 'bg-[#F8F7F5]' };
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function diasColor(d: number | null) {
-  if (d === null)  return 'text-[#9CA3AF]';
-  if (d <= 0)      return 'text-[#DC2626] font-semibold';
-  if (d <= 7)      return 'text-[#DC2626]';
-  if (d <= 15)     return 'text-[#EA580C]';
+  if (d === null) return 'text-[#9CA3AF]';
+  if (d <= 0)     return 'text-[#DC2626] font-semibold';
+  if (d <= 7)     return 'text-[#DC2626]';
+  if (d <= 15)    return 'text-[#EA580C]';
   return 'text-[#6B7280]';
 }
 
 function diasLabel(d: number | null) {
   if (d === null) return '—';
-  if (d <= 0)    return 'Vencido';
+  if (d <= 0)     return 'Vencido';
   return `${d}d`;
 }
 
@@ -79,13 +100,11 @@ type BudgetRowItemProps = {
 };
 
 function BudgetRowItem({ row, onArchivar, onEliminar, onDuplicar }: BudgetRowItemProps) {
-  const [expanded, setExpanded] = useState(false);
+  const router = useRouter();
   const badge = ESTADO_PRESUPUESTO_CONFIG[row.estado as keyof typeof ESTADO_PRESUPUESTO_CONFIG]
     ?? ESTADO_PRESUPUESTO_CONFIG.borrador;
 
-  const admin  = row.costo_directo * (row.administracion_pct / 100);
-  const imprev = row.costo_directo * (row.imprevistos_pct   / 100);
-  const util   = row.costo_directo * (row.utilidad_pct      / 100);
+  const sinValorar = row.total_oferta === 0 || row.costo_directo === 0;
 
   const puedeArchivar = !['aprobado', 'archivado'].includes(row.estado);
   const puedeEliminar = ['borrador', 'rechazado', 'archivado'].includes(row.estado);
@@ -93,66 +112,65 @@ function BudgetRowItem({ row, onArchivar, onEliminar, onDuplicar }: BudgetRowIte
 
   return (
     <li className="border-b border-[#F3F4F6] last:border-0">
-      {/* ── Main row ── */}
       <div
         role="button"
         tabIndex={0}
-        onClick={() => setExpanded((v) => !v)}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setExpanded((v) => !v); }}
-        className="flex items-center gap-4 px-5 py-3.5 hover:bg-[#FAFAFA] transition-colors cursor-pointer group"
+        onClick={() => router.push(`/presupuestos/${row.id}`)}
+        onKeyDown={(e) => { if (e.key === 'Enter') router.push(`/presupuestos/${row.id}`); }}
+        className="flex items-center gap-4 px-5 py-4 hover:bg-[#F5F3F0] transition-colors cursor-pointer group"
       >
-        {/* Toggle chevron */}
-        <span className="shrink-0 text-[#D1D5DB] group-hover:text-[#9CA3AF] transition-colors">
-          {expanded
-            ? <ChevronDown  className="h-3.5 w-3.5" />
-            : <ChevronRight className="h-3.5 w-3.5" />
-          }
-        </span>
-
-        {/* Title + project */}
-        <div className="flex-1 min-w-0">
-          <Link
-            href={`/presupuestos/${row.id}`}
-            onClick={(e) => e.stopPropagation()}
-            className="text-[13px] font-semibold text-[#111827] hover:text-[#D95510] transition-colors truncate block leading-tight"
-          >
+        {/* Nombre + badge "Sin valorar" */}
+        <div className="flex-1 min-w-0 flex items-center gap-2 min-w-0">
+          <span className="text-[13px] font-medium text-[#111827] group-hover:text-[#D95510] transition-colors truncate leading-tight">
             {row.titulo}
-          </Link>
-          {row.proyecto_nombre && (
-            <p className="text-[11px] text-[#9CA3AF] mt-0.5 leading-none truncate">
-              {row.proyecto_nombre}
-            </p>
+          </span>
+          {sinValorar && (
+            <span className="shrink-0 text-[10px] text-[#C4BDB5] leading-none">
+              Sin valorar
+            </span>
           )}
         </div>
 
         {/* Estado */}
-        <span className={cn('hidden sm:inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium shrink-0 w-[100px] justify-center', badge.badge)}>
+        <span className={cn(
+          'hidden sm:inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium shrink-0 w-[100px] justify-center',
+          badge.badge,
+        )}>
           {badge.label}
         </span>
 
         {/* Total oferta */}
-        <span className="text-[13px] font-bold text-[#111827] tabular-nums w-[148px] text-right shrink-0">
-          {formatCurrency(row.total_oferta)}
+        <span className={cn(
+          'text-[13px] font-semibold tabular-nums w-[130px] text-right shrink-0',
+          sinValorar ? 'text-[#D1D5DB]' : 'text-[#111827]',
+        )}>
+          {sinValorar ? '—' : formatCurrency(row.total_oferta)}
         </span>
 
-        {/* Creado */}
-        <span className="text-[11px] text-[#9CA3AF] w-[88px] shrink-0 hidden md:block">
+        {/* Fecha creación */}
+        <span className="text-[11px] text-[#9CA3AF] w-[88px] shrink-0 hidden md:block tabular-nums">
           {new Date(row.created_at).toLocaleDateString('es-CO', {
             day: '2-digit', month: 'short', year: 'numeric',
             timeZone: 'America/Bogota',
-          })}
+          }).replace(/\./g, '').replace(/ de /gi, ' ').replace(/  +/g, ' ').trim()}
         </span>
 
-        {/* Vigencia */}
-        <span className={cn('text-[11px] w-[56px] text-right shrink-0 tabular-nums hidden md:block', diasColor(row.diasRestantes))}>
+        {/* Vigencia — semáforo */}
+        <span className={cn(
+          'text-[11px] w-[52px] text-right shrink-0 tabular-nums hidden md:block',
+          diasColor(row.diasRestantes),
+        )}>
           {diasLabel(row.diasRestantes)}
         </span>
 
-        {/* Menú de acciones ⋯ */}
-        <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+        {/* Menú ⋯ — siempre visible */}
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="shrink-0 w-8 flex items-center justify-center"
+        >
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="h-7 w-7 inline-flex items-center justify-center rounded-lg text-[#C8C0B5] hover:bg-[#EAE6E0] hover:text-[#3D3530] transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100">
+              <button className="h-7 w-7 inline-flex items-center justify-center rounded-lg text-[#9CA3AF] hover:bg-[#EAE6E0] hover:text-[#3D3530] transition-colors">
                 <MoreVertical className="h-4 w-4" />
               </button>
             </DropdownMenuTrigger>
@@ -192,86 +210,32 @@ function BudgetRowItem({ row, onArchivar, onEliminar, onDuplicar }: BudgetRowIte
           </DropdownMenu>
         </div>
       </div>
-
-      {/* ── Expanded detail ── */}
-      {expanded && (
-        <div className="px-5 pt-3 pb-4 bg-[#F8F9FA] border-t border-[#F3F4F6]">
-          <div className="flex items-end justify-between gap-4 flex-wrap">
-
-            {/* AIU breakdown */}
-            <div className="flex items-end gap-5 flex-wrap">
-
-              {/* Costo directo */}
-              <div>
-                <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF] mb-1 leading-none">
-                  Costo directo
-                </p>
-                <p className="text-[13px] font-semibold text-[#374151] tabular-nums leading-none">
-                  {formatCurrency(row.costo_directo)}
-                </p>
-              </div>
-
-              <div className="w-px h-7 bg-[#E5E7EB] shrink-0" />
-
-              {/* Administración */}
-              <div>
-                <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF] mb-1 leading-none">
-                  Administración
-                </p>
-                <p className="text-[13px] font-semibold text-[#374151] tabular-nums leading-none">
-                  {pct(row.administracion_pct)}{' '}
-                  <span className="text-[11px] text-[#9CA3AF] font-normal">· {formatCurrency(admin)}</span>
-                </p>
-              </div>
-
-              {/* Imprevistos */}
-              <div>
-                <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF] mb-1 leading-none">
-                  Imprevistos
-                </p>
-                <p className="text-[13px] font-semibold text-[#374151] tabular-nums leading-none">
-                  {pct(row.imprevistos_pct)}{' '}
-                  <span className="text-[11px] text-[#9CA3AF] font-normal">· {formatCurrency(imprev)}</span>
-                </p>
-              </div>
-
-              {/* Utilidad */}
-              <div>
-                <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF] mb-1 leading-none">
-                  Utilidad
-                </p>
-                <p className="text-[13px] font-semibold text-[#374151] tabular-nums leading-none">
-                  {pct(row.utilidad_pct)}{' '}
-                  <span className="text-[11px] text-[#9CA3AF] font-normal">· {formatCurrency(util)}</span>
-                </p>
-              </div>
-
-              <div className="w-px h-7 bg-[#E5E7EB] shrink-0" />
-
-              {/* Total presupuesto — protagonista */}
-              <div>
-                <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF] mb-1 leading-none">
-                  Total presupuesto
-                </p>
-                <p className="text-[18px] font-bold text-[#111827] tabular-nums leading-none">
-                  {formatCurrency(row.total_oferta)}
-                </p>
-              </div>
-            </div>
-
-            {/* CTA */}
-            <Link
-              href={`/presupuestos/${row.id}`}
-              onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#D95510] text-white text-[12px] font-semibold hover:bg-[#C44A10] transition-colors shrink-0"
-            >
-              Ver detalle
-              <ChevronRight className="h-3.5 w-3.5" />
-            </Link>
-          </div>
-        </div>
-      )}
     </li>
+  );
+}
+
+// ── Encabezado de columnas ─────────────────────────────────────────────────────
+
+function ColumnHeaders() {
+  return (
+    <div className="hidden md:flex items-center gap-4 px-5 py-2 border-b border-[#F3F4F6] bg-[#F9FAFB]">
+      <span className="flex-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF]">
+        Presupuesto
+      </span>
+      <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF] w-[100px] text-center shrink-0">
+        Estado
+      </span>
+      <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF] w-[130px] text-right shrink-0">
+        Total oferta
+      </span>
+      <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF] w-[88px] hidden md:block">
+        Creado
+      </span>
+      <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF] w-[52px] text-right hidden md:block">
+        Vigencia
+      </span>
+      <div className="w-8 shrink-0" />
+    </div>
   );
 }
 
@@ -286,6 +250,17 @@ export function PresupuestosClientList({ rows }: { rows: BudgetRow[] }) {
   const [confirmEliminar, setConfirmEliminar] = useState<string | null>(null);
   const [procesando, setProcesando]           = useState(false);
   const [, startTransition]                   = useTransition();
+
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+  function toggleGrupo(projectId: string) {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(projectId)) next.delete(projectId);
+      else next.add(projectId);
+      return next;
+    });
+  }
 
   const counts = useMemo(() => {
     const map: Record<string, number> = { todos: rows.length };
@@ -304,6 +279,26 @@ export function PresupuestosClientList({ rows }: { rows: BudgetRow[] }) {
     }
     return result;
   }, [rows, activeTab, search]);
+
+  const grupos = useMemo<Grupo[]>(() => {
+    const map = new Map<string, Grupo>();
+    for (const row of filtered) {
+      const pid = row.project_id;
+      if (!map.has(pid)) {
+        map.set(pid, {
+          project_id:      pid,
+          proyecto_nombre: row.proyecto_nombre ?? 'Sin proyecto',
+          tipo_obra:       row.tipo_obra ?? null,
+          rows:            [],
+          totalOferta:     0,
+        });
+      }
+      const g = map.get(pid)!;
+      g.rows.push(row);
+      if (row.total_oferta > 0) g.totalOferta += row.total_oferta;
+    }
+    return Array.from(map.values());
+  }, [filtered]);
 
   async function handleConfirmarArchivar() {
     if (!confirmArchivar) return;
@@ -338,7 +333,7 @@ export function PresupuestosClientList({ rows }: { rows: BudgetRow[] }) {
   return (
     <div className="space-y-4">
 
-      {/* ── Search ── */}
+      {/* ── Buscador ── */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#9CA3AF] pointer-events-none" />
         <input
@@ -350,7 +345,7 @@ export function PresupuestosClientList({ rows }: { rows: BudgetRow[] }) {
         />
       </div>
 
-      {/* ── Status tabs ── */}
+      {/* ── Tabs de estado ── */}
       <div className="flex gap-1.5 flex-wrap">
         {TABS.map(({ key, label, dot }) => {
           const count    = counts[key] ?? 0;
@@ -379,7 +374,7 @@ export function PresupuestosClientList({ rows }: { rows: BudgetRow[] }) {
         })}
       </div>
 
-      {/* ── List ── */}
+      {/* ── Lista agrupada ── */}
       {filtered.length === 0 ? (
         <div className="bg-white rounded-xl border border-[#E5E7EB] flex flex-col items-center justify-center py-16 gap-3">
           <div className="w-10 h-10 rounded-xl bg-[#F3F4F6] flex items-center justify-center">
@@ -395,38 +390,85 @@ export function PresupuestosClientList({ rows }: { rows: BudgetRow[] }) {
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-[#E5E7EB] overflow-hidden shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
+        <div className="space-y-6">
+          {grupos.map((grupo) => {
+            const collapsed    = collapsedGroups.has(grupo.project_id);
+            const { icon, header } = tipoFolder(grupo.tipo_obra);
+            return (
+              <div
+                key={grupo.project_id}
+                className="bg-white rounded-xl border border-[#E5E7EB] overflow-hidden shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]"
+              >
+                {/* ── Encabezado del grupo ── */}
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => toggleGrupo(grupo.project_id)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleGrupo(grupo.project_id); }}
+                  className={cn(
+                    'flex items-center gap-3 px-5 py-4 border-b border-[#E2DDD7] cursor-pointer select-none transition-all',
+                    header,
+                    'hover:brightness-[0.97]',
+                  )}
+                >
+                  {/* Chevron animado */}
+                  <ChevronDown
+                    className={cn(
+                      'h-4 w-4 text-[#9CA3AF] transition-transform duration-200 shrink-0',
+                      collapsed && '-rotate-90',
+                    )}
+                  />
 
-          {/* Column headers */}
-          <div className="hidden md:flex items-center gap-4 px-5 py-2.5 border-b border-[#F3F4F6] bg-[#F9FAFB]">
-            <div className="w-3.5 shrink-0" />
-            <span className="flex-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF]">Presupuesto</span>
-            <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF] w-[100px] text-center shrink-0">Estado</span>
-            <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF] w-[148px] text-right shrink-0">Total oferta</span>
-            <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF] w-[88px] hidden md:block">Creado</span>
-            <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF] w-[56px] text-right hidden md:block">Vigencia</span>
-            <div className="w-7 shrink-0" />
-          </div>
+                  {/* Ícono carpeta coloreado por tipo_obra */}
+                  <FolderOpen className={cn('h-4 w-4 shrink-0', icon)} />
 
-          {/* Rows */}
-          <ul>
-            {filtered.map((row) => (
-              <BudgetRowItem
-                key={row.id}
-                row={row}
-                onArchivar={(id) => setConfirmArchivar(id)}
-                onEliminar={(id) => setConfirmEliminar(id)}
-                onDuplicar={handleDuplicar}
-              />
-            ))}
-          </ul>
+                  {/* Nombre del proyecto como link */}
+                  <Link
+                    href={`/proyectos/${grupo.project_id}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-[13px] font-semibold text-[#111827] hover:text-[#D95510] hover:underline underline-offset-2 transition-colors truncate flex-1 min-w-0"
+                  >
+                    {grupo.proyecto_nombre}
+                  </Link>
 
-          {/* Footer count */}
-          <div className="px-5 py-2.5 border-t border-[#F3F4F6] bg-[#F9FAFB]">
-            <p className="text-[11px] text-[#9CA3AF]">
-              Mostrando {filtered.length} de {rows.length} presupuesto{rows.length !== 1 ? 's' : ''}
-            </p>
-          </div>
+                  {/* Pills sutiles */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-white/80 border border-black/[0.07] text-[#6B7280] tabular-nums">
+                      {grupo.rows.length} ptos.
+                    </span>
+                    {grupo.totalOferta > 0 && (
+                      <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-white/80 border border-black/[0.07] text-[#374151] tabular-nums">
+                        {formatCurrency(grupo.totalOferta)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Cuerpo del grupo ── */}
+                {!collapsed && (
+                  <>
+                    <ColumnHeaders />
+                    <ul>
+                      {grupo.rows.map((row) => (
+                        <BudgetRowItem
+                          key={row.id}
+                          row={row}
+                          onArchivar={(id) => setConfirmArchivar(id)}
+                          onEliminar={(id) => setConfirmEliminar(id)}
+                          onDuplicar={handleDuplicar}
+                        />
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Conteo total */}
+          <p className="text-[11px] text-[#9CA3AF] px-1">
+            Mostrando {filtered.length} de {rows.length} presupuesto{rows.length !== 1 ? 's' : ''} en {grupos.length} proyecto{grupos.length !== 1 ? 's' : ''}
+          </p>
         </div>
       )}
 

@@ -49,7 +49,7 @@ function StatusBadge({ estado }: { estado: string }) {
   );
 }
 
-export function PresupuestosTable({ rows, filtro }: { rows: any[]; filtro: string | null }) {
+export function PresupuestosTable({ rows, filtro, mostrarColumnaProyecto = true }: { rows: any[]; filtro: string | null; mostrarColumnaProyecto?: boolean }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [pagina, setPagina] = useState(1);
@@ -128,9 +128,11 @@ export function PresupuestosTable({ rows, filtro }: { rows: any[]; filtro: strin
           <p className="flex-1 min-w-0 text-[10px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF] leading-none">
             Presupuesto
           </p>
-          <p className="w-[150px] shrink-0 text-[10px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF] leading-none">
-            Proyecto
-          </p>
+          {mostrarColumnaProyecto && (
+            <p className="w-[150px] shrink-0 text-[10px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF] leading-none">
+              Proyecto
+            </p>
+          )}
           <p className="w-[110px] shrink-0 text-[10px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF] leading-none">
             Estado
           </p>
@@ -198,11 +200,23 @@ export function PresupuestosTable({ rows, filtro }: { rows: any[]; filtro: strin
                 </Link>
 
                 {/* Proyecto */}
-                <div className="hidden md:block w-[150px] shrink-0">
-                  <p className="text-[12px] text-[#6B7280] truncate leading-tight">
-                    {r.proyecto_nombre ?? '—'}
-                  </p>
-                </div>
+                {mostrarColumnaProyecto && (
+                  <div className="hidden md:block w-[150px] shrink-0">
+                    {r.project_id ? (
+                      <Link
+                        href={`/proyectos/${r.project_id}`}
+                        className="text-[12px] text-[#6B7280] truncate leading-tight hover:text-[#D95510] transition-colors block"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {r.proyecto_nombre ?? '—'}
+                      </Link>
+                    ) : (
+                      <p className="text-[12px] text-[#6B7280] truncate leading-tight">
+                        {r.proyecto_nombre ?? '—'}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {/* Estado */}
                 <div className="hidden md:flex w-[110px] shrink-0">

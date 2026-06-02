@@ -1,8 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { formatCurrency, cn } from '@/lib/utils';
-import Link from 'next/link';
 import { PresupuestosNewButton } from '@/components/presupuestos/PresupuestosNewButton';
-import { PresupuestosTable } from '@/components/presupuestos/PresupuestosTable';
+import { PresupuestosClientList } from '@/components/presupuestos/PresupuestosClientList';
+import type { BudgetRow } from '@/components/presupuestos/PresupuestosClientList';
 
 export const revalidate = 30;
 
@@ -38,23 +38,7 @@ function KPICard({
   );
 }
 
-const ESTADOS = [
-  { key: 'todos',       label: 'Todos'       },
-  { key: 'borrador',    label: 'Borrador'    },
-  { key: 'en_revision', label: 'En revisión' },
-  { key: 'aprobado',    label: 'Aprobado'    },
-  { key: 'rechazado',   label: 'Rechazado'   },
-  { key: 'archivado',   label: 'Archivado'   },
-];
-
-export default async function PresupuestosPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ estado?: string }>;
-}) {
-  const { estado: estadoParam } = await searchParams;
-  const filtro = estadoParam && estadoParam !== 'todos' ? estadoParam : null;
-
+export default async function PresupuestosPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
@@ -77,19 +61,17 @@ export default async function PresupuestosPage({
     (acc, r) => acc + Number(r.total_oferta ?? 0),
     0
   );
+  const conValor   = (allResumenes ?? []).filter((r) => Number(r.total_oferta ?? 0) > 0).length;
+  const sinValorar = (allBudgets?.length ?? 0) - conValor;
   const totalAprobados = (allBudgets ?? []).filter((b) => b.estado === 'aprobado').length;
   const totalRevision = (allBudgets ?? []).filter((b) => b.estado === 'en_revision').length;
 
-  let query = supabase
+  const { data: listBudgets } = await supabase
     .from('budgets')
-    .select('id, titulo, estado, created_at, vigencia_dias, projects(tipo_obra, nombre)')
+    .select('id, titulo, estado, created_at, vigencia_dias, project_id, administracion_pct, imprevistos_pct, utilidad_pct, projects(tipo_obra, nombre)')
     .eq('user_id', user.id)
     .is('deleted_at', null)
     .order('created_at', { ascending: false });
-
-  if (filtro) query = query.eq('estado', filtro);
-
-  const { data: listBudgets } = await query;
   const listIds = (listBudgets ?? []).map((b) => b.id);
   
   const { data: listResumenes } = listIds.length > 0
@@ -108,17 +90,30 @@ export default async function PresupuestosPage({
   }
 
   const ahora = Date.now();
-  const rows = (listBudgets ?? []).map((b) => {
+  const rows: BudgetRow[] = (listBudgets ?? []).map((b) => {
     const resumen = resumenMap[b.id] ?? { costo_directo: 0, total_oferta: 0 };
     const diasRestantes = b.vigencia_dias > 0
       ? Math.ceil((new Date(b.created_at).getTime() + b.vigencia_dias * 86400000 - ahora) / 86400000)
       : null;
-    const tipo_obra = (b.projects as any)?.tipo_obra ?? null;
-    const proyecto_nombre = (b.projects as any)?.nombre ?? null;
-    return { ...b, ...resumen, diasRestantes, tipo_obra, proyecto_nombre };
+    const proyecto_nombre = (b.projects as any)?.nombre   ?? null;
+    const tipo_obra       = (b.projects as any)?.tipo_obra ?? null;
+    return {
+      id:                b.id,
+      titulo:            b.titulo,
+      estado:            b.estado,
+      created_at:        b.created_at,
+      vigencia_dias:     b.vigencia_dias,
+      diasRestantes,
+      proyecto_nombre,
+      project_id:        b.project_id,
+      tipo_obra,
+      costo_directo:     resumen.costo_directo,
+      total_oferta:      resumen.total_oferta,
+      administracion_pct: Number(b.administracion_pct ?? 10),
+      imprevistos_pct:    Number(b.imprevistos_pct   ?? 5),
+      utilidad_pct:       Number(b.utilidad_pct      ?? 10),
+    };
   });
-
-  const estadoActivo = estadoParam ?? 'todos';
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
@@ -140,7 +135,7 @@ export default async function PresupuestosPage({
         <KPICard
           label="Total Presupuestado"
           value={formatCurrency(globalTotalOferta)}
-          sub={`${allBudgets?.length ?? 0} presupuestos en total`}
+          sub={`${conValor} con valor · ${sinValorar} sin valorar`}
           highlight
         />
         <KPICard
@@ -156,49 +151,15 @@ export default async function PresupuestosPage({
         <KPICard
           label="Promedio por pto."
           value={
-            allBudgets?.length
-              ? formatCurrency(globalTotalOferta / allBudgets.length)
+            conValor > 0
+              ? formatCurrency(globalTotalOferta / conValor)
               : formatCurrency(0)
           }
           sub="Valor medio de cotizaciones"
         />
       </div>
 
-      <div className="flex items-center border-b border-[#E5E7EB] overflow-x-auto">
-        {ESTADOS.map(({ key, label }) => {
-          const active = estadoActivo === key;
-          const count =
-            key === 'todos'
-              ? allBudgets?.length ?? 0
-              : allBudgets?.filter((b) => b.estado === key).length ?? 0;
-
-          return (
-            <Link
-              key={key}
-              href={key === 'todos' ? '/presupuestos' : `/presupuestos?estado=${key}`}
-              className={cn(
-                'inline-flex items-center gap-2 px-4 py-2.5 text-[13px] font-medium whitespace-nowrap transition-all border-b-2 -mb-px shrink-0',
-                active
-                  ? 'border-[#D95510] text-[#D95510]'
-                  : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-200'
-              )}
-            >
-              {label}
-              <span
-                className={cn(
-                  'inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-[11px] font-bold tabular-nums',
-                  active ? 'bg-[#D95510] text-white' : 'bg-neutral-100 text-neutral-500'
-                )}
-              >
-                {count}
-              </span>
-            </Link>
-          );
-        })}
-      </div>
-
-      {/* ── Contenido: Data Table Paginada ─────────────────────────────────────────── */}
-      <PresupuestosTable rows={rows} filtro={filtro} />
+      <PresupuestosClientList rows={rows} />
     </div>
   );
 }

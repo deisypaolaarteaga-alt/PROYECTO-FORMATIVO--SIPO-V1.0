@@ -263,6 +263,211 @@ export async function cambiarEstadoProyecto(
 }
 
 /**
+ * Archiva un proyecto y sus presupuestos no aprobados.
+ * Llama a fn_archivar_proyecto que verifica ownership y presupuestos bloqueantes.
+ */
+export async function archivarProyecto(projectId: string): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'Sesión expirada o no válida.' };
+
+    const admin = createAdminClient();
+    const { error } = await admin.rpc('fn_archivar_proyecto', {
+      p_project_id: projectId,
+      p_user_id: user.id,
+    });
+
+    if (error) {
+      // P0001 = RAISE EXCEPTION del lado de PostgreSQL — mensaje visible al usuario
+      if (error.code === 'P0001' && error.message) {
+        return { success: false, error: error.message };
+      }
+      throw error;
+    }
+
+    revalidatePath('/proyectos');
+    return { success: true };
+  } catch (error: any) {
+    console.error('[archivarProyecto]', error);
+    return { success: false, error: 'No se pudo archivar el proyecto.' };
+  }
+}
+
+/**
+ * Elimina (soft-delete) un proyecto y sus presupuestos en cascada.
+ * Solo permitido si estado es 'borrador' o 'archivado' y no hay presupuestos aprobados/en_revision.
+ */
+export async function eliminarProyecto(projectId: string): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'Sesión expirada o no válida.' };
+
+    const admin = createAdminClient();
+    const { error } = await admin.rpc('fn_eliminar_proyecto', {
+      p_project_id: projectId,
+      p_user_id: user.id,
+    });
+
+    if (error) {
+      if (error.code === 'P0001' && error.message) {
+        return { success: false, error: error.message };
+      }
+      throw error;
+    }
+
+    revalidatePath('/proyectos');
+    return { success: true };
+  } catch (error: any) {
+    console.error('[eliminarProyecto]', error);
+    return { success: false, error: 'No se pudo eliminar el proyecto.' };
+  }
+}
+
+/**
+ * Desarchiva un proyecto volviéndolo a estado 'borrador'.
+ */
+export async function desArchivarProyecto(projectId: string): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'Sesión expirada o no válida.' };
+
+    const { data: proyecto } = await supabase
+      .from('projects')
+      .select('estado')
+      .eq('id', projectId)
+      .eq('user_id', user.id)
+      .is('deleted_at', null)
+      .single();
+
+    if (!proyecto) return { success: false, error: 'Proyecto no encontrado.' };
+    if (proyecto.estado !== 'archivado') {
+      return { success: false, error: 'Solo se pueden desarchivar proyectos en estado archivado.' };
+    }
+
+    const admin = createAdminClient();
+    const { error } = await admin
+      .from('projects')
+      .update({ estado: 'borrador', updated_at: new Date().toISOString() })
+      .eq('id', projectId)
+      .eq('user_id', user.id);
+
+    if (error) throw error;
+
+    revalidatePath('/proyectos');
+    return { success: true };
+  } catch (error: any) {
+    console.error('[desArchivarProyecto]', error);
+    return { success: false, error: 'No se pudo desarchivar el proyecto.' };
+  }
+}
+
+/**
+ * Archiva un presupuesto (estado → 'archivado').
+ * No se puede archivar un presupuesto aprobado.
+ */
+export async function archivarPresupuesto(budgetId: string): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'Sesión expirada o no válida.' };
+
+    // Verificar ownership a través del proyecto
+    const { data: budget } = await supabase
+      .from('budgets')
+      .select('id, estado, project_id, projects!inner(user_id)')
+      .eq('id', budgetId)
+      .is('deleted_at', null)
+      .single();
+
+    if (!budget) return { success: false, error: 'Presupuesto no encontrado.' };
+
+    const proyectoUserId = (budget as any).projects?.user_id;
+    if (proyectoUserId !== user.id) {
+      return { success: false, error: 'No tienes permisos para modificar este presupuesto.' };
+    }
+
+    if (budget.estado === 'aprobado') {
+      return { success: false, error: 'No se puede archivar un presupuesto aprobado.' };
+    }
+
+    if (budget.estado === 'archivado') {
+      return { success: false, error: 'El presupuesto ya está archivado.' };
+    }
+
+    const admin = createAdminClient();
+    const { error } = await admin
+      .from('budgets')
+      .update({ estado: 'archivado' })
+      .eq('id', budgetId);
+
+    if (error) throw error;
+
+    revalidatePath('/presupuestos');
+    revalidatePath(`/presupuestos/${budgetId}`);
+    revalidatePath(`/proyectos/${budget.project_id}`);
+    revalidatePath('/proyectos');
+    return { success: true };
+  } catch (error: any) {
+    console.error('[archivarPresupuesto]', error);
+    return { success: false, error: 'No se pudo archivar el presupuesto.' };
+  }
+}
+
+/**
+ * Elimina (soft-delete) un presupuesto.
+ * Solo permitido si estado es 'borrador', 'rechazado' o 'archivado'.
+ */
+export async function eliminarPresupuesto(budgetId: string): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'Sesión expirada o no válida.' };
+
+    // Verificar ownership a través del proyecto
+    const { data: budget } = await supabase
+      .from('budgets')
+      .select('id, estado, project_id, projects!inner(user_id)')
+      .eq('id', budgetId)
+      .is('deleted_at', null)
+      .single();
+
+    if (!budget) return { success: false, error: 'Presupuesto no encontrado.' };
+
+    const proyectoUserId = (budget as any).projects?.user_id;
+    if (proyectoUserId !== user.id) {
+      return { success: false, error: 'No tienes permisos para eliminar este presupuesto.' };
+    }
+
+    const estadosPermitidos = ['borrador', 'rechazado', 'archivado'];
+    if (!estadosPermitidos.includes(budget.estado)) {
+      return {
+        success: false,
+        error: `No se puede eliminar un presupuesto en estado "${budget.estado}". Solo puedes eliminar presupuestos en borrador, rechazados o archivados.`,
+      };
+    }
+
+    const admin = createAdminClient();
+    const { error } = await admin
+      .from('budgets')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', budgetId);
+
+    if (error) throw error;
+
+    revalidatePath('/presupuestos');
+    revalidatePath(`/proyectos/${budget.project_id}`);
+    revalidatePath('/proyectos');
+    return { success: true };
+  } catch (error: any) {
+    console.error('[eliminarPresupuesto]', error);
+    return { success: false, error: 'No se pudo eliminar el presupuesto.' };
+  }
+}
+
+/**
  * Soft Delete de un proyecto
  */
 export async function deleteProject(id: string): Promise<ActionResult> {

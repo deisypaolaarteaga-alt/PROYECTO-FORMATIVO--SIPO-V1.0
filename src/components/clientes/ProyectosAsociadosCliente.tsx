@@ -1,11 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Layers, MapPin, Calendar, ArrowRight, Briefcase, Trash2 } from 'lucide-react';
-import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
-import { deleteProject } from '@/actions/proyectos';
+import { Layers, MapPin, Calendar, ArrowRight, Briefcase } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/format';
 import { cn } from '@/lib/utils';
 
@@ -50,28 +47,13 @@ interface ProyectosAsociadosClienteProps {
 
 export function ProyectosAsociadosCliente({ initialProyectos }: ProyectosAsociadosClienteProps) {
   console.log('ProyectosAsociadosCliente render:', initialProyectos?.length);
-  const router = useRouter();
-  const [proyectos, setProyectos] = useState<ProyectoItem[]>(initialProyectos);
-  const [confirmEliminar, setConfirmEliminar] = useState<{ id: string; nombre: string } | null>(null);
+  const [proyectos] = useState<ProyectoItem[]>(initialProyectos);
 
   const inversionTotal = proyectos.reduce(
     (acc, p) => acc + (p.budgets ?? []).reduce((s, b) => s + Number(b.costo_directo ?? 0), 0),
     0,
   );
   const totalPresupuestos = proyectos.reduce((acc, p) => acc + (p.budgets?.length ?? 0), 0);
-
-  async function handleEliminarProyecto() {
-    if (!confirmEliminar) return;
-    const { id } = confirmEliminar;
-    setConfirmEliminar(null);
-    const res = await deleteProject(id);
-    if (res.success) {
-      setProyectos(prev => prev.filter(p => p.id !== id));
-      router.refresh();
-    } else {
-      alert(res.error || 'No se pudo eliminar el proyecto.');
-    }
-  }
 
   return (
     <>
@@ -183,13 +165,6 @@ export function ProyectosAsociadosCliente({ initialProyectos }: ProyectosAsociad
                     </div>
 
                     <div className="flex items-center gap-1 w-[72px] shrink-0 justify-end">
-                      <button
-                        aria-label="Eliminar proyecto"
-                        onClick={() => setConfirmEliminar({ id: proyecto.id, nombre: proyecto.nombre })}
-                        className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded opacity-0 group-hover:opacity-100 focus:opacity-100"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
                       <Link
                         href={`/proyectos/${proyecto.id}`}
                         className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#F3F4F6] text-[#9CA3AF] hover:bg-[#D95510] hover:text-white transition-all duration-150 shrink-0"
@@ -218,15 +193,6 @@ export function ProyectosAsociadosCliente({ initialProyectos }: ProyectosAsociad
         )}
       </div>
 
-      <ConfirmDialog
-        open={!!confirmEliminar}
-        title="Eliminar proyecto"
-        description="¿Eliminar este proyecto? Se eliminarán también sus presupuestos asociados."
-        confirmLabel="Eliminar"
-        variant="danger"
-        onConfirm={handleEliminarProyecto}
-        onCancel={() => setConfirmEliminar(null)}
-      />
     </>
   );
 }

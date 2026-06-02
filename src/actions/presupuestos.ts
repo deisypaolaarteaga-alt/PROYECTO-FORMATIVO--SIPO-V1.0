@@ -444,8 +444,14 @@ export async function guardarAPU(
     console.log('[guardarAPU] items a insertar:', payload.items?.length);
 
     // Reemplazar ítems del APU (hard delete válido — son detalles del APU, no entidades independientes)
-    const { error: deleteError } = await supabase.from('apu_items').delete().eq('apu_id', apuId).eq('user_id', user.id);
-    console.log('[guardarAPU] error al borrar items previos:', deleteError);
+    const admin = createAdminClient();
+    console.log('[guardarAPU] borrando items de apu_id:', apuId)
+    const { data: deleted, error: delErr } = await admin
+      .from('apu_items')
+      .delete()
+      .eq('apu_id', apuId)
+      .select('id')
+    console.log('[guardarAPU] items borrados:', deleted?.length, 'error:', delErr?.message)
 
     let validated: ReturnType<typeof apuItemSchema.parse>[] = [];
     if (payload.items.length > 0) {

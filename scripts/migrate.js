@@ -97,6 +97,7 @@ const migrationFiles = [
   'supabase/migrations/20260601200000_user_plantillas.sql',
   'supabase/migrations/20260601300000_activities_catalogo_ref.sql',
   'supabase/migrations/20260601400000_plantillas_tipo_obra.sql',
+  'supabase/migrations/20260602100000_eliminar_archivar_proyectos_presupuestos.sql',
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

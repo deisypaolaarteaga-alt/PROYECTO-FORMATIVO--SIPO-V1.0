@@ -86,53 +86,84 @@ export async function guardarComoPlantilla(
 
     const plantillaId = plantilla.id;
 
-    // Insertar capítulos, actividades e ítems en lotes
-    for (let capIdx = 0; capIdx < (chapters ?? []).length; capIdx++) {
-      const ch = (chapters as any[])[capIdx];
+    // ── Batch 1: todos los capítulos en un solo INSERT ──────────────────────
+    const chapterList = (chapters as any[]) ?? [];
+    const capsPayload = chapterList.map((ch: any, i: number) => ({
+      plantilla_id: plantillaId,
+      nombre:       ch.nombre,
+      orden:        i,
+    }));
 
-      const { data: capIns, error: capErr } = await admin
+    const capIdByOrden = new Map<number, string>();
+    if (capsPayload.length > 0) {
+      const { data: capsIns, error: capsErr } = await admin
         .from('user_plantillas_capitulos')
-        .insert({ plantilla_id: plantillaId, nombre: ch.nombre, orden: capIdx })
-        .select('id')
-        .single();
-      if (capErr) throw capErr;
+        .insert(capsPayload)
+        .select('id, orden');
+      if (capsErr || !capsIns) { console.error('[guardarComoPlantilla] capsErr', capsErr); throw capsErr ?? new Error('caps insert failed'); }
+      for (const c of capsIns) capIdByOrden.set(c.orden, c.id);
+    }
 
+    // ── Batch 2: todas las actividades en un solo INSERT ─────────────────────
+    const actsPayload: any[] = [];
+    // Guardamos (capOrden, actOrden) para reconstruir el mapping tras el INSERT
+    const actKeys: Array<{ capId: string; actOrden: number; srcActivityId: string }> = [];
+
+    for (let capIdx = 0; capIdx < chapterList.length; capIdx++) {
+      const ch = chapterList[capIdx];
+      const capId = capIdByOrden.get(capIdx)!;
       const actividades = (ch.activities ?? []).filter((a: any) => !a.deleted_at);
+
       for (let actIdx = 0; actIdx < actividades.length; actIdx++) {
         const act = actividades[actIdx];
-
-        const { data: actIns, error: actErr } = await admin
-          .from('user_plantillas_actividades')
-          .insert({
-            capitulo_id:     capIns.id,
-            nombre:          act.nombre ?? 'Actividad',
-            unidad:          act.unidad ?? 'gl',
-            cantidad:        act.cantidad ?? 0,
-            precio_unitario: act.precio_unitario ?? 0,
-            orden:           actIdx,
-          })
-          .select('id')
-          .single();
-        if (actErr) throw actErr;
-
-        // Ítems APU de la actividad (indexados por activity_id en query separada)
-        const apuItems: any[] = apuByActivity[act.id]?.apu_items ?? [];
-        if (apuItems.length > 0) {
-          const itemsPayload = apuItems.map((item: any, iIdx: number) => ({
-            actividad_id:    actIns.id,
-            tipo:            item.tipo,
-            nombre:          item.nombre,
-            unidad:          item.unidad ?? 'gl',
-            cantidad:        item.cantidad ?? 0,
-            precio_unitario: item.precio_unitario ?? 0,
-            orden:           item.orden ?? iIdx,
-          }));
-          const { error: itemsErr } = await admin
-            .from('user_plantillas_apu_items')
-            .insert(itemsPayload);
-          if (itemsErr) throw itemsErr;
-        }
+        actsPayload.push({
+          capitulo_id:     capId,
+          nombre:          act.nombre ?? 'Actividad',
+          unidad:          act.unidad ?? 'gl',
+          cantidad:        act.cantidad ?? 0,
+          precio_unitario: act.precio_unitario ?? 0,
+          orden:           actIdx,
+        });
+        actKeys.push({ capId, actOrden: actIdx, srcActivityId: act.id });
       }
+    }
+
+    // Map "capituloId_orden" → actividad_id insertada
+    const actIdByKey = new Map<string, string>();
+    if (actsPayload.length > 0) {
+      const { data: actsIns, error: actsErr } = await admin
+        .from('user_plantillas_actividades')
+        .insert(actsPayload)
+        .select('id, capitulo_id, orden');
+      if (actsErr || !actsIns) { console.error('[guardarComoPlantilla] actsErr', actsErr); throw actsErr ?? new Error('acts insert failed'); }
+      for (const a of actsIns) actIdByKey.set(`${a.capitulo_id}_${a.orden}`, a.id);
+    }
+
+    // ── Batch 3: todos los apu_items en un solo INSERT ────────────────────────
+    const itemsPayload: any[] = [];
+    for (const { capId, actOrden, srcActivityId } of actKeys) {
+      const actId = actIdByKey.get(`${capId}_${actOrden}`);
+      if (!actId) continue;
+      const apuItems: any[] = apuByActivity[srcActivityId]?.apu_items ?? [];
+      for (let iIdx = 0; iIdx < apuItems.length; iIdx++) {
+        const item = apuItems[iIdx];
+        itemsPayload.push({
+          actividad_id:    actId,
+          tipo:            item.tipo,
+          nombre:          item.nombre,
+          unidad:          item.unidad ?? 'gl',
+          cantidad:        item.cantidad ?? 0,
+          precio_unitario: item.precio_unitario ?? 0,
+          orden:           item.orden ?? iIdx,
+        });
+      }
+    }
+
+    if (itemsPayload.length > 0) {
+      const { error: itemsErr } = await admin
+        .from('user_plantillas_apu_items')
+        .insert(itemsPayload);
+      if (itemsErr) { console.error('[guardarComoPlantilla] itemsErr', itemsErr); throw itemsErr; }
     }
 
     return { success: true };

@@ -31,6 +31,7 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
   const [items, setItems] = useState<any[]>([]);
   const [rendimiento, setRendimiento] = useState(1);
   const [cuadrillas, setCuadrillas] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [searchType, setSearchType] = useState<'material' | 'equipo'>('material');
   const [pendingPriceIdx, setPendingPriceIdx] = useState<number | null>(null);
@@ -39,30 +40,12 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
   const [selectedCuadrillaId, setSelectedCuadrillaId] = useState<string | null>(null);
   const [cuadrillaUnidad, setCuadrillaUnidad] = useState('m²');
 
-  // Cargar datos
+  // Cargar datos — única fuente de verdad: servidor
   useEffect(() => {
     if (!isOpen || !activity) return;
-
-    // Usar datos ya embebidos en la actividad como estado inicial (sin esperar red)
-    const apuEmbebido = Array.isArray(activity.apus) ? activity.apus[0] : activity.apus;
-    if (apuEmbebido) {
-      setApu(apuEmbebido);
-      const rawEmbebido = apuEmbebido.apu_items || [];
-      const seenEmbebido = new Set<string>();
-      setItems(rawEmbebido.filter((item: any) => {
-        if (!item.id) return true;
-        if (seenEmbebido.has(item.id)) return false;
-        seenEmbebido.add(item.id);
-        return true;
-      }));
-      setRendimiento(apuEmbebido.rendimiento || 1);
-    } else {
-      setApu(null);
-      setItems([]);
-      setRendimiento(1);
-    }
-
-    // Luego refrescar desde servidor para obtener datos más recientes
+    setApu(null);
+    setItems([]);
+    setRendimiento(1);
     loadData();
   }, [isOpen, activity?.id]);
 
@@ -76,6 +59,7 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
   }, [selectedCuadrillaId, cuadrillas]);
 
   async function loadData() {
+    setLoading(true);
     try {
       const [resApu, resCuad] = await Promise.all([
         obtenerAPU(activity.id),
@@ -85,14 +69,7 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
       if (resApu.data) {
         const apuData = resApu.data as any;
         setApu(apuData);
-        const rawItems = apuData.apu_items || [];
-        const seenIds = new Set<string>();
-        setItems(rawItems.filter((item: any) => {
-          if (!item.id) return true;
-          if (seenIds.has(item.id)) return false;
-          seenIds.add(item.id);
-          return true;
-        }));
+        setItems(apuData.apu_items || []);
         setRendimiento(apuData.rendimiento || 1);
       } else {
         setApu(null);
@@ -102,6 +79,8 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
       setCuadrillas(resCuad || []);
     } catch (error) {
       toast.error('Error al cargar datos del APU');
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -210,6 +189,7 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
 
       if (res.success) {
         await actualizarActividad(activity.id, budgetId, { precio_unitario: totals.costoDirecto });
+        await loadData(); // sincroniza estado con BD para evitar duplicados en reapertura
         toast.success('APU aplicado correctamente');
         setApplied(true);
         setTimeout(() => {
@@ -287,6 +267,14 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
 
             {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+
+              {loading && (
+                <div className="flex items-center justify-center py-16">
+                  <RefreshCw className="h-6 w-6 text-stone animate-spin" />
+                </div>
+              )}
+
+              {!loading && <>
 
               {/* 1. CUADRILLAS (MANO DE OBRA) */}
               <section className="space-y-4">
@@ -566,6 +554,8 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
                   </div>
                 </div>
               </section>
+
+              </>}
             </div>
 
             {/* Footer Summary */}

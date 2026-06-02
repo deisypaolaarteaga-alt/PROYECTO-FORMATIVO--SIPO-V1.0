@@ -1,10 +1,25 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Search, ChevronDown, ChevronRight, FileText } from 'lucide-react';
+import {
+  Search, ChevronDown, ChevronRight, FileText,
+  MoreVertical, ExternalLink, Archive, Trash2, Copy,
+} from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { ESTADO_PRESUPUESTO_CONFIG } from '@/types';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from '@/components/shared/DropdownMenu';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { archivarPresupuesto, eliminarPresupuesto } from '@/actions/proyectos';
+import { duplicarPresupuesto } from '@/actions/presupuesto-estados';
+import { toast } from 'sonner';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -56,7 +71,14 @@ function diasLabel(d: number | null) {
 
 // ── BudgetRowItem ──────────────────────────────────────────────────────────────
 
-function BudgetRowItem({ row }: { row: BudgetRow }) {
+type BudgetRowItemProps = {
+  row: BudgetRow;
+  onArchivar: (id: string) => void;
+  onEliminar: (id: string) => void;
+  onDuplicar: (id: string) => void;
+};
+
+function BudgetRowItem({ row, onArchivar, onEliminar, onDuplicar }: BudgetRowItemProps) {
   const [expanded, setExpanded] = useState(false);
   const badge = ESTADO_PRESUPUESTO_CONFIG[row.estado as keyof typeof ESTADO_PRESUPUESTO_CONFIG]
     ?? ESTADO_PRESUPUESTO_CONFIG.borrador;
@@ -64,6 +86,10 @@ function BudgetRowItem({ row }: { row: BudgetRow }) {
   const admin  = row.costo_directo * (row.administracion_pct / 100);
   const imprev = row.costo_directo * (row.imprevistos_pct   / 100);
   const util   = row.costo_directo * (row.utilidad_pct      / 100);
+
+  const puedeArchivar = !['aprobado', 'archivado'].includes(row.estado);
+  const puedeEliminar = ['borrador', 'rechazado', 'archivado'].includes(row.estado);
+  const puedeDuplicar = row.estado === 'borrador';
 
   return (
     <li className="border-b border-[#F3F4F6] last:border-0">
@@ -121,6 +147,50 @@ function BudgetRowItem({ row }: { row: BudgetRow }) {
         <span className={cn('text-[11px] w-[56px] text-right shrink-0 tabular-nums hidden md:block', diasColor(row.diasRestantes))}>
           {diasLabel(row.diasRestantes)}
         </span>
+
+        {/* Menú de acciones ⋯ */}
+        <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="h-7 w-7 inline-flex items-center justify-center rounded-lg text-[#C8C0B5] hover:bg-[#EAE6E0] hover:text-[#3D3530] transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100">
+                <MoreVertical className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link href={`/presupuestos/${row.id}`} className="flex items-center gap-2">
+                  <ExternalLink className="h-4 w-4" />
+                  Abrir
+                </Link>
+              </DropdownMenuItem>
+              {puedeDuplicar && (
+                <DropdownMenuItem onClick={() => onDuplicar(row.id)}>
+                  <Copy className="h-4 w-4" />
+                  Duplicar
+                </DropdownMenuItem>
+              )}
+              {(puedeArchivar || puedeEliminar) && <DropdownMenuSeparator />}
+              {puedeArchivar && (
+                <DropdownMenuItem
+                  onClick={() => onArchivar(row.id)}
+                  className="text-neutral-500"
+                >
+                  <Archive className="h-4 w-4" />
+                  Archivar
+                </DropdownMenuItem>
+              )}
+              {puedeEliminar && (
+                <DropdownMenuItem
+                  onClick={() => onEliminar(row.id)}
+                  className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Eliminar
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {/* ── Expanded detail ── */}
@@ -208,8 +278,14 @@ function BudgetRowItem({ row }: { row: BudgetRow }) {
 // ── PresupuestosClientList ────────────────────────────────────────────────────
 
 export function PresupuestosClientList({ rows }: { rows: BudgetRow[] }) {
+  const router = useRouter();
   const [search,    setSearch]    = useState('');
   const [activeTab, setActiveTab] = useState('todos');
+
+  const [confirmArchivar, setConfirmArchivar] = useState<string | null>(null);
+  const [confirmEliminar, setConfirmEliminar] = useState<string | null>(null);
+  const [procesando, setProcesando]           = useState(false);
+  const [, startTransition]                   = useTransition();
 
   const counts = useMemo(() => {
     const map: Record<string, number> = { todos: rows.length };
@@ -228,6 +304,36 @@ export function PresupuestosClientList({ rows }: { rows: BudgetRow[] }) {
     }
     return result;
   }, [rows, activeTab, search]);
+
+  async function handleConfirmarArchivar() {
+    if (!confirmArchivar) return;
+    setProcesando(true);
+    const res = await archivarPresupuesto(confirmArchivar);
+    setProcesando(false);
+    setConfirmArchivar(null);
+    if (res.success) { toast.success('Presupuesto archivado'); startTransition(() => router.refresh()); }
+    else toast.error(res.error ?? 'No se pudo archivar el presupuesto');
+  }
+
+  async function handleConfirmarEliminar() {
+    if (!confirmEliminar) return;
+    setProcesando(true);
+    const res = await eliminarPresupuesto(confirmEliminar);
+    setProcesando(false);
+    setConfirmEliminar(null);
+    if (res.success) { toast.success('Presupuesto eliminado'); startTransition(() => router.refresh()); }
+    else toast.error(res.error ?? 'No se pudo eliminar el presupuesto');
+  }
+
+  async function handleDuplicar(budgetId: string) {
+    const res = await duplicarPresupuesto(budgetId);
+    if (res.success) {
+      toast.success('Presupuesto duplicado');
+      startTransition(() => router.refresh());
+    } else {
+      toast.error(res.error ?? 'No se pudo duplicar el presupuesto');
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -299,12 +405,19 @@ export function PresupuestosClientList({ rows }: { rows: BudgetRow[] }) {
             <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF] w-[148px] text-right shrink-0">Total oferta</span>
             <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF] w-[88px] hidden md:block">Creado</span>
             <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#9CA3AF] w-[56px] text-right hidden md:block">Vigencia</span>
+            <div className="w-7 shrink-0" />
           </div>
 
           {/* Rows */}
           <ul>
             {filtered.map((row) => (
-              <BudgetRowItem key={row.id} row={row} />
+              <BudgetRowItem
+                key={row.id}
+                row={row}
+                onArchivar={(id) => setConfirmArchivar(id)}
+                onEliminar={(id) => setConfirmEliminar(id)}
+                onDuplicar={handleDuplicar}
+              />
             ))}
           </ul>
 
@@ -316,6 +429,29 @@ export function PresupuestosClientList({ rows }: { rows: BudgetRow[] }) {
           </div>
         </div>
       )}
+
+      {/* ── Diálogos de confirmación ── */}
+      <ConfirmDialog
+        open={confirmArchivar !== null}
+        title="¿Archivar este presupuesto?"
+        description="No podrás editarlo mientras esté archivado. Podrás desarchivarlo desde la pestaña Archivados."
+        confirmLabel={procesando ? 'Archivando…' : 'Sí, archivar'}
+        cancelLabel="Cancelar"
+        variant="warning"
+        onConfirm={handleConfirmarArchivar}
+        onCancel={() => setConfirmArchivar(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmEliminar !== null}
+        title="¿Eliminar este presupuesto?"
+        description="Esta acción es permanente y no se puede deshacer. El presupuesto será eliminado junto con todos sus capítulos, actividades y APUs."
+        confirmLabel={procesando ? 'Eliminando…' : 'Sí, eliminar'}
+        cancelLabel="Cancelar"
+        variant="danger"
+        onConfirm={handleConfirmarEliminar}
+        onCancel={() => setConfirmEliminar(null)}
+      />
     </div>
   );
 }

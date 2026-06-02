@@ -37,7 +37,7 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
-  const confirmRef = useRef<HTMLButtonElement>(null);
+  const cancelRef  = useRef<HTMLButtonElement>(null);
   const styles = VARIANT_STYLES[variant];
 
   useEffect(() => {
@@ -45,13 +45,13 @@ export function ConfirmDialog({
 
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onCancel();
-      if (e.key === 'Enter') onConfirm();
     };
 
     document.addEventListener('keydown', handleKey);
-    confirmRef.current?.focus();
+    // Enfocar Cancelar por defecto — evita confirmar acciones destructivas con Enter accidental
+    cancelRef.current?.focus();
     return () => document.removeEventListener('keydown', handleKey);
-  }, [open, onConfirm, onCancel]);
+  }, [open, onCancel]);
 
   if (!open || typeof document === 'undefined') return null;
 
@@ -83,13 +83,13 @@ export function ConfirmDialog({
 
         <div className="flex gap-2 justify-end">
           <button
+            ref={cancelRef}
             onClick={onCancel}
             className="px-4 py-2 text-[13px] font-medium rounded-lg border border-neutral-200 text-neutral-700 hover:bg-neutral-50 transition-colors"
           >
             {cancelLabel}
           </button>
           <button
-            ref={confirmRef}
             onClick={onConfirm}
             className={`px-4 py-2 text-[13px] font-medium rounded-lg transition-colors ${styles.button}`}
           >

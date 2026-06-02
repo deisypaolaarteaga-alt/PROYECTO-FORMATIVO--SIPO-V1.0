@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   Search,
   Home, Store, Route, BedDouble, Cog, GraduationCap, Building2,
-  MoreVertical, Eye, FilePlus2, Archive, RotateCcw,
+  MoreVertical, Eye, FilePlus2, Archive, RotateCcw, Trash2,
   ChevronLeft, ChevronRight, List, LayoutGrid,
 } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
@@ -18,7 +18,8 @@ import {
   DropdownMenuSeparator,
 } from '@/components/shared/DropdownMenu';
 import { SelectorPeriodo } from '@/components/shared/SelectorPeriodo';
-import { cambiarEstadoProyecto } from '@/actions/proyectos';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { archivarProyecto, eliminarProyecto, desArchivarProyecto } from '@/actions/proyectos';
 import { toast } from 'sonner';
 import {
   type PeriodoPicker,
@@ -146,6 +147,9 @@ export function ProyectosGrid({ projects }: ProyectosGridProps) {
   const [pagina,            setPagina]            = useState(1);
   const [vista,             setVista]             = useState<'lista' | 'grilla'>('lista');
   const [mostrarArchivados, setMostrarArchivados] = useState(false);
+  const [confirmArchivar, setConfirmArchivar]     = useState<string | null>(null);
+  const [confirmEliminar, setConfirmEliminar]     = useState<string | null>(null);
+  const [procesando, setProcesando]               = useState(false);
 
   // Pre-filtro: ocultar archivados salvo que el toggle esté activo
   const baseProjects = mostrarArchivados
@@ -176,16 +180,29 @@ export function ProyectosGrid({ projects }: ProyectosGridProps) {
   function cambiarPeriodo(p: PeriodoPicker) { setPeriodo(p); setPagina(1); }
   function toggleArchivados() { setMostrarArchivados(v => !v); setPagina(1); }
 
-  async function archivar(id: string, e: React.MouseEvent) {
-    e.stopPropagation();
-    const res = await cambiarEstadoProyecto(id, 'archivado');
+  async function handleConfirmarArchivar() {
+    if (!confirmArchivar) return;
+    setProcesando(true);
+    const res = await archivarProyecto(confirmArchivar);
+    setProcesando(false);
+    setConfirmArchivar(null);
     if (res.success) { toast.success('Proyecto archivado'); router.refresh(); }
     else toast.error(res.error ?? 'No se pudo archivar el proyecto');
   }
 
+  async function handleConfirmarEliminar() {
+    if (!confirmEliminar) return;
+    setProcesando(true);
+    const res = await eliminarProyecto(confirmEliminar);
+    setProcesando(false);
+    setConfirmEliminar(null);
+    if (res.success) { toast.success('Proyecto eliminado'); router.refresh(); }
+    else toast.error(res.error ?? 'No se pudo eliminar el proyecto');
+  }
+
   async function desarchivar(id: string, e: React.MouseEvent) {
     e.stopPropagation();
-    const res = await cambiarEstadoProyecto(id, 'en_progreso');
+    const res = await desArchivarProyecto(id);
     if (res.success) { toast.success('Proyecto desarchivado'); router.refresh(); }
     else toast.error(res.error ?? 'No se pudo desarchivar el proyecto');
   }
@@ -444,32 +461,38 @@ export function ProyectosGrid({ projects }: ProyectosGridProps) {
                             <Eye className="h-4 w-4" />
                             Ver proyecto
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => router.push(`/proyectos/${p.id}?nuevo-presupuesto=1`)}>
-                            <FilePlus2 className="h-4 w-4" />
-                            Nuevo presupuesto
-                          </DropdownMenuItem>
+                          {p.estado !== 'archivado' && (
+                            <DropdownMenuItem onClick={() => router.push(`/proyectos/${p.id}?nuevo-presupuesto=1`)}>
+                              <FilePlus2 className="h-4 w-4" />
+                              Nuevo presupuesto
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuSeparator />
                           {p.estado !== 'archivado' ? (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={(e: React.MouseEvent) => archivar(p.id, e)}
-                                className="text-neutral-500"
-                              >
-                                <Archive className="h-4 w-4" />
-                                Archivar
-                              </DropdownMenuItem>
-                            </>
+                            <DropdownMenuItem
+                              onClick={(e: React.MouseEvent) => { e.stopPropagation(); setConfirmArchivar(p.id); }}
+                              className="text-neutral-500"
+                            >
+                              <Archive className="h-4 w-4" />
+                              Archivar
+                            </DropdownMenuItem>
                           ) : (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={(e: React.MouseEvent) => desarchivar(p.id, e)}
-                                className="text-neutral-500"
-                              >
-                                <RotateCcw className="h-4 w-4" />
-                                Desarchivar
-                              </DropdownMenuItem>
-                            </>
+                            <DropdownMenuItem
+                              onClick={(e: React.MouseEvent) => desarchivar(p.id, e)}
+                              className="text-neutral-500"
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                              Desarchivar
+                            </DropdownMenuItem>
+                          )}
+                          {(p.estado === 'borrador' || p.estado === 'archivado') && (
+                            <DropdownMenuItem
+                              onClick={(e: React.MouseEvent) => { e.stopPropagation(); setConfirmEliminar(p.id); }}
+                              className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              Eliminar proyecto
+                            </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -639,6 +662,29 @@ export function ProyectosGrid({ projects }: ProyectosGridProps) {
           )}
         </>
       )}
+
+      {/* ── Diálogos de confirmación ── */}
+      <ConfirmDialog
+        open={confirmArchivar !== null}
+        title="¿Archivar proyecto?"
+        description="El proyecto y todos sus presupuestos en borrador o rechazados quedarán archivados. Los presupuestos aprobados no se verán afectados."
+        confirmLabel={procesando ? 'Archivando…' : 'Sí, archivar'}
+        cancelLabel="Cancelar"
+        variant="warning"
+        onConfirm={handleConfirmarArchivar}
+        onCancel={() => setConfirmArchivar(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmEliminar !== null}
+        title="¿Eliminar proyecto?"
+        description="Esta acción es permanente. Solo puedes eliminar proyectos en borrador o archivados sin presupuestos aprobados."
+        confirmLabel={procesando ? 'Eliminando…' : 'Sí, eliminar'}
+        cancelLabel="Cancelar"
+        variant="danger"
+        onConfirm={handleConfirmarEliminar}
+        onCancel={() => setConfirmEliminar(null)}
+      />
     </div>
   );
 }

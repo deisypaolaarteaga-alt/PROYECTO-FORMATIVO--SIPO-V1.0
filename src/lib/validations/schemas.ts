@@ -69,7 +69,7 @@ export const createApuItemSchema = z.object({
   cantidad: z.coerce.number().min(0),
   precio_unitario: z.coerce.number().min(0),
   cuadrilla_id: z.string().uuid().optional().nullable(),
-  precio_editado_manual: z.boolean().optional(),
+  precio_editado_manual: z.boolean().nullable().optional().default(false),
 });
 
 // ============ User Material schemas ============

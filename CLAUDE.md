@@ -131,6 +131,7 @@ NEXT_PUBLIC_HCAPTCHA_SITE_KEY # Site key de hCaptcha — requerida en login y re
 | `20260527200000_insumos_activo.sql` | **Schema**: Agrega columna `activo BOOLEAN DEFAULT true` a `user_material_precios` y `user_equipment_precios`; hace `precio_unitario`/`precio_diario` nullable para permitir cambiar solo el estado activo sin personalizar precio. | ✅ applied |
 | `20260601100000_roles_usuario.sql` | **Sistema de roles Fase 1**: `profiles.rol TEXT DEFAULT 'usuario' CHECK (IN 'usuario','super_admin')` + políticas RLS en `catalogo_capitulos/actividades/apu_items` — SELECT público, INSERT/UPDATE/DELETE solo `super_admin`. | ✅ applied |
 | `20260601110000_fix_rol_default.sql` | **Security fix**: Corrige DEFAULT de `profiles.rol` a `'usuario'`; resetea a `'usuario'` todos los perfiles incorrectamente asignados como `super_admin` excepto el de Deisy (`deisypaolaarteaga@gmail.com`). | ✅ applied |
+| `20260601200000_user_plantillas.sql` | **Plantillas personales**: 4 tablas `user_plantillas`, `user_plantillas_capitulos`, `user_plantillas_actividades`, `user_plantillas_apu_items` + RLS FOR ALL con verificación de ownership en cascada. | ✅ applied |
 
 ### Loose SQL files at root (already applied manually — do NOT re-run)
 
@@ -138,7 +139,7 @@ NEXT_PUBLIC_HCAPTCHA_SITE_KEY # Site key de hCaptcha — requerida en login y re
 
 ## Current Database State (as of 2026-06-01)
 
-**30 tables + 5 views** in `public` schema. Jornales en `trabajadores` actualizados a SMMLV 2026 ($1.423.500/mes). Tabla `materials` deduplicada (46 filas, índice único en `nombre+categoria`). `profiles.rol` DEFAULT corregido a `'usuario'` (migración `20260601110000`). Key tables and their non-obvious columns:
+**34 tables + 5 views** in `public` schema. (4 tablas nuevas de plantillas personales: `user_plantillas`, `user_plantillas_capitulos`, `user_plantillas_actividades`, `user_plantillas_apu_items`). Jornales en `trabajadores` actualizados a SMMLV 2026 ($1.423.500/mes). Tabla `materials` deduplicada (46 filas, índice único en `nombre+categoria`). `profiles.rol` DEFAULT corregido a `'usuario'` (migración `20260601110000`). Key tables and their non-obvious columns:
 
 | Table | Key columns beyond the obvious |
 |-------|-------------------------------|
@@ -275,6 +276,7 @@ Token reference: `src/lib/design-tokens.ts`. User accent color stored in `profil
 - ~~**`20260522100000_seed_municipios_completo.sql` no está en `migrate.js`**~~ ✅ 2026-05-31 — ya agregado al array `migrationFiles` en `scripts/migrate.js` (posición 41). El runner la salta con SKIP porque ya estaba en `schema_migrations`.
 
 ### Pendiente — próximas features (prioridad alta)
+~~- **Plantillas personales de usuario**~~ ✅ 2026-06-01 — `user_plantillas` + 3 tablas hijas con RLS. `src/actions/plantillas.ts` (4 exports: `guardarComoPlantilla`, `getMisPlantillas`, `eliminarPlantilla`, `aplicarPlantilla`). `ModalGuardarPlantilla.tsx` en header del editor. `ModalNuevoPresupuesto` ampliado con sección "Mis plantillas" + 3 modos (estructura / con precios / todo igual). `tsc` limpio ✅.
 ~~- **Panel APU — fix duplicados en apu_items**~~ ✅ 2026-05-18 — `guardarAPU` en `presupuestos.ts`: cuando `payload.id` no viene del cliente, ahora busca primero un APU existente para la actividad (`maybeSingle()` con filtro `activity_id + user_id + deleted_at IS NULL`) antes de insertar uno nuevo. Elimina la condición de carrera que creaba APUs duplicados al guardar dos veces sin recargar.
 - **n8n reportes**: Integración con n8n para envío automático de reportes PDF por email al aprobar presupuesto.
 

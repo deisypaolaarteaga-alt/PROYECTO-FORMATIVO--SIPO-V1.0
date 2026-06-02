@@ -20,6 +20,7 @@ import {
   ChevronRight,
   ChevronDown,
   BookOpen,
+  BookmarkCheck,
 } from 'lucide-react';
 import { Logo } from '@/components/shared/Logo';
 import { cn } from '@/lib/utils';
@@ -63,8 +64,9 @@ const NAV_GROUPS: NavGroup[] = [
     heading: 'GESTIÓN',
     items: [
       { href: '/proyectos',    icon: FolderKanban, label: 'Proyectos'    },
-      { href: '/presupuestos', icon: FileText,     label: 'Presupuestos' },
-      { href: '/clientes',     icon: Users,        label: 'Clientes'     },
+      { href: '/presupuestos', icon: FileText,       label: 'Presupuestos' },
+      { href: '/plantillas',   icon: BookmarkCheck, label: 'Plantillas'   },
+      { href: '/clientes',     icon: Users,         label: 'Clientes'     },
       { href: '/proveedores',  icon: ShoppingBag,  label: 'Proveedores'  },
       { href: '/insumos',      icon: Package,      label: 'Insumos'      },
       { href: '/mano-obra',    icon: HardHat,      label: 'Tarifas Salariales' },

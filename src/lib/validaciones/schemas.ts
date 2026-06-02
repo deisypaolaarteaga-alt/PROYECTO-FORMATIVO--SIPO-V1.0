@@ -53,3 +53,33 @@ export const createUserMaterialSchema = z.object({
   precio_unitario: z.number().min(0),
   categoria: cleanString.optional().or(z.literal('')),
 });
+
+export const guardarPlantillaSchema = z.object({
+  nombre: cleanString.min(3, 'El nombre de la plantilla debe tener al menos 3 caracteres').max(200, 'Nombre muy largo'),
+});
+
+export const aplicarPlantillaSchema = z.object({
+  plantillaId: z.string().uuid('ID de plantilla inválido'),
+  budgetId: z.string().uuid('ID de presupuesto inválido'),
+  modo: z.enum(['estructura', 'todo']),
+});
+
+export const renombrarPlantillaSchema = z.object({
+  plantillaId: z.string().uuid('ID de plantilla inválido'),
+  nuevoNombre: cleanString.min(3, 'El nombre debe tener al menos 3 caracteres').max(200, 'Nombre muy largo'),
+});
+
+export const capituloPlantillaInputSchema = z.object({
+  nombre: cleanString.min(1, 'Nombre del capítulo requerido').max(200, 'Nombre muy largo'),
+  actividades: z.array(z.object({
+    nombre:          cleanString.min(1, 'Nombre de actividad requerido').max(300, 'Nombre muy largo'),
+    unidad:          z.string().min(1, 'Unidad requerida').max(20, 'Unidad muy larga'),
+    cantidad:        z.number().min(0, 'Cantidad no puede ser negativa'),
+    precio_unitario: z.number().min(0, 'Precio no puede ser negativo'),
+  })),
+});
+
+export const actualizarEstructuraPlantillaSchema = z.object({
+  plantillaId: z.string().uuid('ID de plantilla inválido'),
+  capitulos:   z.array(capituloPlantillaInputSchema),
+});

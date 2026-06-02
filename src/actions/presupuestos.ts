@@ -400,6 +400,7 @@ export async function guardarAPU(
   payload: { id?: string; rendimiento: number; items: Array<Record<string, unknown>> }
 ): Promise<ActionResult> {
   try {
+    console.log('[guardarAPU] payload recibido:', JSON.stringify(payload));
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { success: false, error: 'No autorizado' };
@@ -422,31 +423,53 @@ export async function guardarAPU(
 
       if (existing) {
         apuId = existing.id;
+        console.log('[guardarAPU] APU existente encontrado, apu_id:', apuId);
       } else {
         const { data, error } = await supabase
           .from('apus')
           .insert({ activity_id: activityId, budget_id: budgetId, user_id: user.id, rendimiento: payload.rendimiento })
           .select('id')
           .single();
-        if (error) throw error;
+        if (error) {
+          console.error('[guardarAPU] error al crear APU:', error);
+          throw error;
+        }
         apuId = data.id;
+        console.log('[guardarAPU] APU nuevo creado, apu_id:', apuId);
       }
+    } else {
+      console.log('[guardarAPU] apu_id recibido del cliente:', apuId);
     }
 
+    console.log('[guardarAPU] items a insertar:', payload.items?.length);
+
     // Reemplazar ítems del APU (hard delete válido — son detalles del APU, no entidades independientes)
-    await supabase.from('apu_items').delete().eq('apu_id', apuId).eq('user_id', user.id);
-    const validated = payload.items.length > 0
-      ? payload.items.map(item => apuItemSchema.parse(item))
-      : [];
+    const { error: deleteError } = await supabase.from('apu_items').delete().eq('apu_id', apuId).eq('user_id', user.id);
+    console.log('[guardarAPU] error al borrar items previos:', deleteError);
+
+    let validated: ReturnType<typeof apuItemSchema.parse>[] = [];
+    if (payload.items.length > 0) {
+      try {
+        validated = payload.items.map(item => apuItemSchema.parse(item));
+        console.log('[guardarAPU] items validados con Zod:', validated.length);
+      } catch (zodErr: any) {
+        console.error('[guardarAPU] error Zod al validar items:', zodErr?.issues ?? zodErr);
+        throw zodErr;
+      }
+    }
     if (validated.length > 0) {
-      const { error } = await supabase
+      const toInsert = validated.map(item => ({
+        ...item,
+        apu_id: apuId,
+        user_id: user.id,
+        precio_editado_manual: item.precio_editado_manual ?? false,
+      }));
+      console.log('[guardarAPU] primer item a insertar:', JSON.stringify(toInsert[0]));
+      const { error: itemsError } = await supabase
         .from('apu_items')
-        .insert(validated.map(item => ({ 
-          ...item, 
-          apu_id: apuId, 
-          user_id: user.id 
-        })));
-      if (error) throw error;
+        .insert(toInsert);
+      console.log('[guardarAPU] error items:', itemsError);
+      if (itemsError) throw itemsError;
     }
 
     // Calcular costos agregados desde los ítems usando Decimal.js

@@ -243,6 +243,7 @@ export interface Activity {
   precio_unitario: number;           // SOLO LECTURA — viene del APU
   subtotal: number;                  // Generated: cantidad × precio_unitario
   precio_desde_apu: boolean;
+  catalogo_actividad_id?: string | null;
   created_at: string;
   updated_at: string;
   // Relación expandida
@@ -569,6 +570,46 @@ export interface ResultadoBusquedaCuadrilla {
   costo_total_dia: number;
   es_sistema: boolean;
   trabajadores: TrabajadorCuadrilla[];
+}
+
+// ── Plantillas personales de usuario ──
+export type ModoAplicarPlantilla = 'estructura' | 'todo';
+
+export interface UserPlantilla {
+  id: string
+  nombre: string
+  tipo_obra?: string
+  descripcion?: string
+  created_at: string
+  _count?: { capitulos: number }
+}
+
+export interface PlantillaDetalle {
+  id: string
+  nombre: string
+  created_at: string
+  capitulos: CapituloPlantilla[]
+}
+
+export interface CapituloPlantilla {
+  id: string
+  nombre: string
+  orden: number
+  actividades: ActividadPlantilla[]
+}
+
+export interface ActividadPlantilla {
+  id: string
+  nombre: string
+  unidad: string
+  cantidad: number
+  precio_unitario: number
+  orden: number
+}
+
+export interface CapituloPlantillaInput {
+  nombre: string
+  actividades: { nombre: string; unidad: string; cantidad: number; precio_unitario: number }[]
 }
 
 // ── Ciudades de Colombia ──

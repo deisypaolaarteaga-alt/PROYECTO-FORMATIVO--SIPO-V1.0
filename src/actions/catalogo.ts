@@ -113,6 +113,7 @@ export async function importarDesdeCatalogo(
       costoHM: number;
       costoEPP: number;
       tieneAPU: boolean;
+      catalogoActividadId: string;
     };
 
     const activityMetas: ActivityMeta[] = [];
@@ -160,6 +161,7 @@ export async function importarDesdeCatalogo(
           costoHM,
           costoEPP,
           tieneAPU,
+          catalogoActividadId: act.id,
         });
       });
     });
@@ -177,61 +179,75 @@ export async function importarDesdeCatalogo(
 
     if (actErr || !activities) throw actErr ?? new Error('No se pudieron insertar las actividades');
 
-    // ── BATCH 3: APUs ─────────────────────────────────────────────────────────
-    const apuPayloads = activityMetas.map((m, i) => ({
-      activity_id: activities[i].id,
-      budget_id: budgetId,
-      user_id: user.id,
-      rendimiento: 1,
-      costo_material: m.costoMaterial,
-      costo_mano_obra: m.costoMO,
-      costo_equipo: m.costoEquipo,
-      costo_herramienta_menor: m.costoHM,
-      costo_epp: m.costoEPP,
-      pct_herramienta_menor: 3,
-      pct_epp: 1,
-    }));
+    // ── BATCH 3 + 4: APUs y apu_items (solo actividades con items de catálogo) ─
+    // Excluimos actividades sin items para no disparar el trigger de precio
+    // con costo_total = 0, que sobrescribiría el precio_referencia_nacional.
+    const metasConAPU = activityMetas
+      .map((meta, actIdx) => ({ meta, actIdx }))
+      .filter(({ meta }) => meta.tieneAPU);
 
-    const { data: apus, error: apuErr } = await admin
-      .from('apus')
-      .insert(apuPayloads)
-      .select('id');
+    let apusCreados = 0;
+    let itemsCreados = 0;
 
-    if (apuErr || !apus) {
-      console.error('Batch APU insert failed:', apuErr);
-    }
+    if (metasConAPU.length > 0) {
+      const apuPayloads = metasConAPU.map(({ meta, actIdx }) => ({
+        activity_id: activities[actIdx].id,
+        budget_id: budgetId,
+        user_id: user.id,
+        rendimiento: 1,
+        costo_material: meta.costoMaterial,
+        costo_mano_obra: meta.costoMO,
+        costo_equipo: meta.costoEquipo,
+        costo_herramienta_menor: meta.costoHM,
+        costo_epp: meta.costoEPP,
+        pct_herramienta_menor: 3,
+        pct_epp: 1,
+      }));
 
-    // ── BATCH 4: apu_items ────────────────────────────────────────────────────
-    if (apus) {
-      const allApuItems: any[] = [];
-      activityMetas.forEach((m, i) => {
-        if (!m.tieneAPU) return;
-        m.catalogoApuItems
-          .sort((a: any, b: any) => a.orden - b.orden)
-          .forEach((item: any) => {
-            allApuItems.push({
-              apu_id: apus[i].id,
-              user_id: user.id,
-              nombre: item.nombre,
-              descripcion: item.descripcion ?? null,
-              tipo: item.tipo,
-              unidad: item.unidad,
-              cantidad: Number(item.cantidad),
-              precio_unitario: Number(item.precio_unitario),
+      const { data: apus, error: apuErr } = await admin
+        .from('apus')
+        .insert(apuPayloads)
+        .select('id');
+
+      if (apuErr || !apus) {
+        console.error('Batch APU insert failed:', apuErr);
+      } else {
+        apusCreados = apus.length;
+
+        // ── BATCH 4: apu_items ──────────────────────────────────────────────
+        const allApuItems: Record<string, unknown>[] = [];
+        metasConAPU.forEach(({ meta }, apuIdx) => {
+          meta.catalogoApuItems
+            .sort((a: any, b: any) => a.orden - b.orden)
+            .forEach((item: any) => {
+              allApuItems.push({
+                apu_id: apus[apuIdx].id,
+                user_id: user.id,
+                nombre: item.nombre,
+                descripcion: item.descripcion ?? null,
+                tipo: item.tipo,
+                unidad: item.unidad,
+                cantidad: Number(item.cantidad),
+                precio_unitario: Number(item.precio_unitario),
+              });
             });
-          });
-      });
+        });
 
-      if (allApuItems.length > 0) {
-        const { error: itemsErr } = await admin.from('apu_items').insert(allApuItems);
-        if (itemsErr) console.error('Batch apu_items insert failed:', itemsErr);
+        if (allApuItems.length > 0) {
+          const { error: itemsErr } = await admin.from('apu_items').insert(allApuItems);
+          if (itemsErr) {
+            console.error('Batch apu_items insert failed:', itemsErr);
+          } else {
+            itemsCreados = allApuItems.length;
+          }
+        }
       }
     }
 
     console.log(
       `importarDesdeCatalogo batch: ${Date.now() - t0}ms | ` +
       `${chapters.length} caps | ${activities.length} acts | ` +
-      `${apus?.length ?? 0} APUs`
+      `${apusCreados} APUs | ${itemsCreados} items`
     );
 
     revalidatePath(`/presupuestos/${budgetId}`);
@@ -341,6 +357,7 @@ export async function crearPresupuestoConPlantilla(
       costoHM: number;
       costoEPP: number;
       tieneAPU: boolean;
+      catalogoActividadId: string;
     };
 
     const activityMetas: ActivityMeta[] = [];
@@ -391,6 +408,7 @@ export async function crearPresupuestoConPlantilla(
           costoHM,
           costoEPP,
           tieneAPU,
+          catalogoActividadId: act.id,
         });
       });
     }
@@ -412,61 +430,75 @@ export async function crearPresupuestoConPlantilla(
       return { success: true, data: { id: budget.id } };
     }
 
-    // ── BATCH 3: APUs ─────────────────────────────────────────────────────────
-    const apuPayloads = activityMetas.map((m, i) => ({
-      activity_id: activities[i].id,
-      budget_id: budget.id,
-      user_id: user.id,
-      rendimiento: 1,
-      costo_material: m.costoMaterial,
-      costo_mano_obra: m.costoMO,
-      costo_equipo: m.costoEquipo,
-      costo_herramienta_menor: m.costoHM,
-      costo_epp: m.costoEPP,
-      pct_herramienta_menor: 3,
-      pct_epp: 1,
-    }));
+    // ── BATCH 3 + 4: APUs y apu_items (solo actividades con items de catálogo) ─
+    // Excluimos actividades sin items para no disparar el trigger de precio
+    // con costo_total = 0, que sobrescribiría el precio_referencia_nacional.
+    const metasConAPU = activityMetas
+      .map((meta, actIdx) => ({ meta, actIdx }))
+      .filter(({ meta }) => meta.tieneAPU);
 
-    const { data: apus, error: apuErr } = await admin
-      .from('apus')
-      .insert(apuPayloads)
-      .select('id');
+    let apusCreados = 0;
+    let itemsCreados = 0;
 
-    if (apuErr || !apus) {
-      console.error('Batch APU insert failed:', apuErr);
-      revalidatePath(`/proyectos/${projectId}`);
-      return { success: true, data: { id: budget.id } };
-    }
+    if (metasConAPU.length > 0) {
+      const apuPayloads = metasConAPU.map(({ meta, actIdx }) => ({
+        activity_id: activities[actIdx].id,
+        budget_id: budget.id,
+        user_id: user.id,
+        rendimiento: 1,
+        costo_material: meta.costoMaterial,
+        costo_mano_obra: meta.costoMO,
+        costo_equipo: meta.costoEquipo,
+        costo_herramienta_menor: meta.costoHM,
+        costo_epp: meta.costoEPP,
+        pct_herramienta_menor: 3,
+        pct_epp: 1,
+      }));
 
-    // ── BATCH 4: apu_items ────────────────────────────────────────────────────
-    const allApuItems: any[] = [];
-    activityMetas.forEach((m, i) => {
-      if (!m.tieneAPU) return;
-      m.catalogoApuItems
-        .sort((a: any, b: any) => a.orden - b.orden)
-        .forEach((item: any) => {
-          allApuItems.push({
-            apu_id: apus[i].id,
-            user_id: user.id,
-            nombre: item.nombre,
-            descripcion: item.descripcion ?? null,
-            tipo: item.tipo,
-            unidad: item.unidad,
-            cantidad: Number(item.cantidad),
-            precio_unitario: Number(item.precio_unitario),
-          });
+      const { data: apus, error: apuErr } = await admin
+        .from('apus')
+        .insert(apuPayloads)
+        .select('id');
+
+      if (apuErr || !apus) {
+        console.error('Batch APU insert failed:', apuErr);
+      } else {
+        apusCreados = apus.length;
+
+        // ── BATCH 4: apu_items ──────────────────────────────────────────────
+        const allApuItems: Record<string, unknown>[] = [];
+        metasConAPU.forEach(({ meta }, apuIdx) => {
+          meta.catalogoApuItems
+            .sort((a: any, b: any) => a.orden - b.orden)
+            .forEach((item: any) => {
+              allApuItems.push({
+                apu_id: apus[apuIdx].id,
+                user_id: user.id,
+                nombre: item.nombre,
+                descripcion: item.descripcion ?? null,
+                tipo: item.tipo,
+                unidad: item.unidad,
+                cantidad: Number(item.cantidad),
+                precio_unitario: Number(item.precio_unitario),
+              });
+            });
         });
-    });
 
-    if (allApuItems.length > 0) {
-      const { error: itemsErr } = await admin.from('apu_items').insert(allApuItems);
-      if (itemsErr) console.error('Batch apu_items insert failed:', itemsErr);
+        if (allApuItems.length > 0) {
+          const { error: itemsErr } = await admin.from('apu_items').insert(allApuItems);
+          if (itemsErr) {
+            console.error('Batch apu_items insert failed:', itemsErr);
+          } else {
+            itemsCreados = allApuItems.length;
+          }
+        }
+      }
     }
 
     console.log(
       `crearPresupuestoConPlantilla batch: ${Date.now() - t0}ms | ` +
       `${chapters.length} caps | ${activities.length} acts | ` +
-      `${apus.length} APUs | ${allApuItems.length} items`
+      `${apusCreados} APUs | ${itemsCreados} items`
     );
 
     revalidatePath(`/proyectos/${projectId}`);

@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronRight, Plus, Trash2,
   Loader2, FileText, Settings, BookOpen, Package,
   Calendar, Check, Copy, GripVertical, MoreHorizontal, TrendingUp,
-  CheckCircle2, LockOpen, Eye,
+  CheckCircle2, LockOpen, Eye, BookmarkPlus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/shared/Button';
@@ -36,6 +36,7 @@ import { ModalCatalogo } from './ModalCatalogo';
 import { BotonEnviarRevision } from './BotonEnviarRevision';
 import { EstadoBadge } from './EstadoBadge';
 import { ExplosionInsumosView } from './ExplosionInsumosView';
+import { ModalGuardarPlantilla } from './ModalGuardarPlantilla';
 import type { BudgetCompleto, ActivityWithAPU, Profile } from '@/types';
 
 interface EditorPresupuestoProps {
@@ -73,6 +74,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
   } | null>(null);
   const [catalogoOpen, setCatalogoOpen] = useState(false);
   const [vistaPreviaOpen, setVistaPreviaOpen] = useState(false);
+  const [guardarPlantillaOpen, setGuardarPlantillaOpen] = useState(false);
   const [bannerCiudadIgnorado, setBannerCiudadIgnorado] = useState(false);
   const [isChangingEstado, setIsChangingEstado] = useState(false);
   const [newChapterId, setNewChapterId] = useState<string | null>(null);
@@ -457,6 +459,18 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
               >
                 Vista previa
               </Button>
+
+              {/* Guardar como plantilla — solo si no está aprobado */}
+              {!estaAprobado && (
+                <Button
+                  onClick={() => setGuardarPlantillaOpen(true)}
+                  variant="ghost"
+                  size="sm"
+                  icon={<BookmarkPlus className="h-4 w-4" />}
+                >
+                  Guardar como plantilla
+                </Button>
+              )}
 
               {/* Marcar como aprobado — solo cuando en revisión */}
               {estaEnRevision && (
@@ -1007,6 +1021,13 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
         budget={budget}
         chapters={budget.chapters}
         profile={profile}
+      />
+
+      <ModalGuardarPlantilla
+        budgetId={budget.id}
+        budgetNombre={budget.titulo ?? ''}
+        isOpen={guardarPlantillaOpen}
+        onClose={() => setGuardarPlantillaOpen(false)}
       />
     </div>
   );

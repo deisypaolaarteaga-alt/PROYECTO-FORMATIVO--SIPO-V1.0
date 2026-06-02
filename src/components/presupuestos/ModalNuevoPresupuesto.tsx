@@ -18,7 +18,13 @@ import {
   Hammer,
   School,
   Factory,
-  BedDouble
+  BedDouble,
+  BookmarkCheck,
+  Layers,
+  Tag,
+  CopyCheck,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { Button } from '@/components/shared/Button';
 import { Card } from '@/components/shared/Card';
@@ -26,10 +32,11 @@ import { cn } from '@/lib/utils';
 import { MunicipioCombobox } from '@/components/clientes/MunicipioCombobox';
 import { crearPresupuesto } from '@/actions/presupuestos';
 import { crearPresupuestoConPlantilla } from '@/actions/catalogo';
+import { aplicarPlantilla, getMisPlantillas } from '@/actions/plantillas';
 import { getProjects } from '@/actions/proyectos';
 import { toast } from 'sonner';
 import { PLANTILLAS_CAPITULOS } from '@/types';
-import type { Project } from '@/types';
+import type { Project, UserPlantilla, ModoAplicarPlantilla } from '@/types';
 
 type TipoObraCatalogo = 'residencial' | 'comercial' | 'industrial' | 'infraestructura' | 'institucional' | 'hotelero';
 
@@ -82,12 +89,19 @@ export function ModalNuevoPresupuesto({
   // Form state
   const [selectedProjectId, setSelectedProjectId] = useState<string>(proyectoId ?? '');
   const [budgetName, setBudgetName] = useState('');
-  const [startingPoint, setStartingPoint] = useState<'blank' | 'template' | 'ai'>('blank');
+  const [startingPoint, setStartingPoint] = useState<'blank' | 'template' | 'ai' | 'plantilla_propia'>('blank');
   const [selectedTipoObra, setSelectedTipoObra] = useState<TipoObraCatalogo>(
     normalizarTipo(proyectoTipoObra)
   );
   const [customChapters, setCustomChapters] = useState<string[]>([]);
   const [ciudadObra, setCiudadObra] = useState('');
+
+  // Plantillas personales
+  const [misPlantillas, setMisPlantillas] = useState<UserPlantilla[]>([]);
+  const [loadingPlantillas, setLoadingPlantillas] = useState(false);
+  const [selectedPlantillaId, setSelectedPlantillaId] = useState<string>('');
+  const [modoPlantilla, setModoPlantilla] = useState<ModoAplicarPlantilla>('estructura');
+  const [mostrarTodasPlantillas, setMostrarTodasPlantillas] = useState(false);
 
   const router = useRouter();
 
@@ -105,7 +119,11 @@ export function ModalNuevoPresupuesto({
       setSelectedTipoObra(normalizarTipo(proyectoTipoObra));
       setCustomChapters([]);
       setCiudadObra(proyectoUbicacion || '');
+      setSelectedPlantillaId('');
+      setModoPlantilla('estructura');
+      setMostrarTodasPlantillas(false);
       if (!proyectoFijo) loadProjects();
+      loadMisPlantillas();
     }
   }, [isOpen]);
 
@@ -139,6 +157,18 @@ export function ModalNuevoPresupuesto({
     }
   }
 
+  async function loadMisPlantillas() {
+    setLoadingPlantillas(true);
+    try {
+      const res = await getMisPlantillas();
+      setMisPlantillas(res);
+    } catch {
+      // Silencioso — no bloquear el flujo si falla
+    } finally {
+      setLoadingPlantillas(false);
+    }
+  }
+
   function handleVolverPaso2() {
     if (proyectoFijo) onClose();
     else setStep(1);
@@ -165,6 +195,17 @@ export function ModalNuevoPresupuesto({
       }
 
       if (res.data) {
+        // Si se seleccionó una plantilla propia, aplicarla al presupuesto recién creado
+        if (selectedPlantillaId && (res.data as any).id) {
+          const applyRes = await aplicarPlantilla(
+            selectedPlantillaId,
+            (res.data as any).id,
+            modoPlantilla
+          );
+          if (!applyRes.success) {
+            toast.warning('Presupuesto creado pero no se pudo aplicar la plantilla propia');
+          }
+        }
         toast.success('Presupuesto creado con éxito');
         onClose();
         router.push(`/presupuestos/${(res.data as any).id}`);
@@ -196,7 +237,7 @@ export function ModalNuevoPresupuesto({
       <div className="absolute inset-0 bg-steel-dark/60 backdrop-blur-sm animate-fade-in" onClick={() => { if (!loading) onClose(); }} />
 
       {/* Modal */}
-      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden animate-scale-in">
+      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-scale-in">
 
         {/* Header */}
         <div className="px-6 py-4 border-b border-concrete flex items-center justify-between bg-steel-fog/50">
@@ -223,7 +264,7 @@ export function ModalNuevoPresupuesto({
         </div>
 
         {/* Content */}
-        <div className="p-8">
+        <div className="flex-1 overflow-y-auto px-6 py-6">
 
           {step === 1 && (
             <div className="space-y-6 animate-slide-right">
@@ -278,17 +319,6 @@ export function ModalNuevoPresupuesto({
                 </div>
               )}
 
-              <div className="pt-4">
-                <Button
-                  fullWidth
-                  disabled={!selectedProjectId}
-                  onClick={() => setStep(2)}
-                  icon={<ChevronRight className="h-4 w-4" />}
-                  className="h-12"
-                >
-                  Continuar
-                </Button>
-              </div>
             </div>
           )}
 
@@ -346,7 +376,7 @@ export function ModalNuevoPresupuesto({
                       <button
                         key={opt.id}
                         disabled={opt.disabled}
-                        onClick={() => setStartingPoint(opt.id as any)}
+                        onClick={() => { setStartingPoint(opt.id as any); setSelectedPlantillaId(''); }}
                         className={cn(
                           "flex items-center gap-4 p-4 rounded-2xl border text-left transition-all",
                           startingPoint === opt.id
@@ -369,18 +399,108 @@ export function ModalNuevoPresupuesto({
                     ))}
                   </div>
                 </div>
+
+                {/* Mis plantillas personales */}
+                {(misPlantillas.length > 0 || loadingPlantillas) && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <BookmarkCheck className="h-4 w-4 text-burn-orange" />
+                      <label className="text-[13px] font-bold text-ink">Mis plantillas</label>
+                    </div>
+
+                    {loadingPlantillas ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="h-5 w-5 text-burn-orange animate-spin" />
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-2">
+                        {(mostrarTodasPlantillas ? misPlantillas : misPlantillas.slice(0, 3)).map(pt => (
+                          <button
+                            key={pt.id}
+                            onClick={() => {
+                              setSelectedPlantillaId(pt.id);
+                              setStartingPoint('plantilla_propia');
+                            }}
+                            className={cn(
+                              "flex items-center gap-3 p-3 rounded-xl border text-left transition-all",
+                              selectedPlantillaId === pt.id
+                                ? "border-burn-orange bg-burn-orange/5 ring-1 ring-burn-orange shadow-md"
+                                : "border-concrete hover:border-steel-light hover:bg-steel-fog/30"
+                            )}
+                          >
+                            <div className={cn(
+                              "h-9 w-9 rounded-xl flex items-center justify-center shrink-0",
+                              selectedPlantillaId === pt.id ? "bg-burn-orange text-white" : "bg-steel-fog text-stone"
+                            )}>
+                              <BookmarkCheck className="h-4 w-4" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[13px] font-bold text-ink truncate">{pt.nombre}</p>
+                              <p className="text-[11px] text-stone">
+                                {pt._count?.capitulos ?? 0} capítulos
+                                {pt.tipo_obra ? ` · ${pt.tipo_obra}` : ''}
+                              </p>
+                            </div>
+                          </button>
+                        ))}
+
+                        {misPlantillas.length > 3 && (
+                          <button
+                            onClick={() => setMostrarTodasPlantillas(prev => !prev)}
+                            className="flex items-center justify-center gap-1.5 text-[12px] font-semibold text-burn-orange hover:bg-burn-orange/5 py-2 rounded-xl border border-dashed border-burn-orange/30 transition-all"
+                          >
+                            {mostrarTodasPlantillas ? (
+                              <>
+                                <ChevronUp className="h-3.5 w-3.5" />
+                                Ver menos ▲
+                              </>
+                            ) : (
+                              <>
+                                <ChevronDown className="h-3.5 w-3.5" />
+                                Ver todas ({misPlantillas.length - 3} más) ▼
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Selector de modo — aparece al seleccionar una plantilla propia */}
+                    {selectedPlantillaId && (
+                      <div className="mt-3 space-y-2 border border-concrete rounded-xl p-3 bg-steel-fog/20">
+                        <p className="text-[12px] font-bold text-ink">Modo de copia</p>
+                        <div className="grid grid-cols-1 gap-2">
+                          {([
+                            { id: 'estructura' as ModoAplicarPlantilla, icon: Layers,    label: 'Solo estructura', desc: 'Capítulos y actividades en cero' },
+                            { id: 'todo' as ModoAplicarPlantilla,       icon: CopyCheck, label: 'Todo igual',      desc: 'Copia exacta para obra similar' },
+                          ] as { id: ModoAplicarPlantilla; icon: React.ElementType; label: string; desc: string }[]).map(m => {
+                            const MIcon = m.icon;
+                            return (
+                              <button
+                                key={m.id}
+                                onClick={() => setModoPlantilla(m.id)}
+                                className={cn(
+                                  "flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left transition-all",
+                                  modoPlantilla === m.id
+                                    ? "border-burn-orange bg-burn-orange/5 ring-1 ring-burn-orange"
+                                    : "border-concrete hover:border-steel-light hover:bg-white"
+                                )}
+                              >
+                                <MIcon className={cn("h-4 w-4 shrink-0", modoPlantilla === m.id ? "text-burn-orange" : "text-stone")} />
+                                <div>
+                                  <p className="text-[12px] font-bold text-ink">{m.label}</p>
+                                  <p className="text-[10px] text-stone">{m.desc}</p>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
-              <div className="pt-4">
-                <Button
-                  fullWidth
-                  onClick={() => startingPoint === 'template' ? setStep(3) : handleCreate()}
-                  className="h-12 text-[15px]"
-                  loading={loading}
-                >
-                  {startingPoint === 'template' ? 'Seleccionar tipo de obra' : 'Crear Presupuesto'}
-                </Button>
-              </div>
             </div>
           )}
 
@@ -478,23 +598,56 @@ export function ModalNuevoPresupuesto({
                 )}
               </div>
 
-              <div className="pt-2">
-                <Button
-                  fullWidth
-                  loading={loading}
-                  onClick={handleCreate}
-                  className="h-12 text-[15px]"
-                >
-                  {loading
-                    ? 'Creando presupuesto con plantilla…'
-                    : customChapters.length > 0
-                      ? `Crear con ${customChapters.length} capítulos`
-                      : 'Crear presupuesto en blanco'}
-                </Button>
-              </div>
             </div>
           )}
 
+        </div>
+
+        {/* Footer fijo — siempre visible independientemente del scroll del contenido */}
+        <div className="shrink-0 px-6 py-4 border-t border-concrete bg-white">
+          {step === 1 && (
+            <Button
+              fullWidth
+              disabled={!selectedProjectId}
+              onClick={() => setStep(2)}
+              icon={<ChevronRight className="h-4 w-4" />}
+              className="h-12"
+            >
+              Continuar
+            </Button>
+          )}
+          {step === 2 && (
+            <Button
+              fullWidth
+              onClick={() => {
+                if (startingPoint === 'plantilla_propia') return handleCreate();
+                if (startingPoint === 'template') return setStep(3);
+                handleCreate();
+              }}
+              className="h-12 text-[15px]"
+              loading={loading}
+            >
+              {startingPoint === 'plantilla_propia'
+                ? 'Crear presupuesto'
+                : startingPoint === 'template'
+                  ? 'Seleccionar tipo de obra'
+                  : 'Crear Presupuesto'}
+            </Button>
+          )}
+          {step === 3 && (
+            <Button
+              fullWidth
+              loading={loading}
+              onClick={handleCreate}
+              className="h-12 text-[15px]"
+            >
+              {loading
+                ? 'Creando presupuesto con plantilla…'
+                : customChapters.length > 0
+                  ? `Crear con ${customChapters.length} capítulos`
+                  : 'Crear presupuesto en blanco'}
+            </Button>
+          )}
         </div>
       </div>
     </div>

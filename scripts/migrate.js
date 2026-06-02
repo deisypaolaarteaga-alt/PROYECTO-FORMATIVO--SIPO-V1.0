@@ -94,6 +94,9 @@ const migrationFiles = [
   'supabase/migrations/20260601100000_roles_usuario.sql',
   'supabase/migrations/20260601110000_fix_rol_default.sql',
   'supabase/migrations/20260601120000_proveedores_activo.sql',
+  'supabase/migrations/20260601200000_user_plantillas.sql',
+  'supabase/migrations/20260601300000_activities_catalogo_ref.sql',
+  'supabase/migrations/20260601400000_plantillas_tipo_obra.sql',
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

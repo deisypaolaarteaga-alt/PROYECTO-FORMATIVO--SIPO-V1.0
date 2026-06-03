@@ -2,7 +2,7 @@
 
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
-import { enviarEmailPresupuesto } from '@/lib/email/brevo';
+import { enviarEmailPresupuesto, enviarEmailNotificacionConstructor } from '@/lib/email/brevo';
 import Decimal from 'decimal.js';
 import type { ActionResult } from '@/types';
 
@@ -275,7 +275,7 @@ export async function responderPresupuesto(
 
     const { data: tokenRow } = await admin
       .from('presupuesto_tokens')
-      .select('id, budget_id, expires_at, cliente_accion')
+      .select('id, budget_id, expires_at, cliente_accion, cliente_nombre, cliente_email')
       .eq('token', token)
       .maybeSingle();
 
@@ -315,6 +315,66 @@ export async function responderPresupuesto(
       .from('budgets')
       .update({ estado: estadosMap[accion] })
       .eq('id', tokenRow.budget_id);
+
+    // ── Notificar al constructor y avanzar proyecto (no bloquea la respuesta) ─
+    try {
+      const { data: budgetNotif } = await admin
+        .from('budgets')
+        .select('id, titulo, user_id, project_id')
+        .eq('id', tokenRow.budget_id)
+        .maybeSingle();
+
+      if (budgetNotif) {
+        const b = budgetNotif as unknown as {
+          id: string;
+          titulo: string;
+          user_id: string;
+          project_id: string;
+        };
+
+        const [{ data: proyectoRaw }, { data: profileRaw }] = await Promise.all([
+          admin.from('projects').select('id, nombre, estado').eq('id', b.project_id).maybeSingle(),
+          admin.from('profiles').select('nombre_completo, email_empresa').eq('id', b.user_id).maybeSingle(),
+        ]);
+
+        const proyecto = proyectoRaw as { id: string; nombre: string; estado: string } | null;
+        const profile  = profileRaw  as { nombre_completo: string | null; email_empresa: string | null } | null;
+
+        // Obtener email del constructor: email_empresa o fallback al email de auth
+        let constructorEmail: string | null = profile?.email_empresa ?? null;
+        if (!constructorEmail) {
+          const { data: authData } = await admin.auth.admin.getUserById(b.user_id);
+          constructorEmail = authData?.user?.email ?? null;
+        }
+
+        if (constructorEmail) {
+          const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+          await enviarEmailNotificacionConstructor({
+            destinatario:       constructorEmail,
+            nombreConstructor:  profile?.nombre_completo ?? 'Constructor',
+            nombreCliente:      (tokenRow as any).cliente_nombre ?? (tokenRow as any).cliente_email ?? 'El cliente',
+            nombrePresupuesto:  b.titulo,
+            nombreProyecto:     proyecto?.nombre ?? 'Proyecto',
+            accion,
+            comentario,
+            firmaNombre,
+            linkPresupuesto:    `${baseUrl}/presupuestos/${b.id}`,
+          });
+        }
+
+        // Avanzar proyecto de borrador a en_progreso cuando el cliente aprueba
+        if (accion === 'aprobado' && proyecto?.id && proyecto.estado === 'borrador') {
+          await admin
+            .from('projects')
+            .update({ estado: 'en_progreso' })
+            .eq('id', proyecto.id)
+            .eq('estado', 'borrador');
+        }
+      }
+    } catch (notifyErr) {
+      console.error('[responderPresupuesto] error al notificar al constructor:', notifyErr);
+      // La respuesta del cliente ya fue guardada — no se re-lanza el error
+    }
 
     return { success: true };
   } catch (err) {

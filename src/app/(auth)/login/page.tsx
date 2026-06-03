@@ -18,9 +18,17 @@ export default function LoginPage() {
 
   const [error, setError] = useState<string | null>(null);
 
+  const [redirectTo, setRedirectTo] = useState('/dashboard');
+
   const [digits, setDigits] = useState(['', '', '', '', '', '']);
   const [countdown, setCountdown] = useState(60);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const r = params.get('redirectTo');
+    if (r && r.startsWith('/') && !r.startsWith('//')) setRedirectTo(r);
+  }, []);
 
   useEffect(() => {
     if (step !== 2 || countdown <= 0) return;
@@ -81,7 +89,7 @@ export default function LoginPage() {
     setVerifyLoading(true);
     setError(null);
     try {
-      const result = await verifyOtp(emailForOtp, token);
+      const result = await verifyOtp(emailForOtp, token, redirectTo);
       if (!result.success) setError(result.error ?? 'Código incorrecto.');
       // Si tiene éxito, verifyOtp hace redirect internamente
     } catch {

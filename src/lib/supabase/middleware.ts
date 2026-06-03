@@ -48,17 +48,25 @@ export async function updateSession(request: NextRequest) {
   const isApiRoute = pathname.startsWith('/api');
   const isPortalCliente = pathname.startsWith('/presupuesto-publico');
 
-  // Si no hay usuario y la ruta es protegida → redirigir a login
+  // Si no hay usuario y la ruta es protegida → redirigir a login preservando el destino
   if (!user && !isPublicRoute && !isAuthCallback && !isApiRoute && !isPortalCliente) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
+    url.search = '';
+    url.searchParams.set('redirectTo', pathname);
     return NextResponse.redirect(url);
   }
 
-  // Si hay usuario y está en rutas de auth → redirigir al dashboard
+  // Si hay usuario y está en rutas de auth → redirigir al destino o al dashboard
   if (user && (pathname === '/login' || pathname === '/registro')) {
+    const redirectTo = request.nextUrl.searchParams.get('redirectTo') ?? '';
+    const destino =
+      redirectTo && redirectTo.startsWith('/') && !redirectTo.startsWith('//')
+        ? redirectTo
+        : '/dashboard';
     const url = request.nextUrl.clone();
-    url.pathname = '/dashboard';
+    url.pathname = destino;
+    url.search = '';
     return NextResponse.redirect(url);
   }
 

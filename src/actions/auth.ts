@@ -84,9 +84,13 @@ export async function sendOtp(email: string): Promise<ActionResult> {
 
 /**
  * Paso 2 del login con 2FA:
- * Verifica el OTP de 6 dígitos. Si es correcto establece la sesión y redirige al dashboard.
+ * Verifica el OTP de 6 dígitos. Si es correcto establece la sesión y redirige al destino.
  */
-export async function verifyOtp(email: string, token: string): Promise<ActionResult> {
+export async function verifyOtp(
+  email: string,
+  token: string,
+  redirectTo?: string
+): Promise<ActionResult> {
   if (!email || !token || token.length !== 6) {
     return { success: false, error: 'Código inválido.' };
   }
@@ -105,7 +109,11 @@ export async function verifyOtp(email: string, token: string): Promise<ActionRes
     return { success: false, error: 'No se pudo verificar el código. Intenta de nuevo.' };
   }
 
-  redirect('/dashboard');
+  const destino =
+    redirectTo && redirectTo.startsWith('/') && !redirectTo.startsWith('//')
+      ? redirectTo
+      : '/dashboard';
+  redirect(destino);
 }
 
 /**

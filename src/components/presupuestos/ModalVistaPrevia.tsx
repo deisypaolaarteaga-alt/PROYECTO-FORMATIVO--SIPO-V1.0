@@ -24,6 +24,8 @@ interface Props {
   budget: any;
   chapters?: any[];
   profile: any;
+  onEnviarCliente?: () => void;
+  onEnviado?: () => void;
 }
 
 export function ModalVistaPrevia(props: Props) {

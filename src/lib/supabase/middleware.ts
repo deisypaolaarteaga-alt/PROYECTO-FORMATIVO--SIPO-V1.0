@@ -46,9 +46,10 @@ export async function updateSession(request: NextRequest) {
   const isPublicRoute = publicRoutes.includes(pathname);
   const isAuthCallback = pathname.startsWith('/auth/callback');
   const isApiRoute = pathname.startsWith('/api');
+  const isPortalCliente = pathname.startsWith('/presupuesto-publico');
 
   // Si no hay usuario y la ruta es protegida → redirigir a login
-  if (!user && !isPublicRoute && !isAuthCallback && !isApiRoute) {
+  if (!user && !isPublicRoute && !isAuthCallback && !isApiRoute && !isPortalCliente) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);

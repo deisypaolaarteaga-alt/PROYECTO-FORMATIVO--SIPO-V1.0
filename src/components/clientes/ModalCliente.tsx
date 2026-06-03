@@ -30,6 +30,7 @@ export function ModalCliente({ isOpen, onClose, cliente, onSuccess }: ModalClien
   const [cargoContactoError, setCargoContactoError] = useState('');
   const [telefonoError, setTelefonoError] = useState('');
   const [nitError, setNitError] = useState('');
+  const [emailError, setEmailError] = useState('');
   const [formData, setFormData] = useState({
     tipo: 'empresa' as 'persona_natural' | 'empresa',
     nombre_razon_social: '',
@@ -80,6 +81,7 @@ export function ModalCliente({ isOpen, onClose, cliente, onSuccess }: ModalClien
     setCargoContactoError('');
     setTelefonoError('');
     setNitError('');
+    setEmailError('');
   }, [cliente, isOpen]);
 
   const isFormValid =
@@ -89,7 +91,8 @@ export function ModalCliente({ isOpen, onClose, cliente, onSuccess }: ModalClien
     !nombreContactoError &&
     !cargoContactoError &&
     !telefonoError &&
-    !nitError;
+    !nitError &&
+    !emailError;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -117,7 +120,13 @@ export function ModalCliente({ isOpen, onClose, cliente, onSuccess }: ModalClien
           toast.success('Cliente actualizado correctamente');
           onClose();
         } else {
-          toast.error(res.error || 'Error al actualizar cliente');
+          if (res.field === 'nit_cedula') {
+            setNitError(res.error || 'NIT/cédula duplicado');
+          } else if (res.field === 'email') {
+            setEmailError(res.error || 'Email duplicado');
+          } else {
+            toast.error(res.error || 'Error al actualizar cliente');
+          }
         }
       } else {
         const res = await crearCliente(validatedData);
@@ -126,7 +135,13 @@ export function ModalCliente({ isOpen, onClose, cliente, onSuccess }: ModalClien
           onSuccess?.(res.data);
           onClose();
         } else {
-          toast.error(res.error || 'Error al crear cliente');
+          if (res.field === 'nit_cedula') {
+            setNitError(res.error || 'NIT/cédula duplicado');
+          } else if (res.field === 'email') {
+            setEmailError(res.error || 'Email duplicado');
+          } else {
+            toast.error(res.error || 'Error al crear cliente');
+          }
         }
       }
     } catch (error: any) {
@@ -285,14 +300,17 @@ export function ModalCliente({ isOpen, onClose, cliente, onSuccess }: ModalClien
                 placeholder="Ej. 300 123 4567"
                 error={telefonoError || undefined}
               />
-              <Input
-                label="Email"
-                icon={<Mail className="h-4 w-4" />}
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="Ej. contacto@cliente.com"
-              />
+              <div className="space-y-1">
+                <Input
+                  label="Email"
+                  icon={<Mail className="h-4 w-4" />}
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => { setFormData({ ...formData, email: e.target.value }); if (emailError) setEmailError(''); }}
+                  placeholder="Ej. contacto@cliente.com"
+                  error={emailError || undefined}
+                />
+              </div>
             </div>
 
             <div className="space-y-1.5">

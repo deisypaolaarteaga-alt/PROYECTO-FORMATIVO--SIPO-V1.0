@@ -181,7 +181,17 @@ export interface Budget {
   chapters?: Chapter[];
 }
 
-export type EstadoPresupuesto = 'borrador' | 'en_revision' | 'aprobado' | 'rechazado' | 'archivado';
+export type EstadoPresupuesto =
+  | 'borrador'
+  | 'en_revision'
+  | 'aprobado'
+  | 'rechazado'
+  | 'archivado'
+  | 'enviado_a_cliente'
+  | 'visto_por_cliente'
+  | 'aprobado_por_cliente'
+  | 'rechazado_por_cliente'
+  | 'con_observaciones';
 export type MetodoAIU = 'porcentaje' | 'detallado';
 export type MetodoIVA = 'no_aplica' | 'sobre_utilidad' | 'sobre_aiu' | 'sobre_total';
 
@@ -191,11 +201,16 @@ export const ESTADO_PRESUPUESTO_CONFIG: Record<EstadoPresupuesto, {
   badge: string;  // clases bg + text para el pill (añade border-radius en el componente)
   dot: string;    // bg-* para el indicador de punto en tabs
 }> = {
-  borrador:    { label: 'Borrador',    badge: 'bg-[#F3F4F6] text-[#4B5563]', dot: 'bg-[#D1D5DB]' },
-  en_revision: { label: 'En revisión', badge: 'bg-[#FFF4EE] text-[#D95510]', dot: 'bg-[#D97706]' },
-  aprobado:    { label: 'Aprobado',    badge: 'bg-[#EBFAF0] text-[#166534]', dot: 'bg-[#16A34A]' },
-  rechazado:   { label: 'Rechazado',   badge: 'bg-[#FEF0F0] text-[#991B1B]', dot: 'bg-[#DC2626]' },
-  archivado:   { label: 'Archivado',   badge: 'bg-[#F3F4F6] text-[#9CA3AF]', dot: 'bg-[#9CA3AF]' },
+  borrador:             { label: 'Borrador',             badge: 'bg-[#F3F4F6] text-[#4B5563]', dot: 'bg-[#D1D5DB]' },
+  en_revision:          { label: 'En revisión',          badge: 'bg-[#FFF4EE] text-[#D95510]', dot: 'bg-[#D97706]' },
+  aprobado:             { label: 'Aprobado',             badge: 'bg-[#EBFAF0] text-[#166534]', dot: 'bg-[#16A34A]' },
+  rechazado:            { label: 'Rechazado',            badge: 'bg-[#FEF0F0] text-[#991B1B]', dot: 'bg-[#DC2626]' },
+  archivado:            { label: 'Archivado',            badge: 'bg-[#F3F4F6] text-[#9CA3AF]', dot: 'bg-[#9CA3AF]' },
+  enviado_a_cliente:    { label: 'Enviado al cliente',   badge: 'bg-[#EFF6FF] text-[#1D4ED8]', dot: 'bg-[#3B82F6]' },
+  visto_por_cliente:    { label: 'Visto por cliente',    badge: 'bg-[#F0F9FF] text-[#0369A1]', dot: 'bg-[#0EA5E9]' },
+  aprobado_por_cliente: { label: 'Aprobado por cliente', badge: 'bg-[#EBFAF0] text-[#166534]', dot: 'bg-[#16A34A]' },
+  rechazado_por_cliente:{ label: 'Rechazado por cliente',badge: 'bg-[#FEF0F0] text-[#991B1B]', dot: 'bg-[#DC2626]' },
+  con_observaciones:    { label: 'Con observaciones',    badge: 'bg-[#FFFBEB] text-[#92400E]', dot: 'bg-[#F59E0B]' },
 };
 
 export interface ConfigAIU {
@@ -484,6 +499,7 @@ export interface ActionResult<T = unknown> {
   error?: string;
   message?: string;
   data?: T;
+  field?: string;
 }
 
 // ── Explosión de Insumos (Lista Global de Materiales) ──
@@ -610,6 +626,22 @@ export interface ActividadPlantilla {
 export interface CapituloPlantillaInput {
   nombre: string
   actividades: { nombre: string; unidad: string; cantidad: number; precio_unitario: number }[]
+}
+
+// ── Portal del Cliente ──
+export interface PresupuestoToken {
+  id: string;
+  budget_id: string;
+  token: string;
+  expires_at: string;
+  cliente_email: string;
+  cliente_nombre: string | null;
+  cliente_accion: 'aprobado' | 'rechazado' | 'comentado' | null;
+  cliente_comentario: string | null;
+  cliente_firma_nombre: string | null;
+  cliente_respondio_at: string | null;
+  visto_at: string | null;
+  visto_count: number;
 }
 
 // ── Ciudades de Colombia ──

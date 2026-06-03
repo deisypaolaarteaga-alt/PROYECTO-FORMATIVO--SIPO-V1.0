@@ -168,7 +168,20 @@ export async function crearCliente(data: z.infer<typeof clienteSchema>): Promise
         .eq('activo', true)
         .maybeSingle();
       if (existing) {
-        return { success: false, error: `Ya existe un cliente activo con el NIT/Cédula "${validated.nit_cedula}".` };
+        return { success: false, error: 'Ya tienes un cliente con ese NIT/cédula', field: 'nit_cedula' };
+      }
+    }
+
+    if (validated.email) {
+      const { data: existing } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('email', validated.email)
+        .eq('activo', true)
+        .maybeSingle();
+      if (existing) {
+        return { success: false, error: 'Ya tienes un cliente con ese email', field: 'email' };
       }
     }
 
@@ -204,6 +217,34 @@ export async function actualizarCliente(
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { success: false, error: 'No autorizado' };
+
+    if (validated.nit_cedula) {
+      const { data: existing } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('nit_cedula', validated.nit_cedula)
+        .eq('activo', true)
+        .neq('id', clienteId)
+        .maybeSingle();
+      if (existing) {
+        return { success: false, error: 'Ya tienes un cliente con ese NIT/cédula', field: 'nit_cedula' };
+      }
+    }
+
+    if (validated.email) {
+      const { data: existing } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('email', validated.email)
+        .eq('activo', true)
+        .neq('id', clienteId)
+        .maybeSingle();
+      if (existing) {
+        return { success: false, error: 'Ya tienes un cliente con ese email', field: 'email' };
+      }
+    }
 
     const { error } = await supabase
       .from('clientes')

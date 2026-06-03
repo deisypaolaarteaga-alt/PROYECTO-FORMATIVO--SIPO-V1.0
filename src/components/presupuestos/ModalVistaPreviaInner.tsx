@@ -21,6 +21,8 @@ interface Props {
   budget: any;
   chapters?: any[];
   profile: any;
+  onEnviarCliente?: () => void;
+  onEnviado?: () => void;
 }
 
 const toggleClass =
@@ -30,7 +32,7 @@ const toggleClass =
   'after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full ' +
   'peer-checked:after:border-white';
 
-export default function ModalVistaPreviaInner({ open, onClose, budget, chapters, profile }: Props) {
+export default function ModalVistaPreviaInner({ open, onClose, budget, chapters, profile, onEnviarCliente, onEnviado }: Props) {
   // Combinar budget con chapters explícitos para garantizar que el PDF
   // siempre tenga los capítulos y actividades aunque budget llegue sin ellos.
   const budgetCompleto = useMemo(
@@ -189,6 +191,7 @@ export default function ModalVistaPreviaInner({ open, onClose, budget, chapters,
       if (!result.success) throw new Error((result as any).error || 'Error al enviar');
       toast.success('Presupuesto enviado a revisión');
       onClose();
+      onEnviado?.();
     } catch (err: any) {
       toast.error(err?.message || 'No se pudo enviar a revisión');
     } finally {
@@ -446,6 +449,17 @@ export default function ModalVistaPreviaInner({ open, onClose, budget, chapters,
                       className="w-full justify-center"
                     >
                       {loadingRevision ? 'Enviando…' : 'Enviar a revisión'}
+                    </Button>
+                  )}
+
+                  {onEnviarCliente && (
+                    <Button
+                      onClick={onEnviarCliente}
+                      variant="ghost"
+                      icon={<Send className="h-4 w-4" />}
+                      className="w-full justify-center text-[#1E4D8C] hover:text-[#16396A]"
+                    >
+                      Enviar al cliente
                     </Button>
                   )}
 

@@ -100,6 +100,9 @@ const migrationFiles = [
   'supabase/migrations/20260602100000_eliminar_archivar_proyectos_presupuestos.sql',
   'supabase/migrations/20260602200000_profiles_tipo_persona.sql',
   'supabase/migrations/20260602300000_fix_security_advisor.sql',
+  'supabase/migrations/20260603100000_portal_cliente.sql',
+  'supabase/migrations/20260603200000_clientes_unique.sql',
+  'supabase/migrations/20260603210000_clientes_drop_nombre_unique.sql',
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

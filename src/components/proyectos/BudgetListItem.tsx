@@ -25,18 +25,19 @@ interface Transicion {
 
 // borrador no tiene transiciones aquí — se envía a revisión desde el editor (BotonEnviarRevision)
 const TRANSICIONES: Record<EstadoPresupuesto, Transicion[]> = {
-  borrador:    [],
-  en_revision: [
+  borrador:              [],
+  en_revision:           [
     { estado: 'aprobado',  label: 'Aprobar' },
     { estado: 'rechazado', label: 'Rechazar' },
   ],
-  rechazado: [
-    { estado: 'borrador', label: 'Reabrir como borrador' },
-  ],
-  aprobado: [
-    { estado: 'archivado', label: 'Archivar' },
-  ],
-  archivado: [],
+  rechazado:             [{ estado: 'borrador', label: 'Reabrir como borrador' }],
+  aprobado:              [{ estado: 'archivado', label: 'Archivar' }],
+  archivado:             [],
+  enviado_a_cliente:     [],
+  visto_por_cliente:     [],
+  aprobado_por_cliente:  [{ estado: 'archivado', label: 'Archivar' }],
+  rechazado_por_cliente: [{ estado: 'borrador',  label: 'Reabrir como borrador' }],
+  con_observaciones:     [{ estado: 'borrador',  label: 'Reabrir como borrador' }],
 };
 
 const TIPO_OBRA_LABELS: Record<string, string> = {

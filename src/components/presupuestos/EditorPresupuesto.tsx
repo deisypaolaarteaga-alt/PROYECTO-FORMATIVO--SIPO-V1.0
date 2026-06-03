@@ -6,7 +6,8 @@ import {
   ChevronDown, ChevronRight, Plus, Trash2,
   Loader2, FileText, Settings, BookOpen, Package,
   Calendar, Check, Copy, GripVertical, MoreHorizontal, TrendingUp,
-  CheckCircle2, LockOpen, Eye, BookmarkPlus,
+  CheckCircle2, LockOpen, Eye, BookmarkPlus, X,
+  Clock, CheckCheck, XCircle, MessageSquare, RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/shared/Button';
@@ -34,10 +35,11 @@ const ModalVistaPrevia = dynamic(
 import { ResumenFinanciero } from './ResumenFinanciero';
 import { ResumenFinancieroTab } from './ResumenFinancieroTab';
 import { ModalCatalogo } from './ModalCatalogo';
-import { BotonEnviarRevision } from './BotonEnviarRevision';
 import { EstadoBadge } from './EstadoBadge';
 import { ExplosionInsumosView } from './ExplosionInsumosView';
 import { ModalGuardarPlantilla } from './ModalGuardarPlantilla';
+import { ModalEnviarCliente } from './ModalEnviarCliente';
+import { getResumenTokenPresupuesto, type TokenResumen } from '@/actions/portal-cliente';
 import type { BudgetCompleto, ActivityWithAPU, Profile } from '@/types';
 
 interface EditorPresupuestoProps {
@@ -76,9 +78,12 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
   const [catalogoOpen, setCatalogoOpen] = useState(false);
   const [vistaPreviaOpen, setVistaPreviaOpen] = useState(false);
   const [guardarPlantillaOpen, setGuardarPlantillaOpen] = useState(false);
+  const [enviarClienteOpen, setEnviarClienteOpen] = useState(false);
+  const [estadoEnvioOpen, setEstadoEnvioOpen] = useState(false);
   const [bannerCiudadIgnorado, setBannerCiudadIgnorado] = useState(false);
   const [isChangingEstado, setIsChangingEstado] = useState(false);
   const [newChapterId, setNewChapterId] = useState<string | null>(null);
+  const [tokenResumen, setTokenResumen] = useState<TokenResumen | null>(null);
 
   // Drag & drop (local reorder solo — sin persistir en BD)
   const [dragSrcActId, setDragSrcActId] = useState<string | null>(null);
@@ -104,6 +109,19 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
     };
   }, []);
 
+  // Cargar resumen del token cuando el presupuesto está en un estado del portal
+  const ESTADOS_PORTAL = [
+    'enviado_a_cliente', 'visto_por_cliente',
+    'aprobado_por_cliente', 'rechazado_por_cliente', 'con_observaciones',
+  ];
+  useEffect(() => {
+    if (!ESTADOS_PORTAL.includes(budget.estado ?? '')) return;
+    getResumenTokenPresupuesto(budget.id).then(r => {
+      if (r.success && r.data) setTokenResumen(r.data);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [budget.id, budget.estado]);
+
   const ciudadPerfil = (profile?.ciudad || '').trim().toLowerCase();
   const ciudadObra   = (budget.ciudad_ica || '').trim().toLowerCase();
   const mostrarBannerCiudad =
@@ -115,6 +133,18 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
   const estaAprobado   = budget.estado === 'aprobado';
   const estaEnRevision = budget.estado === 'en_revision';
   const bloqueado      = estaAprobado;
+
+  // Estados del portal del cliente
+  const clienteEmail   = (budget as any).projects?.clientes?.email ?? null;
+  const clienteNombre  = (budget as any).projects?.clientes?.nombre_razon_social ?? null;
+  const estadoPortal   = budget.estado as string;
+  const mostrarBotonEnviar = [
+    'borrador', 'en_revision', 'enviado_a_cliente', 'visto_por_cliente', 'con_observaciones',
+  ].includes(estadoPortal);
+  const aprobadoPorCliente  = estadoPortal === 'aprobado_por_cliente';
+  const rechazadoPorCliente = estadoPortal === 'rechazado_por_cliente';
+  const conObservaciones    = estadoPortal === 'con_observaciones';
+  const tieneRespuestaCliente = aprobadoPorCliente || rechazadoPorCliente || conObservaciones;
 
   const fechaAprobada = budget.aprobado_en
     ? new Intl.DateTimeFormat('es-CO', {
@@ -509,18 +539,34 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                 </button>
               )}
 
-              {/* Enviar a revisión — solo cuando borrador */}
-              <BotonEnviarRevision
-                budgetId={budget.id}
-                proyectoId={budget.project_id}
-                estado={budget.estado ?? 'borrador'}
-              />
             </div>
 
-            {/* Fila inferior: total */}
+            {/* Fila inferior: total + indicador de estado portal */}
             <div className="text-left md:text-right">
               <p className="text-[10px] text-stone uppercase font-bold tracking-widest">Total Presupuesto</p>
               <p className="text-3xl font-black text-[#1C1814] leading-none" style={{ fontFamily: 'var(--font-mono)' }}>{formatearCOP(totalGeneral)}</p>
+
+              {/* Indicador de estado del portal — clic abre detalle */}
+              {ESTADOS_PORTAL.includes(estadoPortal) && (() => {
+                const configs: Record<string, { icon: React.ReactNode; text: string; cls: string }> = {
+                  enviado_a_cliente:     { icon: <Clock className="h-3 w-3" />,          text: 'Enviado — pendiente de ver',   cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+                  visto_por_cliente:     { icon: <Eye className="h-3 w-3" />,             text: 'Visto por el cliente',          cls: 'bg-sky-50 text-sky-700 border-sky-200' },
+                  con_observaciones:     { icon: <MessageSquare className="h-3 w-3" />,   text: 'El cliente dejó comentarios',   cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+                  aprobado_por_cliente:  { icon: <CheckCheck className="h-3 w-3" />,      text: 'Aprobado por el cliente',       cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+                  rechazado_por_cliente: { icon: <XCircle className="h-3 w-3" />,         text: 'Rechazado por el cliente',      cls: 'bg-red-50 text-red-700 border-red-200' },
+                };
+                const cfg = configs[estadoPortal];
+                if (!cfg) return null;
+                return (
+                  <button
+                    onClick={() => setEstadoEnvioOpen(true)}
+                    className={`mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-opacity hover:opacity-70 ${cfg.cls}`}
+                  >
+                    {cfg.icon}
+                    {cfg.text}
+                  </button>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -565,7 +611,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
         </div>
       )}
 
-      {/* ── BANNER APROBADO ───────────────────────────────────────────────── */}
+      {/* ── BANNER APROBADO (flujo interno) ──────────────────────────────── */}
       {estaAprobado && (
         <div className="bg-success-bg border-b border-success-border px-6 py-3 flex items-center gap-3">
           <CheckCircle2 className="h-5 w-5 text-success-text shrink-0" />
@@ -573,6 +619,58 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
             Presupuesto aprobado
             {fechaAprobada && <> el <strong>{fechaAprobada}</strong></>}
           </p>
+        </div>
+      )}
+
+      {/* ── BANNERS PORTAL DEL CLIENTE ────────────────────────────────────── */}
+      {aprobadoPorCliente && tokenResumen && (
+        <div className="bg-emerald-50 border-b border-emerald-200 px-6 py-3 flex items-start gap-3">
+          <CheckCheck className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+          <div className="text-sm text-emerald-800 space-y-0.5">
+            <p className="font-semibold">
+              {tokenResumen.cliente_nombre ?? 'El cliente'} aprobó este presupuesto
+              {tokenResumen.cliente_respondio_at && (
+                <> el <strong>{new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'America/Bogota' }).format(new Date(tokenResumen.cliente_respondio_at))}</strong></>
+              )}
+            </p>
+            {tokenResumen.cliente_firma_nombre && (
+              <p className="text-emerald-700">Firma: <strong>{tokenResumen.cliente_firma_nombre}</strong></p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {rechazadoPorCliente && tokenResumen && (
+        <div className="bg-red-50 border-b border-red-200 px-6 py-3 flex items-start gap-3">
+          <XCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+          <div className="text-sm text-red-800 space-y-0.5">
+            <p className="font-semibold">
+              {tokenResumen.cliente_nombre ?? 'El cliente'} rechazó este presupuesto
+              {tokenResumen.cliente_respondio_at && (
+                <> el <strong>{new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'America/Bogota' }).format(new Date(tokenResumen.cliente_respondio_at))}</strong></>
+              )}
+            </p>
+            {tokenResumen.cliente_comentario && (
+              <p className="text-red-700 italic">"{tokenResumen.cliente_comentario}"</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {conObservaciones && tokenResumen && (
+        <div className="bg-amber-50 border-b border-amber-200 px-6 py-3 flex items-start gap-3">
+          <MessageSquare className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="text-sm text-amber-800 space-y-0.5">
+            <p className="font-semibold">
+              {tokenResumen.cliente_nombre ?? 'El cliente'} dejó observaciones
+              {tokenResumen.cliente_respondio_at && (
+                <> el <strong>{new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'America/Bogota' }).format(new Date(tokenResumen.cliente_respondio_at))}</strong></>
+              )}
+            </p>
+            {tokenResumen.cliente_comentario && (
+              <p className="text-amber-700 italic">"{tokenResumen.cliente_comentario}"</p>
+            )}
+          </div>
         </div>
       )}
 
@@ -1019,6 +1117,11 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
         budget={budget}
         chapters={budget.chapters}
         profile={profile}
+        onEnviarCliente={clienteEmail ? () => {
+          setVistaPreviaOpen(false);
+          setEnviarClienteOpen(true);
+        } : undefined}
+        onEnviado={() => router.refresh()}
       />
 
       <ModalGuardarPlantilla
@@ -1028,6 +1131,106 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
         isOpen={guardarPlantillaOpen}
         onClose={() => setGuardarPlantillaOpen(false)}
       />
+
+      {/* Modal enviar al cliente */}
+      {clienteEmail && (
+        <ModalEnviarCliente
+          isOpen={enviarClienteOpen}
+          onClose={() => setEnviarClienteOpen(false)}
+          budgetId={budget.id}
+          clienteNombre={clienteNombre}
+          clienteEmail={clienteEmail}
+          onEnviado={() => router.refresh()}
+        />
+      )}
+
+      {/* Modal detalle del estado del envío */}
+      {estadoEnvioOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setEstadoEnvioOpen(false)} />
+          <div className="relative z-10 w-full max-w-md bg-white rounded-2xl shadow-2xl border border-[#E8E4DE] animate-in fade-in-0 zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8E4DE]">
+              <h2 className="text-base font-semibold text-[#1C1814]">Estado del envío al cliente</h2>
+              <button onClick={() => setEstadoEnvioOpen(false)} className="h-7 w-7 flex items-center justify-center rounded-lg bg-[#F5F2EE] text-stone hover:bg-[#EDE6DC] transition-colors">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-5 space-y-4">
+              {tokenResumen ? (
+                <>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between py-2 border-b border-[#F0EDE8]">
+                      <span className="text-xs font-semibold text-stone uppercase tracking-wide">Destinatario</span>
+                      <span className="text-sm text-[#1C1814] font-medium">{tokenResumen.cliente_nombre ?? tokenResumen.cliente_email}</span>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-[#F0EDE8]">
+                      <span className="text-xs font-semibold text-stone uppercase tracking-wide">Fecha de envío</span>
+                      <span className="text-sm text-[#1C1814]">
+                        {new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'America/Bogota' }).format(new Date(tokenResumen.created_at))}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-[#F0EDE8]">
+                      <span className="text-xs font-semibold text-stone uppercase tracking-wide">Primera vista</span>
+                      <span className="text-sm text-[#1C1814]">
+                        {tokenResumen.visto_at
+                          ? new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'America/Bogota' }).format(new Date(tokenResumen.visto_at))
+                          : <span className="text-stone italic">Aún no visto</span>}
+                      </span>
+                    </div>
+                    {tokenResumen.visto_count > 0 && (
+                      <div className="flex items-center justify-between py-2 border-b border-[#F0EDE8]">
+                        <span className="text-xs font-semibold text-stone uppercase tracking-wide">Veces visto</span>
+                        <span className="text-sm text-[#1C1814]">{tokenResumen.visto_count}</span>
+                      </div>
+                    )}
+                    {tokenResumen.cliente_accion && (
+                      <div className="bg-[#F9F8F6] rounded-xl border border-[#E8E4DE] p-4 space-y-2">
+                        <p className="text-[10px] font-bold text-stone uppercase tracking-wide">Respuesta del cliente</p>
+                        <p className="text-sm font-semibold text-[#1C1814] capitalize">
+                          {tokenResumen.cliente_accion === 'aprobado' ? '✅ Aprobó el presupuesto'
+                            : tokenResumen.cliente_accion === 'rechazado' ? '❌ Rechazó el presupuesto'
+                            : '💬 Dejó observaciones'}
+                        </p>
+                        {tokenResumen.cliente_firma_nombre && (
+                          <p className="text-xs text-stone">Firma: <strong>{tokenResumen.cliente_firma_nombre}</strong></p>
+                        )}
+                        {tokenResumen.cliente_comentario && (
+                          <p className="text-sm text-[#374151] italic">"{tokenResumen.cliente_comentario}"</p>
+                        )}
+                        {tokenResumen.cliente_respondio_at && (
+                          <p className="text-[11px] text-stone">
+                            {new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Bogota' }).format(new Date(tokenResumen.cliente_respondio_at))}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Botón reenviar — si no ha respondido */}
+                  {!tokenResumen.cliente_accion && clienteEmail && (
+                    <div className="pt-2">
+                      <button
+                        onClick={() => { setEstadoEnvioOpen(false); setEnviarClienteOpen(true); }}
+                        className="w-full inline-flex items-center justify-center gap-2 h-9 px-4 text-sm font-semibold text-[#1E4D8C] bg-[#EBF2FA] hover:bg-[#DBEAFE] rounded-lg border border-[#BFDBFE] transition-colors"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        Reenviar presupuesto
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="py-6 flex items-center justify-center">
+                  <div className="h-5 w-5 border-2 border-[#C84B1A]/30 border-t-[#C84B1A] rounded-full animate-spin" />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

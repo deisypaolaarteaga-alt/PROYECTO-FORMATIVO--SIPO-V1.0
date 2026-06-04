@@ -43,6 +43,7 @@ pnpm-debug.log*
 # Claude / AI settings
 .claude/
 .gemini/
+CLAUDE.md
 
 # sipo specific
 /scratch/

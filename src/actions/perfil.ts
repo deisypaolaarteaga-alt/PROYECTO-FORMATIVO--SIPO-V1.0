@@ -15,6 +15,41 @@ export interface PerfilEmpresaData {
   cargo_firma?:     string;
 }
 
+export async function guardarEmpresaOnboarding(data: {
+  empresa:       string;
+  nit?:          string;
+  ciudad?:       string;
+  telefono?:     string;
+  email_empresa?: string;
+  direccion?:    string;
+}): Promise<{ success: boolean; error?: string }> {
+  if (!data.empresa?.trim()) return { success: false, error: 'La razón social es obligatoria' };
+
+  const supabase = await createClient();
+  const { data: { user }, error: authErr } = await supabase.auth.getUser();
+  if (authErr || !user) return { success: false, error: 'Sin sesión activa.' };
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      empresa:       data.empresa.trim(),
+      nit:           data.nit           || null,
+      ciudad:        data.ciudad        || null,
+      telefono:      data.telefono      || null,
+      email_empresa: data.email_empresa || null,
+      direccion:     data.direccion     || null,
+    })
+    .eq('id', user.id);
+
+  if (error) {
+    console.error('guardarEmpresaOnboarding error:', error);
+    return { success: false, error: 'Error al guardar. Intenta de nuevo.' };
+  }
+
+  revalidatePath('/dashboard');
+  return { success: true };
+}
+
 export async function guardarPerfilEmpresa(data: PerfilEmpresaData) {
   if (!data.empresa?.trim()) return { success: false, error: 'La razón social es obligatoria' };
 

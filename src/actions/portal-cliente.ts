@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { enviarEmailPresupuesto, enviarEmailNotificacionConstructor } from '@/lib/email/brevo';
 import Decimal from 'decimal.js';
 import type { ActionResult } from '@/types';
+import { guardarSnapshot } from '@/actions/versiones';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -188,6 +189,9 @@ export async function enviarPresupuestoAlCliente(
       vigenciaFecha: vigenciaFechaStr,
     });
 
+    // ── Congelar snapshot de la versión que se envía ──
+    await guardarSnapshot(budgetId, 'envio_cliente');
+
     // ── Actualizar estado del presupuesto ──
     await admin
       .from('budgets')
@@ -310,6 +314,112 @@ export async function responderPresupuesto(
       rechazado: 'rechazado_por_cliente',
       comentado: 'con_observaciones',
     };
+
+    // Guardar snapshot ANTES de cambiar estado cuando el cliente aprueba
+    if (accion === 'aprobado') {
+      const { data: budgetOwnerRow } = await admin
+        .from('budgets')
+        .select('user_id')
+        .eq('id', tokenRow.budget_id)
+        .maybeSingle();
+
+      if (budgetOwnerRow) {
+        const { data: fullBudget } = await admin
+          .from('budgets')
+          .select(`
+            id, version, estado,
+            metodo_aiu, administracion_pct, imprevistos_pct, utilidad_pct,
+            metodo_iva, iva_porcentaje, costo_directo,
+            chapters (
+              id, nombre, numero, valor_subtotal,
+              activities (
+                id, nombre, unidad, cantidad, precio_unitario,
+                deleted_at,
+                apus (
+                  rendimiento, pct_herramienta_menor, pct_epp,
+                  costo_material, costo_mano_obra, costo_equipo,
+                  apu_items (
+                    tipo, nombre, unidad, cantidad, precio_unitario
+                  )
+                )
+              )
+            )
+          `)
+          .eq('id', tokenRow.budget_id)
+          .single();
+
+        if (fullBudget) {
+          const fb = fullBudget as unknown as {
+            version: number; estado: string;
+            metodo_aiu: string; administracion_pct: number;
+            imprevistos_pct: number; utilidad_pct: number;
+            metodo_iva: string; iva_porcentaje: number;
+            costo_directo: number;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            chapters: any[];
+          };
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const capitulos = fb.chapters.map((cap: any) => ({
+            id: cap.id, nombre: cap.nombre, orden: cap.numero ?? 0,
+            valor_subtotal: cap.valor_subtotal,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            actividades: (cap.activities ?? []).filter((a: any) => !a.deleted_at).map((act: any) => {
+              const apuRaw = act.apus?.[0];
+              return {
+                id: act.id, nombre: act.nombre, unidad: act.unidad,
+                cantidad: act.cantidad, precio_unitario: act.precio_unitario,
+                subtotal: new Decimal(act.cantidad ?? 0).mul(act.precio_unitario ?? 0).toNumber(),
+                apu: apuRaw ? {
+                  rendimiento: apuRaw.rendimiento,
+                  pct_herramienta_menor: apuRaw.pct_herramienta_menor,
+                  pct_epp: apuRaw.pct_epp,
+                  costo_material: apuRaw.costo_material,
+                  costo_mano_obra: apuRaw.costo_mano_obra,
+                  costo_equipo: apuRaw.costo_equipo,
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  items: (apuRaw.apu_items ?? []).map((item: any) => ({
+                    tipo: item.tipo, nombre: item.nombre, unidad: item.unidad,
+                    cantidad: item.cantidad, precio_unitario: item.precio_unitario,
+                    subtotal: new Decimal(item.cantidad ?? 0).mul(item.precio_unitario ?? 0).toNumber(),
+                  })),
+                } : undefined,
+              };
+            }),
+          }));
+
+          const { data: lastSnap } = await admin
+            .from('budget_snapshots')
+            .select('version')
+            .eq('budget_id', tokenRow.budget_id)
+            .order('version', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          const nextVersion = (lastSnap?.version ?? 0) + 1;
+          const snapshotData = {
+            version: nextVersion, costo_directo: fb.costo_directo,
+            metodo_aiu: fb.metodo_aiu, administracion_pct: fb.administracion_pct,
+            imprevistos_pct: fb.imprevistos_pct, utilidad_pct: fb.utilidad_pct,
+            metodo_iva: fb.metodo_iva, iva_porcentaje: fb.iva_porcentaje,
+            capitulos,
+          };
+          const totalOferta = calcularTotalOferta(fb);
+
+          await admin.from('budget_snapshots').insert({
+            budget_id:     tokenRow.budget_id,
+            user_id:       budgetOwnerRow.user_id,
+            version:       nextVersion,
+            motivo:        'aprobacion',
+            estado_budget: fb.estado,
+            total_oferta:  totalOferta,
+            costo_directo: fb.costo_directo,
+            datos_json:    snapshotData,
+            data:          snapshotData,
+          });
+        }
+      }
+    }
 
     await admin
       .from('budgets')

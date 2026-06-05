@@ -36,7 +36,7 @@ const TRANSICIONES: Record<EstadoPresupuesto, Transicion[]> = {
   enviado_a_cliente:     [],
   visto_por_cliente:     [],
   aprobado_por_cliente:  [{ estado: 'archivado', label: 'Archivar' }],
-  rechazado_por_cliente: [{ estado: 'borrador',  label: 'Reabrir como borrador' }],
+  rechazado_por_cliente: [],
   con_observaciones:     [{ estado: 'borrador',  label: 'Reabrir como borrador' }],
 };
 

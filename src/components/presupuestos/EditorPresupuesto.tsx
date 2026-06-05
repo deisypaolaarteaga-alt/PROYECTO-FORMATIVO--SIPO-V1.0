@@ -7,7 +7,7 @@ import {
   Loader2, FileText, Settings, BookOpen, Package,
   Calendar, Check, Copy, GripVertical, MoreHorizontal, TrendingUp,
   CheckCircle2, LockOpen, Eye, BookmarkPlus, X,
-  Clock, CheckCheck, XCircle, MessageSquare, RefreshCw,
+  Clock, CheckCheck, XCircle, MessageSquare, RefreshCw, History,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/shared/Button';
@@ -25,6 +25,7 @@ import {
   eliminarActividad, eliminarCapitulo,
   aprobarPresupuesto, reabrirPresupuesto,
 } from '@/actions/presupuestos';
+import { corregirPresupuesto } from '@/actions/presupuesto-estados';
 import { formatearCOP } from '@/lib/utils/formato-cop';
 import dynamic from 'next/dynamic';
 const PanelAPU = dynamic(() => import('./PanelAPU').then(m => ({ default: m.PanelAPU })), { ssr: false });
@@ -40,7 +41,9 @@ import { ExplosionInsumosView } from './ExplosionInsumosView';
 import { ModalGuardarPlantilla } from './ModalGuardarPlantilla';
 import { ModalEnviarCliente } from './ModalEnviarCliente';
 import { getResumenTokenPresupuesto, type TokenResumen } from '@/actions/portal-cliente';
-import type { BudgetCompleto, ActivityWithAPU, Profile } from '@/types';
+import { getVersiones } from '@/actions/versiones';
+import { VersionesTab } from './VersionesTab';
+import type { BudgetCompleto, ActivityWithAPU, Profile, BudgetSnapshot } from '@/types';
 
 interface EditorPresupuestoProps {
   budget: BudgetCompleto;
@@ -66,7 +69,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
     setExpanded(new Set(initialBudget.chapters?.map((c) => c.id) || []));
   }, [initialBudget]);
 
-  const [activeTab, setActiveTab] = useState<'estructura' | 'insumos' | 'resumen'>('estructura');
+  const [activeTab, setActiveTab] = useState<'estructura' | 'insumos' | 'resumen' | 'versiones'>('estructura');
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [, forceRefreshTime] = useState(0);
@@ -84,6 +87,8 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
   const [isChangingEstado, setIsChangingEstado] = useState(false);
   const [newChapterId, setNewChapterId] = useState<string | null>(null);
   const [tokenResumen, setTokenResumen] = useState<TokenResumen | null>(null);
+  const [versiones, setVersiones] = useState<BudgetSnapshot[]>([]);
+  const [isCorrigiendo, setIsCorrigiendo] = useState(false);
 
   // Drag & drop (local reorder solo — sin persistir en BD)
   const [dragSrcActId, setDragSrcActId] = useState<string | null>(null);
@@ -118,6 +123,15 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
     if (!ESTADOS_PORTAL.includes(budget.estado ?? '')) return;
     getResumenTokenPresupuesto(budget.id).then(r => {
       if (r.success && r.data) setTokenResumen(r.data);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [budget.id, budget.estado]);
+
+  // Cargar versiones del presupuesto — se re-ejecuta cuando cambia el estado
+  // porque las transiciones de estado crean snapshots nuevos
+  useEffect(() => {
+    getVersiones(budget.id).then(r => {
+      if (r.success && r.versiones) setVersiones(r.versiones);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [budget.id, budget.estado]);
@@ -404,6 +418,9 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
     { key: 'estructura', label: '1. Estructura y Costos',     icon: FileText    },
     { key: 'insumos',    label: '2. Explosión de Insumos',    icon: Package     },
     { key: 'resumen',    label: '3. Resumen y Exportación',   icon: TrendingUp  },
+    ...(versiones.length > 0
+      ? [{ key: 'versiones' as const, label: `Versiones (${versiones.length})`, icon: History }]
+      : []),
   ] as const;
 
   return (
@@ -640,20 +657,39 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
         </div>
       )}
 
-      {rechazadoPorCliente && tokenResumen && (
-        <div className="bg-red-50 border-b border-red-200 px-6 py-3 flex items-start gap-3">
-          <XCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
-          <div className="text-sm text-red-800 space-y-0.5">
-            <p className="font-semibold">
-              {tokenResumen.cliente_nombre ?? 'El cliente'} rechazó este presupuesto
-              {tokenResumen.cliente_respondio_at && (
-                <> el <strong>{new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'America/Bogota' }).format(new Date(tokenResumen.cliente_respondio_at))}</strong></>
+      {rechazadoPorCliente && (
+        <div className="bg-red-50 border-b border-red-200 px-6 py-3 flex items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <XCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+            <div className="text-sm text-red-800 space-y-0.5">
+              <p className="font-semibold">
+                {tokenResumen
+                  ? `${tokenResumen.cliente_nombre ?? 'El cliente'} rechazó este presupuesto`
+                  : 'Este presupuesto fue rechazado por el cliente'}
+                {tokenResumen?.cliente_respondio_at && (
+                  <> el <strong>{new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'America/Bogota' }).format(new Date(tokenResumen.cliente_respondio_at))}</strong></>
+                )}
+              </p>
+              {tokenResumen?.cliente_comentario && (
+                <p className="text-red-700 italic">"{tokenResumen.cliente_comentario}"</p>
               )}
-            </p>
-            {tokenResumen.cliente_comentario && (
-              <p className="text-red-700 italic">"{tokenResumen.cliente_comentario}"</p>
-            )}
+            </div>
           </div>
+          <button
+            onClick={async () => {
+              setIsCorrigiendo(true);
+              const res = await corregirPresupuesto(budget.id);
+              setIsCorrigiendo(false);
+              if (res.success) router.refresh();
+            }}
+            disabled={isCorrigiendo}
+            className="inline-flex items-center gap-1.5 h-8 px-3 text-[13px] font-semibold rounded-lg bg-red-600 hover:bg-red-700 text-white disabled:opacity-60 transition-colors shrink-0"
+          >
+            {isCorrigiendo
+              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              : <RefreshCw className="h-3.5 w-3.5" />}
+            {isCorrigiendo ? 'Guardando…' : 'Corregir presupuesto'}
+          </button>
         </div>
       )}
 
@@ -671,6 +707,13 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
               <p className="text-amber-700 italic">"{tokenResumen.cliente_comentario}"</p>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ── TAB: VERSIONES ─────────────────────────────────────────────────── */}
+      {activeTab === 'versiones' && (
+        <div className="flex-1 overflow-y-auto p-8">
+          <VersionesTab versiones={versiones} budgetId={budget.id} />
         </div>
       )}
 

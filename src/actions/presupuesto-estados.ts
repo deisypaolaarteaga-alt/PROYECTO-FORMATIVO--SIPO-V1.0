@@ -2,16 +2,21 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { guardarSnapshot } from '@/actions/versiones';
 import type { ActionResult } from '@/types';
 
-type EstadoPresupuesto = 'borrador' | 'en_revision' | 'aprobado' | 'rechazado' | 'archivado';
+type EstadoPresupuesto =
+  | 'borrador' | 'en_revision' | 'aprobado' | 'rechazado' | 'archivado'
+  | 'rechazado_por_cliente' | 'con_observaciones';
 
 const TRANSICIONES_PERMITIDAS: Record<EstadoPresupuesto, EstadoPresupuesto[]> = {
-  borrador: ['en_revision'],
-  en_revision: ['aprobado', 'rechazado'],
-  aprobado: ['archivado'],
-  rechazado: ['borrador'],
-  archivado: [],
+  borrador:               ['en_revision'],
+  en_revision:            ['aprobado', 'rechazado'],
+  aprobado:               ['archivado'],
+  rechazado:              ['borrador'],
+  archivado:              [],
+  rechazado_por_cliente:  ['borrador'],
+  con_observaciones:      ['borrador'],
 };
 
 /**
@@ -46,34 +51,16 @@ export async function cambiarEstadoPresupuesto(
       };
     }
 
-    // 3. Si se aprueba, tomar snapshot
+    // 3. Guardar snapshot ANTES de transiciones críticas
     if (nuevoEstado === 'aprobado') {
-      const { data: fullBudget } = await supabase
-        .from('budgets')
-        .select(`
-          *,
-          chapters (
-            *,
-            activities (
-              *,
-              apus (
-                *,
-                apu_items (*)
-              )
-            )
-          )
-        `)
-        .eq('id', budgetId)
-        .single();
-
-      if (fullBudget) {
-        await supabase.from('budget_snapshots').insert({
-          budget_id: budgetId,
-          user_id: user.id,
-          version: budget.version,
-          datos_json: fullBudget
-        });
-      }
+      await guardarSnapshot(budgetId, 'aprobacion');
+    } else if (nuevoEstado === 'rechazado') {
+      await guardarSnapshot(budgetId, 'rechazo_cliente');
+    } else if (
+      (estadoActual === 'rechazado' || estadoActual === 'rechazado_por_cliente') &&
+      nuevoEstado === 'borrador'
+    ) {
+      await guardarSnapshot(budgetId, 'reapertura_manual');
     }
 
     // 4. Actualizar estado
@@ -110,6 +97,49 @@ export async function cambiarEstadoPresupuesto(
     return { success: true };
   } catch (error) {
     return { success: false, error: 'Error al cambiar el estado del presupuesto.' };
+  }
+}
+
+/**
+ * Guarda snapshot de la versión rechazada y regresa el presupuesto a borrador.
+ * Debe llamarse desde el editor cuando el constructor decide corregir el presupuesto.
+ */
+export async function corregirPresupuesto(budgetId: string): Promise<ActionResult> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'No autorizado' };
+
+    const { data: budget, error: fetchErr } = await supabase
+      .from('budgets')
+      .select('estado, user_id, project_id')
+      .eq('id', budgetId)
+      .single();
+
+    if (fetchErr || !budget) return { success: false, error: 'Presupuesto no encontrado' };
+    if (budget.user_id !== user.id) return { success: false, error: 'No tienes permiso' };
+    if (budget.estado !== 'rechazado_por_cliente') {
+      return { success: false, error: 'El presupuesto no está en estado rechazado por el cliente' };
+    }
+
+    // Congelar la versión rechazada antes de reabrir
+    await guardarSnapshot(budgetId, 'rechazo_cliente');
+
+    const { error: updateErr } = await supabase
+      .from('budgets')
+      .update({ estado: 'borrador', updated_at: new Date().toISOString() })
+      .eq('id', budgetId);
+
+    if (updateErr) throw updateErr;
+
+    revalidatePath(`/presupuestos/${budgetId}`);
+    if (budget.project_id) {
+      revalidatePath(`/proyectos/${budget.project_id}`);
+      revalidatePath('/proyectos');
+    }
+    return { success: true };
+  } catch {
+    return { success: false, error: 'Error al corregir el presupuesto.' };
   }
 }
 

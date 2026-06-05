@@ -644,6 +644,69 @@ export interface PresupuestoToken {
   visto_count: number;
 }
 
+// ── Versionado de presupuestos ───────────────────────────────────────────────
+
+export interface BudgetSnapshot {
+  id: string
+  budget_id: string
+  version: number
+  motivo: 'rechazo_cliente' | 'reapertura_manual' | 'aprobacion' | 'envio_cliente'
+  estado_budget: string
+  total_oferta: number
+  costo_directo: number
+  created_at: string
+  data?: SnapshotData
+}
+
+export interface SnapshotData {
+  version: number
+  costo_directo: number
+  metodo_aiu: string
+  administracion_pct: number
+  imprevistos_pct: number
+  utilidad_pct: number
+  metodo_iva: string
+  iva_porcentaje: number
+  capitulos: SnapshotCapitulo[]
+}
+
+export interface SnapshotCapitulo {
+  id: string
+  nombre: string
+  orden: number
+  valor_subtotal: number
+  actividades: SnapshotActividad[]
+}
+
+export interface SnapshotActividad {
+  id: string
+  nombre: string
+  unidad: string
+  cantidad: number
+  precio_unitario: number
+  subtotal: number
+  apu?: SnapshotAPU
+}
+
+export interface SnapshotAPU {
+  rendimiento: number
+  pct_herramienta_menor: number
+  pct_epp: number
+  costo_material: number
+  costo_mano_obra: number
+  costo_equipo: number
+  items: SnapshotAPUItem[]
+}
+
+export interface SnapshotAPUItem {
+  tipo: string
+  nombre: string
+  unidad: string
+  cantidad: number
+  precio_unitario: number
+  subtotal: number
+}
+
 // ── Ciudades de Colombia ──
 export const CIUDADES_COLOMBIA = [
   'Bogotá D.C.', 'Medellín', 'Cali', 'Barranquilla', 'Cartagena',

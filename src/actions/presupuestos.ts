@@ -589,11 +589,13 @@ export async function createBudgetFromAI(
 }
 
 const TRANSICIONES_VALIDAS: Record<string, string[]> = {
-  borrador:    ['en_revision'],
-  en_revision: ['aprobado', 'rechazado'],
-  rechazado:   ['borrador'],
-  aprobado:    ['archivado'],
-  archivado:   [],
+  borrador:              ['en_revision'],
+  en_revision:           ['aprobado', 'rechazado'],
+  rechazado:             ['borrador'],
+  aprobado:              ['archivado'],
+  archivado:             [],
+  rechazado_por_cliente: ['borrador'],
+  con_observaciones:     ['borrador'],
 };
 
 /**

@@ -124,6 +124,47 @@ export const proveedorSchema = z.object({
   notas: z.string().max(500).optional(),
 });
 
+// ============ CSV Import schemas ============
+
+export const csvClienteRowSchema = z.object({
+  nombre_razon_social: z.string().min(2, 'Nombre requerido').max(200),
+  tipo: z.enum(['persona_natural', 'empresa'], { message: 'tipo debe ser persona_natural o empresa' }),
+  nit_cedula: z.string().max(20).optional().default(''),
+  email: z.union([z.string().email('Email inválido'), z.literal('')]).optional().default(''),
+  telefono: z.string().max(20).optional().default(''),
+  ciudad: z.string().min(1, 'Ciudad requerida').max(100),
+  nombre_contacto: z.string().max(100).optional().default(''),
+  cargo_contacto: z.string().max(100).optional().default(''),
+});
+
+export const csvProveedorRowSchema = z.object({
+  nombre_razon_social: z.string().min(2, 'Nombre requerido').max(200),
+  tipo: z.enum(['persona', 'empresa'], { message: 'tipo debe ser persona o empresa' }),
+  categoria: z.enum(
+    ['ferreteria', 'contratista', 'equipos', 'laboratorio', 'transporte', 'servicios', 'otro'],
+    { message: 'categoria inválida — usa: ferreteria|contratista|equipos|laboratorio|transporte|servicios|otro' }
+  ),
+  nit_cedula: z.string().max(20).optional().default(''),
+  email: z.union([z.string().email('Email inválido'), z.literal('')]).optional().default(''),
+  telefono: z.string().max(20).optional().default(''),
+  ciudad: z.string().max(100).optional().default(''),
+  sitio_web: z.union([z.string().url('URL inválida'), z.literal('')]).optional().default(''),
+});
+
+export const csvInsumoRowSchema = z.object({
+  nombre: z.string().min(1, 'Nombre requerido').max(200),
+  categoria: z.string().max(100).optional().default(''),
+  unidad: z.string().min(1, 'Unidad requerida').max(50),
+  precio_unitario: z.preprocess(
+    (v) => (v === '' || v == null ? 0 : Number(v)),
+    z.number().min(0, 'Precio debe ser ≥ 0')
+  ),
+});
+
+export type CsvClienteRow = z.infer<typeof csvClienteRowSchema>;
+export type CsvProveedorRow = z.infer<typeof csvProveedorRowSchema>;
+export type CsvInsumoRow = z.infer<typeof csvInsumoRowSchema>;
+
 // ============ Auth schemas ============
 
 export const loginSchema = z.object({

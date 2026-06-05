@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Search, Building2, User, MoreVertical,
-  Edit, Ban, CheckCircle, ExternalLink, Plus, Download,
+  Edit, Ban, CheckCircle, ExternalLink, Plus, Download, Upload,
   ChevronLeft, ChevronRight,
   ChevronDown, Truck, Phone, Mail, Globe, EyeOff,
 } from 'lucide-react';
@@ -16,10 +16,16 @@ import {
   DropdownMenuItem,
 } from '@/components/shared/DropdownMenu';
 import { ModalProveedor } from './ModalProveedor';
-import { toggleProveedorActivo } from '@/actions/proveedores';
+import { ModalImportarCSV } from '@/components/shared/ModalImportarCSV';
+import { toggleProveedorActivo, importarProveedoresCSV } from '@/actions/proveedores';
 import { toast } from 'sonner';
 import type { Proveedor, CategoriaProveedor } from '@/types';
 import { CATEGORIA_PROVEEDOR_LABELS } from '@/types';
+
+const COLUMNAS_CSV_PROVEEDORES = [
+  'nombre_razon_social', 'tipo', 'categoria', 'nit_cedula',
+  'email', 'telefono', 'ciudad', 'sitio_web',
+];
 
 const PAGE_SIZE = 10;
 
@@ -102,6 +108,7 @@ export function ProveedoresList({ initialProveedores }: ProveedoresListProps) {
   const [filtroCategoria, setFiltroCategoria] = useState('todos');
   const [pagina, setPagina] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showImportCSV, setShowImportCSV] = useState(false);
   const [proveedorAEditar, setProveedorAEditar] = useState<Proveedor | undefined>(undefined);
   const [ocultarInactivos, setOcultarInactivos] = useState(false);
 
@@ -277,6 +284,15 @@ export function ProveedoresList({ initialProveedores }: ProveedoresListProps) {
           >
             <Download className="h-4 w-4 text-[#6B7280]" />
             Exportar
+          </button>
+
+          {/* Importar CSV */}
+          <button
+            onClick={() => setShowImportCSV(true)}
+            className="w-full sm:w-auto h-10 px-4 flex items-center justify-center gap-2 border border-[#E8E4DE] rounded-lg text-sm text-[#374151] bg-white hover:bg-[#F9FAFB] transition-colors"
+          >
+            <Upload className="h-4 w-4 text-[#6B7280]" />
+            Importar CSV
           </button>
 
           <button
@@ -569,6 +585,16 @@ export function ProveedoresList({ initialProveedores }: ProveedoresListProps) {
         proveedor={proveedorAEditar}
         onSuccess={() => router.refresh()}
       />
+
+      {showImportCSV && (
+        <ModalImportarCSV
+          entidad="proveedores"
+          titulo="Proveedores"
+          columnas={COLUMNAS_CSV_PROVEEDORES}
+          onImportar={importarProveedoresCSV}
+          onClose={() => { setShowImportCSV(false); router.refresh(); }}
+        />
+      )}
     </div>
   );
 }

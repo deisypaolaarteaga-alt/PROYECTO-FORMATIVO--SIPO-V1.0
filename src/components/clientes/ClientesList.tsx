@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Search, Building2, User, MoreVertical,
-  Edit, UserX, UserCheck, ExternalLink, Plus, Download,
+  Edit, UserX, UserCheck, ExternalLink, Plus, Download, Upload,
   ChevronLeft, ChevronRight,
   ChevronDown, MapPin, Loader2,
 } from 'lucide-react';
@@ -17,9 +17,15 @@ import {
 } from '@/components/shared/DropdownMenu';
 import { ModalCliente } from './ModalCliente';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
-import { toggleActivoCliente, getClientes } from '@/actions/clientes';
+import { ModalImportarCSV } from '@/components/shared/ModalImportarCSV';
+import { toggleActivoCliente, getClientes, importarClientesCSV } from '@/actions/clientes';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
+
+const COLUMNAS_CSV_CLIENTES = [
+  'nombre_razon_social', 'tipo', 'nit_cedula', 'email',
+  'telefono', 'ciudad', 'nombre_contacto', 'cargo_contacto',
+];
 
 const PAGE_SIZE = 10;
 
@@ -137,6 +143,7 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
   const [mostrarInactivos, setMostrarInactivos] = useState(false);
   const [pagina, setPagina] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showImportCSV, setShowImportCSV] = useState(false);
   const [clienteAEditar, setClienteAEditar] = useState<any>(undefined);
   const [confirmInhabilitar, setConfirmInhabilitar] = useState<{ id: string; nombre: string } | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -355,6 +362,15 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
           >
             <Download className="h-4 w-4 text-[#6B7280]" />
             Exportar
+          </button>
+
+          {/* Importar CSV */}
+          <button
+            onClick={() => setShowImportCSV(true)}
+            className="h-10 px-4 flex items-center gap-2 border border-[#E8E4DE] rounded-lg text-sm text-[#374151] bg-white hover:bg-[#F9FAFB] transition-colors"
+          >
+            <Upload className="h-4 w-4 text-[#6B7280]" />
+            Importar CSV
           </button>
 
           {/* Nuevo Cliente */}
@@ -722,6 +738,16 @@ export function ClientesList({ initialClientes }: ClientesListProps) {
         cliente={clienteAEditar}
         onSuccess={() => router.refresh()}
       />
+
+      {showImportCSV && (
+        <ModalImportarCSV
+          entidad="clientes"
+          titulo="Clientes"
+          columnas={COLUMNAS_CSV_CLIENTES}
+          onImportar={importarClientesCSV}
+          onClose={() => { setShowImportCSV(false); router.refresh(); }}
+        />
+      )}
     </div>
   );
 }

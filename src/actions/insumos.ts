@@ -1,10 +1,75 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
-import { createUserMaterialSchema } from '@/lib/validations/schemas';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createUserMaterialSchema, csvInsumoRowSchema } from '@/lib/validations/schemas';
 import type { ActionResult, ExplosionInsumos, TipoAPUItem, MaterialConPrecio, EquipoConPrecio } from '@/types';
 import { revalidatePath } from 'next/cache';
 import Decimal from 'decimal.js';
+
+export type ResultadoImportacion = {
+  importados: number;
+  errores: { fila: number; mensaje: string }[];
+};
+
+/**
+ * Importación masiva de insumos propios desde CSV.
+ * Inserta en user_materials con tipo='material'. Omite duplicados por nombre.
+ */
+export async function importarInsumosCSV(
+  filas: Record<string, string>[]
+): Promise<ResultadoImportacion> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { importados: 0, errores: [{ fila: 0, mensaje: 'No autorizado' }] };
+
+  const admin = createAdminClient();
+  let importados = 0;
+  const errores: { fila: number; mensaje: string }[] = [];
+
+  for (let i = 0; i < filas.length; i++) {
+    const fila = filas[i];
+    const parsed = csvInsumoRowSchema.safeParse(fila);
+    if (!parsed.success) {
+      const msg = parsed.error.issues[0]?.message ?? 'Datos inválidos';
+      errores.push({ fila: i + 1, mensaje: msg });
+      continue;
+    }
+
+    const data = parsed.data;
+
+    // Verificar duplicado por nombre dentro de los materiales del usuario
+    const { data: existing } = await admin
+      .from('user_materials')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('nombre', data.nombre)
+      .eq('tipo', 'material')
+      .maybeSingle();
+
+    if (existing) {
+      errores.push({ fila: i + 1, mensaje: `Material "${data.nombre}" ya existe, fila omitida` });
+      continue;
+    }
+
+    const { error } = await admin.from('user_materials').insert({
+      user_id: user.id,
+      nombre: data.nombre,
+      descripcion: data.categoria || null,
+      tipo: 'material',
+      unidad: data.unidad,
+      precio_unitario: new Decimal(data.precio_unitario).toDecimalPlaces(2).toNumber(),
+    });
+
+    if (error) {
+      errores.push({ fila: i + 1, mensaje: error.message });
+    } else {
+      importados++;
+    }
+  }
+
+  if (importados > 0) revalidatePath('/insumos');
+  return { importados, errores };
+}
 
 export async function getMaterials(search?: string, categoria?: string) {
   const supabase = await createClient();

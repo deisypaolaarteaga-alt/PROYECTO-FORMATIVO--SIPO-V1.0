@@ -1,10 +1,15 @@
 'use server';
 
 import { createClient, createAdminClient } from '@/lib/supabase/server';
-import { proveedorSchema } from '@/lib/validations/schemas';
+import { proveedorSchema, csvProveedorRowSchema } from '@/lib/validations/schemas';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import type { ActionResult, Proveedor, TipoAPUItem } from '@/types';
+
+export type ResultadoImportacion = {
+  importados: number;
+  errores: { fila: number; mensaje: string }[];
+};
 
 export async function getProveedores(filtros?: {
   busqueda?: string;
@@ -293,6 +298,83 @@ export async function getInsumosDelProveedor(proveedorId: string) {
     console.error('[getInsumosDelProveedor] error:', err);
     return [];
   }
+}
+
+/**
+ * Importación masiva de proveedores desde CSV.
+ * Upsert: si ya existe con mismo nit_cedula → omite; si sin nit, verifica por nombre.
+ */
+export async function importarProveedoresCSV(
+  filas: Record<string, string>[]
+): Promise<ResultadoImportacion> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { importados: 0, errores: [{ fila: 0, mensaje: 'No autorizado' }] };
+
+  const admin = createAdminClient();
+  let importados = 0;
+  const errores: { fila: number; mensaje: string }[] = [];
+
+  for (let i = 0; i < filas.length; i++) {
+    const fila = filas[i];
+    const parsed = csvProveedorRowSchema.safeParse(fila);
+    if (!parsed.success) {
+      const msg = parsed.error.issues[0]?.message ?? 'Datos inválidos';
+      errores.push({ fila: i + 1, mensaje: msg });
+      continue;
+    }
+
+    const data = parsed.data;
+
+    // Verificar duplicado
+    if (data.nit_cedula) {
+      const { data: existing } = await admin
+        .from('proveedores')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('nit_cedula', data.nit_cedula)
+        .is('deleted_at', null)
+        .maybeSingle();
+      if (existing) {
+        errores.push({ fila: i + 1, mensaje: `NIT/cédula "${data.nit_cedula}" ya existe, fila omitida` });
+        continue;
+      }
+    } else {
+      const { data: existing } = await admin
+        .from('proveedores')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('nombre_razon_social', data.nombre_razon_social)
+        .is('deleted_at', null)
+        .maybeSingle();
+      if (existing) {
+        errores.push({ fila: i + 1, mensaje: `Proveedor "${data.nombre_razon_social}" ya existe, fila omitida` });
+        continue;
+      }
+    }
+
+    const { error } = await admin.from('proveedores').insert({
+      user_id: user.id,
+      nombre_razon_social: data.nombre_razon_social,
+      tipo: data.tipo,
+      categoria: data.categoria,
+      nit_cedula: data.nit_cedula || null,
+      email: data.email || null,
+      telefono: data.telefono || null,
+      ciudad: data.ciudad || null,
+      sitio_web: data.sitio_web || null,
+      activo: true,
+    });
+
+    if (error) {
+      errores.push({ fila: i + 1, mensaje: error.message });
+    } else {
+      importados++;
+    }
+  }
+
+  if (importados > 0) revalidatePath('/proveedores');
+  return { importados, errores };
 }
 
 export async function buscarProveedores(

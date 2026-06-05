@@ -7,7 +7,7 @@ import {
   Package, Drill, ShieldCheck,
   Search, ChevronUp, ChevronDown, ChevronsUpDown,
   Plus, Trash2, Edit2, Power, PowerOff,
-  Loader2, Info, X, Save, UserPlus, Minus, ArrowRight,
+  Loader2, Info, X, Save, UserPlus, Minus, ArrowRight, Upload,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Card } from '@/components/shared/Card';
@@ -27,9 +27,13 @@ import {
   updateCuadrilla, importarLaborComoTrabajador, agregarTrabajadorACuadrilla,
 } from '@/actions/cuadrillas';
 import { ModalTrabajador } from '@/components/mano-obra/ModalTrabajador';
+import { ModalImportarCSV } from '@/components/shared/ModalImportarCSV';
+import { importarInsumosCSV } from '@/actions/insumos';
 import type { TrabajadorReferencia } from '@/actions/mano-obra';
 import type { MaterialConPrecio, EquipoConPrecio } from '@/types';
 import { cn } from '@/lib/utils';
+
+const COLUMNAS_CSV_INSUMOS = ['nombre', 'categoria', 'unidad', 'precio_unitario'];
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
@@ -102,6 +106,7 @@ export default function InsumosPage() {
   const [editingMatId, setEditingMatId] = useState<string | null>(null);
   const [matEditPrice, setMatEditPrice] = useState('');
   const [savingMatEdit, setSavingMatEdit] = useState(false);
+  const [showImportMat, setShowImportMat] = useState(false);
   const [showCreateMat, setShowCreateMat] = useState(false);
   const [createMatNombre, setCreateMatNombre] = useState('');
   const [createMatUnidad, setCreateMatUnidad] = useState('');
@@ -664,6 +669,13 @@ export default function InsumosPage() {
                 )}
               >
                 {mostrarInactivosMat ? 'Ocultar inactivos' : 'Mostrar inactivos'}
+              </button>
+              <button
+                onClick={() => setShowImportMat(true)}
+                className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border bg-sand text-steel-mid border-concrete hover:bg-concrete/60"
+              >
+                <Upload className="h-3.5 w-3.5" />
+                Importar CSV
               </button>
               <Button size="sm" className="w-full sm:w-auto" icon={<Plus className="h-4 w-4" />} onClick={() => { setShowCreateMat(true); setCreateMatError(''); }}>
                 Agregar material
@@ -1292,6 +1304,22 @@ export default function InsumosPage() {
 
       {showCrearTrabajador && (
         <ModalTrabajador onClose={() => setShowCrearTrabajador(false)} onSaved={handleTrabajadorCreado} />
+      )}
+
+      {showImportMat && (
+        <ModalImportarCSV
+          entidad="insumos"
+          titulo="Insumos propios"
+          columnas={COLUMNAS_CSV_INSUMOS}
+          onImportar={importarInsumosCSV}
+          onClose={() => {
+            setShowImportMat(false);
+            // Recargar lista de materiales propios tras importación
+            getUserMaterials().then((uMats) => {
+              setUserMateriales((uMats as any[]).filter((u) => u.tipo === 'material'));
+            });
+          }}
+        />
       )}
     </div>
   );

@@ -105,6 +105,7 @@ const migrationFiles = [
   'supabase/migrations/20260603210000_clientes_drop_nombre_unique.sql',
   'supabase/migrations/20260604100000_budget_snapshots_v2.sql',
   'supabase/migrations/20260605100000_budget_snapshots_motivo_envio.sql',
+  'supabase/migrations/20260606100000_ia_apu_sugerencias.sql',
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

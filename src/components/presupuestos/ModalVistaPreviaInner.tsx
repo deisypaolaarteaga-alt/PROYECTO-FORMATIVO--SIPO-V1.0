@@ -43,10 +43,11 @@ export default function ModalVistaPreviaInner({ open, onClose, budget, chapters,
   const [clienteNombre, setClienteNombre] = useState('');
   const [vigencia, setVigencia] = useState<number | ''>(Number(budget?.vigencia_dias) || '');
   const [hojasExcel, setHojasExcel] = useState({
-    incluirResumen:     true,
-    incluirPresupuesto: true,
-    incluirAPUs:        true,
-    incluirInsumos:     true,
+    incluirResumen:      true,
+    incluirPresupuesto:  true,
+    incluirAPUs:         true,
+    incluirInsumos:      true,
+    incluirProgramaObra: true,
   });
   const [loadingPDF, setLoadingPDF] = useState(false);
   const [loadingPDFTecnico, setLoadingPDFTecnico] = useState(false);
@@ -175,7 +176,7 @@ export default function ModalVistaPreviaInner({ open, onClose, budget, chapters,
     setLoadingExcel(true);
     try {
       const { exportarPresupuestoExcel } = await import('@/lib/excel/exportarPresupuestoExcel');
-      exportarPresupuestoExcel(budgetCompleto, profile, hojasExcel);
+      await exportarPresupuestoExcel(budgetCompleto, profile, hojasExcel);
       toast.success('Excel generado correctamente');
     } catch (err: any) {
       toast.error(err?.message || 'No se pudo generar el Excel');
@@ -390,9 +391,10 @@ export default function ModalVistaPreviaInner({ open, onClose, budget, chapters,
                   </div>
                   {([
                     { key: 'incluirResumen',     label: 'Resumen Financiero'   },
-                    { key: 'incluirPresupuesto', label: 'Presupuesto de Obra'  },
-                    { key: 'incluirAPUs',        label: 'APUs Detallados'      },
-                    { key: 'incluirInsumos',     label: 'Explosión de Insumos' },
+                    { key: 'incluirPresupuesto',  label: 'Presupuesto de Obra'  },
+                    { key: 'incluirAPUs',         label: 'APUs Detallados'      },
+                    { key: 'incluirInsumos',      label: 'Explosión de Insumos' },
+                    { key: 'incluirProgramaObra', label: 'Programa de Obra'     },
                   ] as { key: keyof typeof hojasExcel; label: string }[]).map(({ key, label }) => (
                     <label key={key} className="flex items-center gap-2.5 cursor-pointer">
                       <input

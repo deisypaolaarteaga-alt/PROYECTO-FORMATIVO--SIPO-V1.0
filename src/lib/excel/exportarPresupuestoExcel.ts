@@ -1,4 +1,5 @@
-import * as XLSX from 'xlsx';
+import { Workbook } from 'exceljs';
+import type { Cell, Row, Borders, Alignment } from 'exceljs';
 import Decimal from 'decimal.js';
 import type { PresupuestoPDFData, ConfigPDFProfesional } from '@/types/pdf';
 
@@ -14,81 +15,74 @@ const TIPO_LABEL: Record<string, string> = {
 };
 
 export interface ExportarExcelOptions {
-  incluirResumen:     boolean;
-  incluirPresupuesto: boolean;
-  incluirAPUs:        boolean;
-  incluirInsumos:     boolean;
+  incluirResumen:      boolean;
+  incluirPresupuesto:  boolean;
+  incluirAPUs:         boolean;
+  incluirInsumos:      boolean;
+  incluirProgramaObra: boolean;
 }
 
-// ── Helpers de estilo ─────────────────────────────────────────────────────────
-type CellVal = string | number | null | undefined;
-type Row     = CellVal[];
-type CS      = Record<string, unknown>;
+// ── Paleta ────────────────────────────────────────────────────────────────────
+const C = {
+  orange:    'FFE8571A',
+  darkHdr:   'FF1F2937',
+  chapterBg: 'FFF3F4F6',
+  white:     'FFFFFFFF',
+  black:     'FF000000',
+  amberBg:   'FFFEF3C7',
+  amberText: 'FF92400E',
+  altRow:    'FFF8F7F5',
+  border:    'FFD0D4DB',
+} as const;
 
 const MF  = '"$"#,##0';
 const PCT = '0.0%';
 
-const BRD = {
-  top:    { style: 'thin', color: { rgb: 'FFD0D4DB' } },
-  bottom: { style: 'thin', color: { rgb: 'FFD0D4DB' } },
-  left:   { style: 'thin', color: { rgb: 'FFD0D4DB' } },
-  right:  { style: 'thin', color: { rgb: 'FFD0D4DB' } },
-};
+// ── Helpers de estilo ─────────────────────────────────────────────────────────
+type HAlign = Alignment['horizontal'];
 
-const ST: Record<string, CS> = {
-  // Fila de título hoja — fondo naranja, texto blanco bold
-  title:      { fill: { patternType: 'solid', fgColor: { rgb: 'FFE8571A' } }, font: { bold: true,        color: { rgb: 'FFFFFFFF' }, name: 'Calibri' }, border: BRD },
-  // Nombre empresa — texto naranja bold 16px sobre fondo blanco
-  empresa:    { fill: { patternType: 'solid', fgColor: { rgb: 'FFFFFFFF' } }, font: { bold: true, sz: 16, color: { rgb: 'FFE8571A' }, name: 'Calibri' }, border: BRD },
-  // Encabezado de columnas oscuro — Hoja Presupuesto
-  headerDark: { fill: { patternType: 'solid', fgColor: { rgb: 'FF1A1A1A' } }, font: { bold: true,        color: { rgb: 'FFFFFFFF' }, name: 'Calibri' }, border: BRD },
-  // Encabezado de sección claro — Resumen / APUs / Insumos
-  header:     { fill: { patternType: 'solid', fgColor: { rgb: 'FFE4E7EC' } }, font: { bold: true,        color: { rgb: 'FF1F2937' }, name: 'Calibri' }, border: BRD },
-  // Fila de capítulo — beige claro, texto naranja bold
-  chapter:    { fill: { patternType: 'solid', fgColor: { rgb: 'FFF4F2EE' } }, font: { bold: true,        color: { rgb: 'FFE8571A' }, name: 'Calibri' }, border: BRD },
-  // Filas alternadas
-  alt:        { fill: { patternType: 'solid', fgColor: { rgb: 'FFF8F7F5' } }, font: {                                                name: 'Calibri' }, border: BRD },
-  white:      { fill: { patternType: 'solid', fgColor: { rgb: 'FFFFFFFF' } }, font: {                                                name: 'Calibri' }, border: BRD },
-  // Total — fondo naranja, texto blanco bold
-  total:      { fill: { patternType: 'solid', fgColor: { rgb: 'FFE8571A' } }, font: { bold: true,        color: { rgb: 'FFFFFFFF' }, name: 'Calibri' }, border: BRD },
-  // Etiqueta en col 0 — bold, fondo blanco
-  label:      { fill: { patternType: 'solid', fgColor: { rgb: 'FFFFFFFF' } }, font: { bold: true,                                   name: 'Calibri' }, border: BRD },
-  // Valor en col 1 — alineado a la derecha, fondo blanco
-  value:      { fill: { patternType: 'solid', fgColor: { rgb: 'FFFFFFFF' } }, font: {                                                name: 'Calibri' }, alignment: { horizontal: 'right' }, border: BRD },
-};
-
-function setStyle(ws: XLSX.WorkSheet, r: number, c: number, style: CS, numFmt?: string) {
-  const addr = XLSX.utils.encode_cell({ r, c });
-  if (!ws[addr]) ws[addr] = { t: 'z', v: '' } as any;
-  const s: CS = { ...style };
-  if (numFmt) s.numFmt = numFmt;
-  (ws[addr] as any).s = s;
+interface CS {
+  bg?:    string;   // ARGB
+  fg?:    string;   // ARGB
+  bold?:  boolean;
+  sz?:    number;
+  nf?:    string;   // numFmt
+  align?: HAlign;
+  bdr?:   boolean;
 }
 
-function styleRow(
-  ws: XLSX.WorkSheet, r: number, n: number, style: CS,
-  moneyCols: number[] = [], pctCols: number[] = []
-) {
-  for (let c = 0; c < n; c++) {
-    const nf = moneyCols.includes(c) ? MF : pctCols.includes(c) ? PCT : undefined;
-    setStyle(ws, r, c, style, nf);
+function sc(cell: Cell, s: CS): void {
+  if (s.bg) {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: s.bg } };
+  }
+  cell.font = {
+    name:  'Calibri',
+    size:  s.sz ?? 11,
+    bold:  s.bold ?? false,
+    color: { argb: s.fg ?? C.black },
+  };
+  if (s.nf) cell.numFmt = s.nf;
+  cell.alignment = { horizontal: s.align ?? 'left', vertical: 'middle' };
+  if (s.bdr) {
+    const t = { style: 'thin' as const, color: { argb: C.border } };
+    cell.border = { top: t, bottom: t, left: t, right: t } as Partial<Borders>;
   }
 }
 
-function pad(arr: Row, len: number): Row {
-  const out = [...arr];
-  while (out.length < len) out.push('');
-  return out;
+function sr(row: Row, n: number, base: CS, over?: Record<number, Partial<CS>>): void {
+  for (let c = 1; c <= n; c++) {
+    sc(row.getCell(c), over?.[c] ? { ...base, ...over[c] } : base);
+  }
 }
 
-export function exportarPresupuestoExcel(
+export async function exportarPresupuestoExcel(
   budget:  PresupuestoPDFData,
   profile: ConfigPDFProfesional,
   options: ExportarExcelOptions = {
-    incluirResumen: true, incluirPresupuesto: true, incluirAPUs: true, incluirInsumos: true,
+    incluirResumen: true, incluirPresupuesto: true, incluirAPUs: true, incluirInsumos: true, incluirProgramaObra: true,
   }
-) {
-  // ── Cálculos ──────────────────────────────────────────────────────────────
+): Promise<void> {
+  // ── Cálculos ────────────────────────────────────────────────────────────────
   const sortedChapters = (budget.chapters || [])
     .slice()
     .sort((a, b) =>
@@ -163,174 +157,235 @@ export function exportarPresupuestoExcel(
     ? (() => { const d = new Date(budget.created_at); d.setDate(d.getDate() + vigDias); return fmtFecha(d); })()
     : 'No especificada';
 
-  const wb = XLSX.utils.book_new();
+  // ── Workbook ─────────────────────────────────────────────────────────────────
+  const wb = new Workbook();
+  wb.creator = profile.empresa || profile.nombre_completo || 'SIPO';
+  wb.created = new Date();
 
-  // ── Hoja 1: Resumen ───────────────────────────────────────────────────────
+  // ── Hoja 1: Resumen ───────────────────────────────────────────────────────────
   if (options.incluirResumen) {
-    type RStyle = 'empresa' | 'title' | 'empty' | 'header' | 'info' | 'money' | 'total';
-    type Meta   = { row: Row; style: RStyle };
-    const meta: Meta[] = [];
-    const R = (row: Row, style: RStyle) => meta.push({ row, style });
+    const ws = wb.addWorksheet('Resumen');
+    ws.columns = [{ width: 42 }, { width: 22 }];
 
-    // Encabezado de empresa — bold 16px naranja sobre blanco
-    R(pad([profile.empresa || profile.nombre_completo || 'PRESUPUESTO DE OBRA'], 2), 'empresa');
-    R(pad([`PRESUPUESTO DE OBRA — ${(budget.titulo || '').toUpperCase()}`], 2), 'title');
-    R([], 'empty');
-    R(['Proyecto',           budget.projects?.nombre   || ''], 'info');
-    R(['Ubicación',          budget.projects?.ubicacion || ''], 'info');
-    R(['Elaborado por',      profile.nombre_completo    || ''], 'info');
-    R(['Empresa',            profile.empresa            || ''], 'info');
-    R(['Tipo de obra',       tipoObraExcel],                    'info');
-    if (areaM2Excel) R(['Área', `${areaM2Excel} m²`],          'info');
-    R(['Fecha elaboración',  fechaElaboracionExcel],            'info');
-    R(['Vigente hasta',      fechaVigenciaExcel],               'info');
-    R([], 'empty');
-    R(['CONCEPTO', 'VALOR (COP)'],                              'header');
-    R(['Costo Directo',                    fmt(costoDirecto)],  'money');
-    R([`Administración (${adminPct}%)`,    fmt(aiuAdmin)],      'money');
-    R([`Imprevistos (${imprevPct}%)`,      fmt(aiuImprevistos)],'money');
-    R([`Utilidad (${utilPct}%)`,           fmt(aiuUtilidad)],   'money');
-    R(['AIU Total',                        fmt(aiuTotal)],      'money');
-    R(['Subtotal (CD + AIU)',              fmt(subtotal)],      'money');
-    R([ivaLabel,                           fmt(iva)],           'money');
-    R(['TOTAL OFERTA',                     fmt(totalOferta)],   'total');
-    R([], 'empty');
-    R(['RETENCIONES INFORMATIVAS', ''],                         'header');
-    R([`ReteFuente (${reteFuentePct}%)`,   fmt(reteFuente)],    'money');
-    R([`ReteICA (${icaPct.toFixed(3)}%)`,  fmt(reteIca)],       'money');
-    if (reteivaPct > 0 && iva.greaterThan(0)) {
-      R([`ReteIVA (${reteivaPct}% del IVA)`, fmt(reteIva)],    'money');
-    }
-    R(['Valor Neto a Girar (Informativo)', fmt(valorNeto)],     'total');
+    // Empresa — blanco, naranja bold 14px
+    const rEmp = ws.addRow([profile.empresa || profile.nombre_completo || 'PRESUPUESTO DE OBRA', null]);
+    ws.mergeCells(rEmp.number, 1, rEmp.number, 2);
+    rEmp.height = 26;
+    sr(rEmp, 2, { bg: C.white, fg: C.orange, bold: true, sz: 14 });
 
-    const ws = XLSX.utils.aoa_to_sheet(meta.map(m => m.row));
-    ws['!cols']   = [{ wch: 42 }, { wch: 22 }];
-    ws['!merges'] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: 1 } },
-      { s: { r: 1, c: 0 }, e: { r: 1, c: 1 } },
+    // Título — fondo naranja, texto blanco bold
+    const rTit = ws.addRow([`PRESUPUESTO DE OBRA — ${(budget.titulo || '').toUpperCase()}`, null]);
+    ws.mergeCells(rTit.number, 1, rTit.number, 2);
+    rTit.height = 20;
+    sr(rTit, 2, { bg: C.orange, fg: C.white, bold: true });
+
+    ws.addRow([]);
+
+    // Filas informativas
+    const infoItems: [string, string][] = [
+      ['Proyecto',          budget.projects?.nombre    || ''],
+      ['Ubicación',         budget.projects?.ubicacion || ''],
+      ['Elaborado por',     profile.nombre_completo    || ''],
+      ['Empresa',           profile.empresa            || ''],
+      ['Tipo de obra',      tipoObraExcel],
     ];
+    if (areaM2Excel) infoItems.push(['Área', `${areaM2Excel} m²`]);
+    infoItems.push(
+      ['Fecha elaboración', fechaElaboracionExcel],
+      ['Vigente hasta',     fechaVigenciaExcel],
+    );
+    for (const [lbl, val] of infoItems) {
+      const r = ws.addRow([lbl, val]);
+      sc(r.getCell(1), { bg: C.white, bold: true, bdr: true });
+      sc(r.getCell(2), { bg: C.white, align: 'right', bdr: true });
+    }
 
-    meta.forEach(({ style }, r) => {
-      switch (style) {
-        case 'empty':   break;
-        case 'empresa': styleRow(ws, r, 2, ST.empresa);    break;
-        case 'title':   styleRow(ws, r, 2, ST.title);      break;
-        case 'header':  styleRow(ws, r, 2, ST.header);     break;
-        case 'info':
-          setStyle(ws, r, 0, ST.label);
-          setStyle(ws, r, 1, ST.value);
-          break;
-        case 'money':
-          setStyle(ws, r, 0, ST.label);
-          setStyle(ws, r, 1, ST.value, MF);
-          break;
-        case 'total': styleRow(ws, r, 2, ST.total, [1]);   break;
-      }
-    });
+    ws.addRow([]);
 
-    XLSX.utils.book_append_sheet(wb, ws, 'Resumen');
+    // Encabezado tabla resumen
+    const rHdr = ws.addRow(['CONCEPTO', 'VALOR (COP)']);
+    sr(rHdr, 2, { bg: C.darkHdr, fg: C.white, bold: true, bdr: true, align: 'center' });
+
+    // Filas de valores COP
+    const moneyItems: [string, number][] = [
+      ['Costo Directo',                  fmt(costoDirecto)  ],
+      [`Administración (${adminPct}%)`,  fmt(aiuAdmin)      ],
+      [`Imprevistos (${imprevPct}%)`,    fmt(aiuImprevistos)],
+      [`Utilidad (${utilPct}%)`,         fmt(aiuUtilidad)   ],
+      ['AIU Total',                      fmt(aiuTotal)      ],
+      ['Subtotal (CD + AIU)',            fmt(subtotal)      ],
+      [ivaLabel,                         fmt(iva)           ],
+    ];
+    for (const [lbl, val] of moneyItems) {
+      const r = ws.addRow([lbl, val]);
+      sc(r.getCell(1), { bg: C.white, bold: true, bdr: true });
+      sc(r.getCell(2), { bg: C.white, nf: MF, align: 'right', bdr: true });
+    }
+
+    // TOTAL OFERTA — naranja, blanco, bold
+    const rTot = ws.addRow(['TOTAL OFERTA', fmt(totalOferta)]);
+    rTot.height = 18;
+    sc(rTot.getCell(1), { bg: C.orange, fg: C.white, bold: true, bdr: true });
+    sc(rTot.getCell(2), { bg: C.orange, fg: C.white, bold: true, nf: MF, align: 'right', bdr: true });
+
+    ws.addRow([]);
+
+    // Encabezado retenciones
+    const rRHdr = ws.addRow(['RETENCIONES INFORMATIVAS', null]);
+    ws.mergeCells(rRHdr.number, 1, rRHdr.number, 2);
+    sr(rRHdr, 2, { bg: C.darkHdr, fg: C.white, bold: true, bdr: true, align: 'center' });
+
+    // Filas de retención — ámbar
+    const retItems: [string, number][] = [
+      [`ReteFuente (${reteFuentePct}%)`,  fmt(reteFuente)],
+      [`ReteICA (${icaPct.toFixed(3)}%)`, fmt(reteIca)   ],
+    ];
+    if (reteivaPct > 0 && iva.greaterThan(0)) {
+      retItems.push([`ReteIVA (${reteivaPct}% del IVA)`, fmt(reteIva)]);
+    }
+    for (const [lbl, val] of retItems) {
+      const r = ws.addRow([lbl, val]);
+      sc(r.getCell(1), { bg: C.amberBg, fg: C.amberText, bdr: true });
+      sc(r.getCell(2), { bg: C.amberBg, fg: C.amberText, nf: MF, align: 'right', bdr: true });
+    }
+
+    // Valor neto — naranja, blanco, bold
+    const rNeto = ws.addRow(['Valor Neto a Girar (Informativo)', fmt(valorNeto)]);
+    sc(rNeto.getCell(1), { bg: C.orange, fg: C.white, bold: true, bdr: true });
+    sc(rNeto.getCell(2), { bg: C.orange, fg: C.white, bold: true, nf: MF, align: 'right', bdr: true });
   }
 
-  // ── Hoja 2: Presupuesto ───────────────────────────────────────────────────
+  // ── Hoja 2: Presupuesto ───────────────────────────────────────────────────────
   if (options.incluirPresupuesto) {
     const N = 7;
-    type Meta = { row: Row; style: 'title' | 'headerDark' | 'chapter' | 'act-even' | 'act-odd' | 'empty' };
-    const meta: Meta[] = [];
-    const R = (row: Row, style: Meta['style']) => meta.push({ row, style });
+    const ws = wb.addWorksheet('Presupuesto');
+    ws.columns = [
+      { width: 6  },
+      { width: 45 },
+      { width: 10 },
+      { width: 12 },
+      { width: 18 },
+      { width: 18 },
+      { width: 8  },
+    ];
 
-    R(pad([`PRESUPUESTO — ${(budget.titulo || '').toUpperCase()}`], N), 'title');
-    R(['N°', 'Descripción', 'Unidad', 'Cantidad', 'Precio Unit. (COP)', 'Total (COP)', '% C.D.'], 'headerDark');
+    // Título
+    const rTit = ws.addRow([`PRESUPUESTO — ${(budget.titulo || '').toUpperCase()}`, ...Array(N - 1).fill(null)]);
+    ws.mergeCells(rTit.number, 1, rTit.number, N);
+    rTit.height = 20;
+    sc(rTit.getCell(1), { bg: C.orange, fg: C.white, bold: true });
+
+    // Header tabla
+    const rHdr = ws.addRow(['N°', 'Descripción', 'Unidad', 'Cantidad', 'Precio Unit. (COP)', 'Total (COP)', '% C.D.']);
+    sr(rHdr, N, { bg: C.darkHdr, fg: C.white, bold: true, bdr: true, align: 'center' });
 
     let actIdx = 0;
-    sortedChapters.forEach(ch => {
+    for (const ch of sortedChapters) {
       const sortedActs = (ch.activities || [])
         .slice()
         .sort((a, b) => (Number((a as any).orden) || 0) - (Number((b as any).orden) || 0));
 
       let chTotal = new Decimal(0);
-      sortedActs.forEach((act, j) => {
+      for (const [j, act] of sortedActs.entries()) {
         const vrTotal = D(act.cantidad).times(D(act.precio_unitario));
         chTotal = chTotal.plus(vrTotal);
-        // Guardar como decimal (0.xxxx) para que el formato 0.0% multiplique ×100
         const pct = costoDirecto.greaterThan(0)
           ? vrTotal.dividedBy(costoDirecto).toDecimalPlaces(4).toNumber()
           : 0;
-        R(
-          [`${ch.numero}.${j + 1}`, act.nombre, act.unidad,
-           D(act.cantidad).toNumber(), D(act.precio_unitario).toNumber(), fmt(vrTotal), pct],
-          actIdx++ % 2 === 0 ? 'act-even' : 'act-odd'
-        );
-      });
+
+        const isAlt = actIdx++ % 2 !== 0;
+        const r = ws.addRow([
+          `${ch.numero}.${j + 1}`,
+          act.nombre,
+          act.unidad,
+          D(act.cantidad).toNumber(),
+          D(act.precio_unitario).toNumber(),
+          fmt(vrTotal),
+          pct,
+        ]);
+        sr(r, N, { bg: isAlt ? C.altRow : C.white, bdr: true }, {
+          4: { align: 'right' },
+          5: { nf: MF,  align: 'right' },
+          6: { nf: MF,  align: 'right' },
+          7: { nf: PCT, align: 'right' },
+        });
+      }
 
       const pctCap = costoDirecto.greaterThan(0)
         ? chTotal.dividedBy(costoDirecto).toDecimalPlaces(4).toNumber()
         : 0;
-      R(pad([`SUBTOTAL CAP. ${ch.numero} — ${ch.nombre}`, '', '', '', '', fmt(chTotal), pctCap], N), 'chapter');
-      R([], 'empty');
-    });
 
-    const ws = XLSX.utils.aoa_to_sheet(meta.map(m => m.row));
-    // descripción 40, unidad 8, cantidad 10, precio 15, total 15, %CD 8
-    ws['!cols']   = [6, 40, 8, 10, 15, 15, 8].map(wch => ({ wch }));
-    ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: N - 1 } }];
+      // Fila de capítulo — gris claro, negrita
+      const rCh = ws.addRow([
+        `SUBTOTAL CAP. ${ch.numero} — ${ch.nombre}`,
+        ...Array(4).fill(null),
+        fmt(chTotal),
+        pctCap,
+      ]);
+      rCh.height = 16;
+      ws.mergeCells(rCh.number, 1, rCh.number, 5);
+      sr(rCh, N, { bg: C.chapterBg, bold: true, bdr: true }, {
+        6: { nf: MF,  align: 'right' },
+        7: { nf: PCT, align: 'right' },
+      });
 
-    meta.forEach(({ style }, r) => {
-      if (style === 'empty')      return;
-      if (style === 'title')      { styleRow(ws, r, N, ST.title);                    return; }
-      if (style === 'headerDark') { styleRow(ws, r, N, ST.headerDark);               return; }
-      if (style === 'chapter')    { styleRow(ws, r, N, ST.chapter,  [5],    [6]);    return; }
-      if (style === 'act-even')   { styleRow(ws, r, N, ST.white,    [4, 5], [6]);    return; }
-      if (style === 'act-odd')    { styleRow(ws, r, N, ST.alt,      [4, 5], [6]);    return; }
-    });
-
-    XLSX.utils.book_append_sheet(wb, ws, 'Presupuesto');
+      ws.addRow([]);
+    }
   }
 
-  // ── Hoja 3: APUs ──────────────────────────────────────────────────────────
+  // ── Hoja 3: APUs ─────────────────────────────────────────────────────────────
   if (options.incluirAPUs) {
     const N = 7;
-    type Meta = { row: Row; style: 'title' | 'header' | 'act-even' | 'act-odd' | 'empty' };
-    const meta: Meta[] = [];
-    const R = (row: Row, style: Meta['style']) => meta.push({ row, style });
+    const ws = wb.addWorksheet('APUs');
+    ws.columns = [
+      { width: 30 },
+      { width: 14 },
+      { width: 30 },
+      { width: 10 },
+      { width: 10 },
+      { width: 18 },
+      { width: 18 },
+    ];
 
-    R(pad(['ANÁLISIS DE PRECIOS UNITARIOS (APU)'], N), 'title');
-    R(['Actividad', 'Tipo', 'Insumo', 'Unidad', 'Cantidad', 'Precio Unit. (COP)', 'Subtotal (COP)'], 'header');
+    const rTit = ws.addRow(['ANÁLISIS DE PRECIOS UNITARIOS (APU)', ...Array(N - 1).fill(null)]);
+    ws.mergeCells(rTit.number, 1, rTit.number, N);
+    rTit.height = 20;
+    sc(rTit.getCell(1), { bg: C.orange, fg: C.white, bold: true });
 
-    sortedChapters.forEach(ch => {
-      (ch.activities || []).forEach(act => {
+    const rHdr = ws.addRow(['Actividad', 'Tipo', 'Insumo', 'Unidad', 'Cantidad', 'Precio Unit. (COP)', 'Subtotal (COP)']);
+    sr(rHdr, N, { bg: C.darkHdr, fg: C.white, bold: true, bdr: true, align: 'center' });
+
+    let rowIdx = 0;
+    for (const ch of sortedChapters) {
+      for (const act of (ch.activities || [])) {
         const apus  = (act as any).apus || [];
         const items: any[] = apus.length > 0 ? (apus[0].apu_items || []) : [];
-        if (items.length === 0) return;
+        if (items.length === 0) continue;
 
-        items.forEach((item, idx) => {
-          const sub = D(item.cantidad).times(D(item.precio_unitario));
-          R(
-            [act.nombre, TIPO_LABEL[item.tipo] || item.tipo, item.nombre,
-             item.unidad, D(item.cantidad).toNumber(), D(item.precio_unitario).toNumber(),
-             sub.toDecimalPlaces(2).toNumber()],
-            idx % 2 === 0 ? 'act-even' : 'act-odd'
-          );
-        });
-        R([], 'empty');
-      });
-    });
-
-    const ws = XLSX.utils.aoa_to_sheet(meta.map(m => m.row));
-    ws['!cols']   = [{ wch: 30 }, { wch: 14 }, { wch: 30 }, { wch: 10 }, { wch: 10 }, { wch: 18 }, { wch: 18 }];
-    ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: N - 1 } }];
-
-    meta.forEach(({ style }, r) => {
-      if (style === 'empty')    return;
-      if (style === 'title')    { styleRow(ws, r, N, ST.title);          return; }
-      if (style === 'header')   { styleRow(ws, r, N, ST.header);         return; }
-      if (style === 'act-even') { styleRow(ws, r, N, ST.white, [5, 6]);  return; }
-      if (style === 'act-odd')  { styleRow(ws, r, N, ST.alt,   [5, 6]);  return; }
-    });
-
-    XLSX.utils.book_append_sheet(wb, ws, 'APUs');
+        for (const item of items) {
+          const sub   = D(item.cantidad).times(D(item.precio_unitario));
+          const isAlt = rowIdx++ % 2 !== 0;
+          const r = ws.addRow([
+            act.nombre,
+            TIPO_LABEL[item.tipo] || item.tipo,
+            item.nombre,
+            item.unidad,
+            D(item.cantidad).toNumber(),
+            D(item.precio_unitario).toNumber(),
+            sub.toDecimalPlaces(2).toNumber(),
+          ]);
+          sr(r, N, { bg: isAlt ? C.altRow : C.white, bdr: true }, {
+            5: { align: 'right' },
+            6: { nf: MF, align: 'right' },
+            7: { nf: MF, align: 'right' },
+          });
+        }
+        ws.addRow([]);
+      }
+    }
   }
 
-  // ── Hoja 4: Insumos (explosión consolidada) ───────────────────────────────
+  // ── Hoja 4: Insumos (explosión consolidada) ───────────────────────────────────
   if (options.incluirInsumos) {
     const N = 6;
     const insumosMap = new Map<string, {
@@ -338,16 +393,16 @@ export function exportarPresupuestoExcel(
       cantidadTotal: Decimal; precio: number; subtotalTotal: Decimal;
     }>();
 
-    sortedChapters.forEach(ch => {
-      (ch.activities || []).forEach(act => {
+    for (const ch of sortedChapters) {
+      for (const act of (ch.activities || [])) {
         const actCant = D(act.cantidad);
         const apus    = (act as any).apus || [];
         const items: any[] = apus.length > 0 ? (apus[0].apu_items || []) : [];
-        items.forEach(item => {
-          const key = `${item.tipo}||${item.nombre}||${item.unidad}||${item.precio_unitario}`;
-          const existing = insumosMap.get(key);
+        for (const item of items) {
+          const key           = `${item.tipo}||${item.nombre}||${item.unidad}||${item.precio_unitario}`;
           const cantItems     = D(item.cantidad).times(actCant);
           const subtotalItems = D(item.cantidad).times(D(item.precio_unitario)).times(actCant);
+          const existing      = insumosMap.get(key);
           if (existing) {
             existing.cantidadTotal = existing.cantidadTotal.plus(cantItems);
             existing.subtotalTotal = existing.subtotalTotal.plus(subtotalItems);
@@ -356,52 +411,172 @@ export function exportarPresupuestoExcel(
               nombre: item.nombre,
               tipo:   TIPO_LABEL[item.tipo] || item.tipo,
               unidad: item.unidad,
-              cantidadTotal:  cantItems,
-              precio:         Number(item.precio_unitario) || 0,
-              subtotalTotal:  subtotalItems,
+              cantidadTotal: cantItems,
+              precio:        Number(item.precio_unitario) || 0,
+              subtotalTotal: subtotalItems,
             });
           }
-        });
-      });
-    });
+        }
+      }
+    }
 
-    type Meta = { row: Row; style: 'title' | 'header' | 'act-even' | 'act-odd' };
-    const meta: Meta[] = [];
-    const R = (row: Row, style: Meta['style']) => meta.push({ row, style });
+    const ws = wb.addWorksheet('Insumos');
+    ws.columns = [
+      { width: 14 },
+      { width: 40 },
+      { width: 10 },
+      { width: 16 },
+      { width: 18 },
+      { width: 18 },
+    ];
 
-    R(pad(['EXPLOSIÓN DE INSUMOS'], N), 'title');
-    R(['Tipo', 'Nombre', 'Unidad', 'Cantidad Total', 'Precio Unit. (COP)', 'Subtotal Total (COP)'], 'header');
+    const rTit = ws.addRow(['EXPLOSIÓN DE INSUMOS', ...Array(N - 1).fill(null)]);
+    ws.mergeCells(rTit.number, 1, rTit.number, N);
+    rTit.height = 20;
+    sc(rTit.getCell(1), { bg: C.orange, fg: C.white, bold: true });
 
-    Array.from(insumosMap.values())
+    const rHdr = ws.addRow(['Tipo', 'Nombre', 'Unidad', 'Cantidad Total', 'Precio Unit. (COP)', 'Subtotal Total (COP)']);
+    sr(rHdr, N, { bg: C.darkHdr, fg: C.white, bold: true, bdr: true, align: 'center' });
+
+    let rowIdx = 0;
+    for (const ins of Array.from(insumosMap.values())
       .sort((a, b) => a.tipo.localeCompare(b.tipo) || a.nombre.localeCompare(b.nombre))
-      .forEach((ins, idx) => {
-        R(
-          [ins.tipo, ins.nombre, ins.unidad,
-           ins.cantidadTotal.toDecimalPlaces(3).toNumber(), ins.precio, fmt(ins.subtotalTotal)],
-          idx % 2 === 0 ? 'act-even' : 'act-odd'
-        );
+    ) {
+      const isAlt = rowIdx++ % 2 !== 0;
+      const r = ws.addRow([
+        ins.tipo,
+        ins.nombre,
+        ins.unidad,
+        ins.cantidadTotal.toDecimalPlaces(3).toNumber(),
+        ins.precio,
+        fmt(ins.subtotalTotal),
+      ]);
+      sr(r, N, { bg: isAlt ? C.altRow : C.white, bdr: true }, {
+        4: { align: 'right' },
+        5: { nf: MF, align: 'right' },
+        6: { nf: MF, align: 'right' },
       });
-
-    const ws = XLSX.utils.aoa_to_sheet(meta.map(m => m.row));
-    ws['!cols']   = [{ wch: 14 }, { wch: 40 }, { wch: 10 }, { wch: 16 }, { wch: 20 }, { wch: 22 }];
-    ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: N - 1 } }];
-
-    meta.forEach(({ style }, r) => {
-      if (style === 'title')    { styleRow(ws, r, N, ST.title);          return; }
-      if (style === 'header')   { styleRow(ws, r, N, ST.header);         return; }
-      if (style === 'act-even') { styleRow(ws, r, N, ST.white, [4, 5]);  return; }
-      if (style === 'act-odd')  { styleRow(ws, r, N, ST.alt,   [4, 5]);  return; }
-    });
-
-    XLSX.utils.book_append_sheet(wb, ws, 'Insumos');
+    }
   }
 
-  // ── Descargar ─────────────────────────────────────────────────────────────
-  if (wb.SheetNames.length === 0) {
+  // ── Hoja 5: Programa de Obra ──────────────────────────────────────────────────
+  if (options.incluirProgramaObra) {
+    const rawMeses = Number(budget.duracion_meses) || 0;
+    const semanas  = Math.min(24, Math.max(8, rawMeses > 0 ? Math.ceil(rawMeses * 4.33) : 8));
+    const NFIXED   = 6;
+    const N        = NFIXED + semanas;
+
+    const ws = wb.addWorksheet('Programa de Obra');
+    ws.columns = [
+      { width: 5  },
+      { width: 25 },
+      { width: 40 },
+      { width: 10 },
+      { width: 12 },
+      { width: 18 },
+      ...Array.from({ length: semanas }, () => ({ width: 12 })),
+    ];
+
+    // Fila 1: título
+    const rTit = ws.addRow(['PROGRAMA DE OBRA', ...Array(N - 1).fill(null)]);
+    ws.mergeCells(rTit.number, 1, rTit.number, N);
+    rTit.height = 22;
+    sc(rTit.getCell(1), { bg: C.darkHdr, fg: C.white, bold: true, sz: 13 });
+
+    // Fila 2: proyecto y fecha
+    const rInfo = ws.addRow([
+      budget.projects?.nombre || '',
+      null, null,
+      `Fecha: ${fechaElaboracionExcel}`,
+      ...Array(N - 4).fill(null),
+    ]);
+    rInfo.height = 16;
+    ws.mergeCells(rInfo.number, 1, rInfo.number, 3);
+    ws.mergeCells(rInfo.number, 4, rInfo.number, N);
+    sc(rInfo.getCell(1), { bg: C.white, bold: true });
+    sc(rInfo.getCell(4), { bg: C.white, align: 'right' });
+
+    // Fila 3: headers fijos (dark) + semanas (orange)
+    const hdrCols: string[] = ['N°', 'Capítulo', 'Actividad', 'Unidad', 'Cantidad', 'Valor Total (COP)'];
+    for (let s = 1; s <= semanas; s++) hdrCols.push(`Semana ${s}`);
+    const rHdr = ws.addRow(hdrCols);
+    rHdr.height = 16;
+    for (let c = 1; c <= NFIXED; c++) {
+      sc(rHdr.getCell(c), { bg: C.darkHdr, fg: C.white, bold: true, bdr: true, align: 'center' });
+    }
+    for (let c = NFIXED + 1; c <= N; c++) {
+      sc(rHdr.getCell(c), { bg: C.orange, fg: C.white, bold: true, bdr: true, align: 'center' });
+    }
+
+    const bdrThin = { style: 'thin' as const, color: { argb: C.border } };
+    const bdrAll  = { top: bdrThin, bottom: bdrThin, left: bdrThin, right: bdrThin } as Partial<Borders>;
+
+    for (const ch of sortedChapters) {
+      const sortedActs = (ch.activities || [])
+        .slice()
+        .sort((a, b) => (Number((a as any).orden) || 0) - (Number((b as any).orden) || 0));
+
+      const chTotal = sortedActs.reduce(
+        (s, a) => s.plus(D(a.cantidad).times(D(a.precio_unitario))),
+        new Decimal(0)
+      );
+
+      // Fila de capítulo — gris claro, negrita
+      const rCh = ws.addRow([
+        `${ch.numero}`,
+        ch.nombre,
+        null, null, null,
+        fmt(chTotal),
+        ...Array(semanas).fill(null),
+      ]);
+      rCh.height = 16;
+      ws.mergeCells(rCh.number, 2, rCh.number, 5);
+      sc(rCh.getCell(1), { bg: C.chapterBg, bold: true, bdr: true, align: 'center' });
+      sc(rCh.getCell(2), { bg: C.chapterBg, bold: true, bdr: true });
+      sc(rCh.getCell(6), { bg: C.chapterBg, bold: true, nf: MF,  bdr: true, align: 'right' });
+      for (let c = NFIXED + 1; c <= N; c++) {
+        const cell = rCh.getCell(c);
+        cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.chapterBg } };
+        cell.font   = { name: 'Calibri', size: 11, bold: true, color: { argb: C.black } };
+        cell.border = bdrAll;
+      }
+
+      // Filas de actividades
+      for (const [j, act] of sortedActs.entries()) {
+        const vrTotal = D(act.cantidad).times(D(act.precio_unitario));
+        const r = ws.addRow([
+          `${ch.numero}.${j + 1}`,
+          ch.nombre,
+          act.nombre,
+          act.unidad,
+          D(act.cantidad).toNumber(),
+          fmt(vrTotal),
+          ...Array(semanas).fill(null),
+        ]);
+        sc(r.getCell(1), { bg: C.white, bdr: true, align: 'center' });
+        sc(r.getCell(2), { bg: C.white, bdr: true });
+        sc(r.getCell(3), { bg: C.white, bdr: true });
+        sc(r.getCell(4), { bg: C.white, bdr: true, align: 'center' });
+        sc(r.getCell(5), { bg: C.white, bdr: true, align: 'right' });
+        sc(r.getCell(6), { bg: C.white, nf: MF,  bdr: true, align: 'right' });
+        for (let c = NFIXED + 1; c <= N; c++) {
+          const cell = r.getCell(c);
+          cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFAFAFA' } };
+          cell.font   = { name: 'Calibri', size: 11, color: { argb: C.black } };
+          cell.border = bdrAll;
+        }
+      }
+
+      ws.addRow([]);
+    }
+  }
+
+  // ── Descargar ─────────────────────────────────────────────────────────────────
+  if (wb.worksheets.length === 0) {
     throw new Error('Debe seleccionar al menos una hoja para exportar.');
   }
-  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array', cellStyles: true });
-  const blob = new Blob([wbout], {
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer as ArrayBuffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });
   const url = URL.createObjectURL(blob);

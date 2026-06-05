@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { FileSpreadsheet, Settings2, LayoutList, Hammer, Package } from 'lucide-react';
+import { FileSpreadsheet, Settings2, LayoutList, Hammer, Package, CalendarDays } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/shared/Button';
 import {
@@ -52,6 +52,12 @@ const HOJAS: HojaConfig[] = [
     descripcion: 'Consolidado de insumos para toda la obra agrupado por tipo y nombre.',
     icon: <Package className="h-4 w-4 text-[#7A5800]" />,
   },
+  {
+    key: 'incluirProgramaObra',
+    label: 'Programa de Obra',
+    descripcion: 'Cronograma semanal por actividad para que el constructor registre el avance.',
+    icon: <CalendarDays className="h-4 w-4 text-[#2E4A63]" />,
+  },
 ];
 
 export function BotonExportarExcel({ budget, profile }: Props) {
@@ -62,6 +68,7 @@ export function BotonExportarExcel({ budget, profile }: Props) {
     incluirPresupuesto: true,
     incluirAPUs: true,
     incluirInsumos: true,
+    incluirProgramaObra: true,
   });
 
   const todasMarcadas = Object.values(opciones).every(Boolean);
@@ -74,6 +81,7 @@ export function BotonExportarExcel({ budget, profile }: Props) {
       incluirPresupuesto: nuevoValor,
       incluirAPUs: nuevoValor,
       incluirInsumos: nuevoValor,
+      incluirProgramaObra: nuevoValor,
     });
   };
 
@@ -86,7 +94,7 @@ export function BotonExportarExcel({ budget, profile }: Props) {
     setLoading(true);
     try {
       const { exportarPresupuestoExcel } = await import('@/lib/excel/exportarPresupuestoExcel');
-      exportarPresupuestoExcel(budget, profile, opciones);
+      await exportarPresupuestoExcel(budget, profile, opciones);
       const hojasSeleccionadas = HOJAS.filter(h => opciones[h.key]).length;
       toast.success(`Excel generado con ${hojasSeleccionadas} hoja${hojasSeleccionadas !== 1 ? 's' : ''}`);
     } catch (err: any) {

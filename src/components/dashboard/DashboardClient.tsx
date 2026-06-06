@@ -9,6 +9,7 @@ import {
   ChevronRight,
   AlertTriangle,
   BarChart2,
+  Send,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { SelectorPeriodo } from '@/components/shared/SelectorPeriodo';
@@ -66,7 +67,7 @@ export default function DashboardClient({
   }
 
   // ── KPI derivadas ──
-  const presupuestosAprobados = kpis.presupuestos_por_estado['aprobado'] ?? 0;
+  const presupuestosAprobados = kpis.presupuestos_aprobados;
   const proyectosEnObra       = kpis.proyectos_en_progreso;
   const tasaAprobacion        = kpis.presupuestos_total > 0
     ? Math.round((presupuestosAprobados / kpis.presupuestos_total) * 100)
@@ -93,7 +94,7 @@ export default function DashboardClient({
   const proximos   = vencimientos.filter((v) => v.dias_restantes > 7 && v.dias_restantes <= 15);
   const enRadar    = vencimientos.filter((v) => v.dias_restantes > 15 && v.dias_restantes <= 30);
   const enRevision = kpis.presupuestos_por_estado['en_revision'] ?? 0;
-  const rechazados = kpis.presupuestos_por_estado['rechazado'] ?? 0;
+  const rechazados = kpis.presupuestos_rechazados;
 
   return (
     <div className={`space-y-6 transition-opacity duration-200 ${isPending ? 'opacity-60 pointer-events-none' : ''}`}>
@@ -116,7 +117,7 @@ export default function DashboardClient({
       </div>
 
       {/* ── KPI Cards ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         <KPICard
           title="Proyectos activos"
           value={String(proyectosEnObra + (kpis.proyectos_borrador ?? 0))}
@@ -142,13 +143,23 @@ export default function DashboardClient({
           sparkPath="M0 32 C10 26 18 18 28 13 C38 8 46 6 56 5 C66 4 72 8 80 6"
         />
         <KPICard
-          title="Próximos a vencer"
-          value={String(kpis.proximos_a_vencer)}
-          sub="en los próximos 30 días"
-          icon={<Clock className="w-[16px] h-[16px]" style={{ color: MO_COLOR }} />}
+          title="Con cliente"
+          value={String(kpis.presupuestos_con_cliente)}
+          sub="enviados o pendientes de respuesta"
+          icon={<Send className="w-[16px] h-[16px]" style={{ color: MO_COLOR }} />}
           iconBg="#E8F0F8"
           accentColor={MO_COLOR}
           sparkColor={MO_COLOR}
+          sparkPath="M0 20 C8 18 16 14 24 12 C32 10 40 12 48 10 C56 8 64 14 72 12 C76 11 78 13 80 11"
+        />
+        <KPICard
+          title="Próximos a vencer"
+          value={String(kpis.proximos_a_vencer)}
+          sub="en los próximos 30 días"
+          icon={<Clock className="w-[16px] h-[16px]" style={{ color: HM_COLOR }} />}
+          iconBg="#F5F3F0"
+          accentColor={HM_COLOR}
+          sparkColor={HM_COLOR}
           sparkPath="M0 10 C8 12 16 20 24 22 C32 24 40 30 48 28 C56 26 62 22 70 24 C74 25 78 28 80 26"
         />
         <KPICard

@@ -50,13 +50,21 @@ type Grupo = {
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
+const GRUPOS_ESTADO: Record<string, string[]> = {
+  borrador:    ['borrador', 'en_revision'],
+  con_cliente: ['enviado_a_cliente', 'visto_por_cliente', 'con_observaciones'],
+  aprobado:    ['aprobado', 'aprobado_por_cliente'],
+  rechazado:   ['rechazado', 'rechazado_por_cliente'],
+  archivado:   ['archivado'],
+};
+
 const TABS = [
   { key: 'todos',       label: 'Todos',       dot: '' },
-  { key: 'borrador',    ...ESTADO_PRESUPUESTO_CONFIG.borrador    },
-  { key: 'en_revision', ...ESTADO_PRESUPUESTO_CONFIG.en_revision },
-  { key: 'aprobado',    ...ESTADO_PRESUPUESTO_CONFIG.aprobado    },
-  { key: 'rechazado',   ...ESTADO_PRESUPUESTO_CONFIG.rechazado   },
-  { key: 'archivado',   ...ESTADO_PRESUPUESTO_CONFIG.archivado   },
+  { key: 'borrador',    label: 'Borrador',    dot: 'bg-[#D1D5DB]' },
+  { key: 'con_cliente', label: 'Con cliente', dot: 'bg-[#2563EB]' },
+  { key: 'aprobado',    label: 'Aprobado',    dot: 'bg-[#16A34A]' },
+  { key: 'rechazado',   label: 'Rechazado',   dot: 'bg-[#DC2626]' },
+  { key: 'archivado',   label: 'Archivado',   dot: 'bg-[#9CA3AF]' },
 ] as const;
 
 // Color del ícono de carpeta y fondo del header según tipo_obra
@@ -264,13 +272,18 @@ export function PresupuestosClientList({ rows }: { rows: BudgetRow[] }) {
 
   const counts = useMemo(() => {
     const map: Record<string, number> = { todos: rows.length };
-    for (const r of rows) map[r.estado] = (map[r.estado] ?? 0) + 1;
+    for (const [groupKey, estados] of Object.entries(GRUPOS_ESTADO)) {
+      map[groupKey] = rows.filter((r) => estados.includes(r.estado)).length;
+    }
     return map;
   }, [rows]);
 
   const filtered = useMemo(() => {
     let result = rows;
-    if (activeTab !== 'todos') result = result.filter((r) => r.estado === activeTab);
+    if (activeTab !== 'todos') {
+      const estados = GRUPOS_ESTADO[activeTab] ?? [activeTab];
+      result = result.filter((r) => estados.includes(r.estado));
+    }
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(

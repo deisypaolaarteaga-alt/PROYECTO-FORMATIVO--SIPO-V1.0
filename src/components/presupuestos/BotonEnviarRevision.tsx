@@ -5,15 +5,15 @@ import { useRouter } from 'next/navigation';
 import { Send } from 'lucide-react';
 import { Button } from '@/components/shared/Button';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
-import { cambiarEstadoPresupuesto } from '@/actions/presupuestos';
+import { cambiarEstadoPresupuesto } from '@/actions/presupuesto-estados';
 
 interface BotonEnviarRevisionProps {
   budgetId: string;
-  proyectoId: string;
+  proyectoId?: string; // conservado por compatibilidad, ya no se usa
   estado: string;
 }
 
-export function BotonEnviarRevision({ budgetId, proyectoId, estado }: BotonEnviarRevisionProps) {
+export function BotonEnviarRevision({ budgetId, estado }: BotonEnviarRevisionProps) {
   const router = useRouter();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [loading,     setLoading]     = useState(false);
@@ -22,7 +22,8 @@ export function BotonEnviarRevision({ budgetId, proyectoId, estado }: BotonEnvia
   async function handleConfirm() {
     setLoading(true);
     setErrorMsg('');
-    const result = await cambiarEstadoPresupuesto(budgetId, 'en_revision', proyectoId);
+    // en_revision se conserva por compatibilidad; el flujo nuevo usa enviado_a_cliente
+    const result = await cambiarEstadoPresupuesto(budgetId, 'en_revision');
     setLoading(false);
     setConfirmOpen(false);
     if (result.success) {

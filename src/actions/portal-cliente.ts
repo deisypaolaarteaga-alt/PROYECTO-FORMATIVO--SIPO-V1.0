@@ -477,14 +477,8 @@ export async function responderPresupuesto(
           });
         }
 
-        // Avanzar proyecto de borrador a en_progreso cuando el cliente aprueba
-        if (accion === 'aprobado' && proyecto?.id && proyecto.estado === 'borrador') {
-          await admin
-            .from('projects')
-            .update({ estado: 'en_progreso' })
-            .eq('id', proyecto.id)
-            .eq('estado', 'borrador');
-        }
+        // El avance de proyecto (borrador → en_progreso) ocurre cuando el constructor
+        // confirma la aprobación (aprobado_por_cliente → aprobado) en cambiarEstadoPresupuesto.
       }
     } catch (notifyErr) {
       console.error('[responderPresupuesto] error al notificar al constructor:', notifyErr);

@@ -7,7 +7,7 @@ import {
   Loader2, FileText, Settings, BookOpen, Package,
   Calendar, Check, Copy, GripVertical, MoreHorizontal, TrendingUp,
   CheckCircle2, LockOpen, Eye, BookmarkPlus, X,
-  Clock, CheckCheck, XCircle, MessageSquare, RefreshCw, History,
+  Clock, CheckCheck, XCircle, MessageSquare, RefreshCw, History, BarChart2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/shared/Button';
@@ -23,15 +23,18 @@ import {
   agregarCapitulo, agregarActividad,
   actualizarActividad, actualizarPresupuesto, actualizarCapitulo,
   eliminarActividad, eliminarCapitulo,
-  aprobarPresupuesto, reabrirPresupuesto,
   validarPresupuesto,
 } from '@/actions/presupuestos';
-import { corregirPresupuesto } from '@/actions/presupuesto-estados';
+import { cambiarEstadoPresupuesto } from '@/actions/presupuesto-estados';
 import { formatearCOP } from '@/lib/utils/formato-cop';
 import dynamic from 'next/dynamic';
 const PanelAPU = dynamic(() => import('./PanelAPU').then(m => ({ default: m.PanelAPU })), { ssr: false });
 const ModalVistaPrevia = dynamic(
   () => import('./ModalVistaPrevia').then(m => ({ default: m.ModalVistaPrevia })),
+  { ssr: false }
+);
+const EstrategiaFinancieraTab = dynamic(
+  () => import('./EstrategiaFinancieraTab').then(m => ({ default: m.EstrategiaFinancieraTab })),
   { ssr: false }
 );
 import { ResumenFinanciero } from './ResumenFinanciero';
@@ -70,7 +73,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
     setExpanded(new Set(initialBudget.chapters?.map((c) => c.id) || []));
   }, [initialBudget]);
 
-  const [activeTab, setActiveTab] = useState<'estructura' | 'insumos' | 'resumen' | 'versiones'>('estructura');
+  const [activeTab, setActiveTab] = useState<'estructura' | 'insumos' | 'estrategia' | 'resumen' | 'versiones'>('estructura');
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [, forceRefreshTime] = useState(0);
@@ -101,6 +104,13 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
 
   // Ref para debounce de guardado — evita un server round-trip por cada keystroke
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0
+    }
+  }, [activeTab])
 
   // Actualizar "hace Xs" cada 10s mientras hay lastSaved
   useEffect(() => {
@@ -146,21 +156,20 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
     ciudadObra   !== '' &&
     ciudadPerfil !== ciudadObra;
 
-  const estaAprobado   = budget.estado === 'aprobado';
-  const estaEnRevision = budget.estado === 'en_revision';
-  const bloqueado      = estaAprobado;
-
-  // Estados del portal del cliente
-  const clienteEmail   = (budget as any).projects?.clientes?.email ?? null;
-  const clienteNombre  = (budget as any).projects?.clientes?.nombre_razon_social ?? null;
-  const estadoPortal   = budget.estado as string;
-  const mostrarBotonEnviar = [
-    'borrador', 'en_revision', 'enviado_a_cliente', 'visto_por_cliente', 'con_observaciones',
-  ].includes(estadoPortal);
+  const estadoPortal        = budget.estado as string;
+  const estaAprobado        = estadoPortal === 'aprobado';
+  const estaEnRevision      = estadoPortal === 'en_revision';
+  const estaBorrador        = estadoPortal === 'borrador';
   const aprobadoPorCliente  = estadoPortal === 'aprobado_por_cliente';
   const rechazadoPorCliente = estadoPortal === 'rechazado_por_cliente';
   const conObservaciones    = estadoPortal === 'con_observaciones';
-  const tieneRespuestaCliente = aprobadoPorCliente || rechazadoPorCliente || conObservaciones;
+
+  // Editor bloqueado cuando el presupuesto está en revisión con el cliente o ya aprobado
+  const bloqueado = ['aprobado', 'enviado_a_cliente', 'visto_por_cliente', 'aprobado_por_cliente'].includes(estadoPortal);
+
+  // Datos del portal del cliente
+  const clienteEmail  = (budget as any).projects?.clientes?.email ?? null;
+  const clienteNombre = (budget as any).projects?.clientes?.nombre_razon_social ?? null;
 
   const fechaAprobada = budget.aprobado_en
     ? new Intl.DateTimeFormat('es-CO', {
@@ -298,7 +307,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
 
   const handleAprobar = async () => {
     setIsChangingEstado(true);
-    const res = await aprobarPresupuesto(budget.id);
+    const res = await cambiarEstadoPresupuesto(budget.id, 'aprobado');
     setIsChangingEstado(false);
     if (res.success) router.refresh();
   };
@@ -454,9 +463,10 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
   }, []);
 
   const tabs = [
-    { key: 'estructura', label: '1. Estructura y Costos',     icon: FileText    },
-    { key: 'insumos',    label: '2. Explosión de Insumos',    icon: Package     },
-    { key: 'resumen',    label: '3. Resumen y Exportación',   icon: TrendingUp  },
+    { key: 'estructura',  label: '1. Estructura y Costos',     icon: FileText   },
+    { key: 'insumos',     label: '2. Explosión de Insumos',    icon: Package    },
+    { key: 'estrategia',  label: '3. Estrategia Financiera',   icon: BarChart2  },
+    { key: 'resumen',     label: '4. Resumen y Exportación',   icon: TrendingUp },
     ...(versiones.length > 0
       ? [{ key: 'versiones' as const, label: `Versiones (${versiones.length})`, icon: History }]
       : []),
@@ -560,19 +570,87 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                 </Button>
               )}
 
-              {/* Marcar como aprobado — solo cuando en revisión */}
-              {estaEnRevision && (
+              {/* borrador: Enviar al cliente + Aprobar internamente */}
+              {estaBorrador && clienteEmail && (
+                <button
+                  onClick={handleAbrirEnviarCliente}
+                  disabled={validandoAccion}
+                  className="inline-flex items-center gap-1.5 h-8 px-3 text-[13px] font-semibold rounded-lg border border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB] hover:text-white disabled:opacity-60 transition-colors"
+                >
+                  <Clock className="h-4 w-4" />
+                  Enviar al cliente
+                </button>
+              )}
+              {estaBorrador && (
                 <button
                   onClick={handleAprobar}
                   disabled={isChangingEstado}
                   className="inline-flex items-center gap-1.5 h-8 px-3 text-[13px] font-semibold rounded-lg bg-[#C84B1A] hover:bg-[#A83A14] text-white disabled:opacity-60 transition-colors"
                 >
                   <CheckCircle2 className="h-4 w-4" />
-                  {isChangingEstado ? 'Aprobando…' : 'Marcar como aprobado'}
+                  {isChangingEstado ? 'Aprobando…' : 'Aprobar internamente'}
                 </button>
               )}
 
-              {/* Reabrir para edición — solo cuando aprobado */}
+              {/* en_revision (legacy): Aprobar + Reabrir */}
+              {estaEnRevision && (
+                <>
+                  <button
+                    onClick={handleAprobar}
+                    disabled={isChangingEstado}
+                    className="inline-flex items-center gap-1.5 h-8 px-3 text-[13px] font-semibold rounded-lg bg-[#C84B1A] hover:bg-[#A83A14] text-white disabled:opacity-60 transition-colors"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    {isChangingEstado ? 'Aprobando…' : 'Aprobar'}
+                  </button>
+                  <button
+                    onClick={() => setConfirmState({
+                      title: '¿Reabrir para edición?',
+                      description: 'El presupuesto volverá a borrador y podrá editarse nuevamente.',
+                      confirmLabel: 'Sí, reabrir',
+                      variant: 'warning',
+                      onConfirm: async () => {
+                        setConfirmState(null);
+                        setIsChangingEstado(true);
+                        await cambiarEstadoPresupuesto(budget.id, 'borrador');
+                        setIsChangingEstado(false);
+                        router.refresh();
+                      },
+                    })}
+                    disabled={isChangingEstado}
+                    className="inline-flex items-center gap-1.5 h-8 px-3 text-[13px] font-semibold rounded-lg border border-[#E8E4DE] text-stone hover:text-[#1C1814] hover:border-[#1C1814] disabled:opacity-60 transition-colors"
+                  >
+                    <LockOpen className="h-4 w-4" />
+                    Reabrir
+                  </button>
+                </>
+              )}
+
+              {/* aprobado_por_cliente: constructor confirma la aprobación */}
+              {aprobadoPorCliente && (
+                <button
+                  onClick={() => setConfirmState({
+                    title: '¿Confirmar aprobación del cliente?',
+                    description: 'El presupuesto pasará a estado aprobado. El proyecto avanzará a en progreso si estaba en borrador.',
+                    confirmLabel: 'Sí, confirmar',
+                    variant: 'warning',
+                    onConfirm: async () => {
+                      setConfirmState(null);
+                      setIsChangingEstado(true);
+                      await cambiarEstadoPresupuesto(budget.id, 'aprobado');
+                      setIsChangingEstado(false);
+                      router.refresh();
+                    },
+                  })}
+                  disabled={isChangingEstado}
+                  className="inline-flex items-center gap-1.5 h-8 px-3 text-[13px] font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-60 transition-colors"
+                >
+                  <CheckCheck className="h-4 w-4" />
+                  {isChangingEstado ? 'Confirmando…' : 'Confirmar aprobación'}
+                </button>
+              )}
+
+              {/* aprobado: Reabrir para edición */}
               {estaAprobado && (
                 <button
                   onClick={() => setConfirmState({
@@ -583,7 +661,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                     onConfirm: async () => {
                       setConfirmState(null);
                       setIsChangingEstado(true);
-                      await reabrirPresupuesto(budget.id);
+                      await cambiarEstadoPresupuesto(budget.id, 'borrador');
                       setIsChangingEstado(false);
                       router.refresh();
                     },
@@ -718,7 +796,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
           <button
             onClick={async () => {
               setIsCorrigiendo(true);
-              const res = await corregirPresupuesto(budget.id);
+              const res = await cambiarEstadoPresupuesto(budget.id, 'borrador');
               setIsCorrigiendo(false);
               if (res.success) router.refresh();
             }}
@@ -733,47 +811,71 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
         </div>
       )}
 
-      {conObservaciones && tokenResumen && (
-        <div className="bg-amber-50 border-b border-amber-200 px-6 py-3 flex items-start gap-3">
-          <MessageSquare className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-          <div className="text-sm text-amber-800 space-y-0.5">
-            <p className="font-semibold">
-              {tokenResumen.cliente_nombre ?? 'El cliente'} dejó observaciones
-              {tokenResumen.cliente_respondio_at && (
-                <> el <strong>{new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'America/Bogota' }).format(new Date(tokenResumen.cliente_respondio_at))}</strong></>
+      {conObservaciones && (
+        <div className="bg-amber-50 border-b border-amber-200 px-6 py-3 flex items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <MessageSquare className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="text-sm text-amber-800 space-y-0.5">
+              <p className="font-semibold">
+                {tokenResumen?.cliente_nombre ?? 'El cliente'} dejó observaciones
+                {tokenResumen?.cliente_respondio_at && (
+                  <> el <strong>{new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'America/Bogota' }).format(new Date(tokenResumen.cliente_respondio_at))}</strong></>
+                )}
+              </p>
+              {tokenResumen?.cliente_comentario && (
+                <p className="text-amber-700 italic">"{tokenResumen.cliente_comentario}"</p>
               )}
-            </p>
-            {tokenResumen.cliente_comentario && (
-              <p className="text-amber-700 italic">"{tokenResumen.cliente_comentario}"</p>
-            )}
+            </div>
           </div>
+          <button
+            onClick={async () => {
+              setIsCorrigiendo(true);
+              const res = await cambiarEstadoPresupuesto(budget.id, 'borrador');
+              setIsCorrigiendo(false);
+              if (res.success) router.refresh();
+            }}
+            disabled={isCorrigiendo}
+            className="inline-flex items-center gap-1.5 h-8 px-3 text-[13px] font-semibold rounded-lg bg-amber-600 hover:bg-amber-700 text-white disabled:opacity-60 transition-colors shrink-0"
+          >
+            {isCorrigiendo
+              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              : <RefreshCw className="h-3.5 w-3.5" />}
+            {isCorrigiendo ? 'Guardando…' : 'Corregir presupuesto'}
+          </button>
         </div>
       )}
 
       {/* ── TAB: VERSIONES ─────────────────────────────────────────────────── */}
       {activeTab === 'versiones' && (
-        <div className="flex-1 overflow-y-auto p-8">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-8">
           <VersionesTab versiones={versiones} budgetId={budget.id} />
         </div>
       )}
 
       {/* ── TAB: EXPLOSIÓN DE INSUMOS ──────────────────────────────────────── */}
       {activeTab === 'insumos' && (
-        <div className="flex-1 overflow-y-auto p-8">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-8">
           <ExplosionInsumosView budgetId={budget.id} />
+        </div>
+      )}
+
+      {/* ── TAB: ESTRATEGIA FINANCIERA ────────────────────────────────────── */}
+      {activeTab === 'estrategia' && (
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-8">
+          <EstrategiaFinancieraTab budgetId={budget.id} />
         </div>
       )}
 
       {/* ── TAB: RESUMEN FINANCIERO ────────────────────────────────────────── */}
       {activeTab === 'resumen' && (
-        <div className="flex-1 overflow-y-auto p-8">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-8">
           <ResumenFinancieroTab budget={budget} subtotalDirecto={subtotalDirecto} />
         </div>
       )}
 
       {/* ── TAB: ESTRUCTURA ───────────────────────────────────────────────── */}
       {activeTab === 'estructura' && (
-        <div className="flex-1 overflow-y-auto p-6 lg:p-8">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-6 lg:p-8">
         <fieldset
           disabled={bloqueado}
           className={cn('border-0 p-0 m-0 min-w-0 flex flex-col lg:flex-row items-start gap-8', bloqueado && 'opacity-70')}

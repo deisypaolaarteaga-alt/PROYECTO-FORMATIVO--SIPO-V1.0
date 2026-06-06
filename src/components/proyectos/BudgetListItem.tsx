@@ -14,7 +14,8 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from '@/components/shared/DropdownMenu';
-import { eliminarPresupuesto, cambiarEstadoPresupuesto, actualizarPresupuesto } from '@/actions/presupuestos';
+import { eliminarPresupuesto, actualizarPresupuesto } from '@/actions/presupuestos';
+import { cambiarEstadoPresupuesto } from '@/actions/presupuesto-estados';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import type { EstadoPresupuesto } from '@/types';
 
@@ -23,21 +24,21 @@ interface Transicion {
   label: string;
 }
 
-// borrador no tiene transiciones aquí — se envía a revisión desde el editor (BotonEnviarRevision)
+// Las transiciones desde la lista de proyecto son solo de compatibilidad / emergencia
 const TRANSICIONES: Record<EstadoPresupuesto, Transicion[]> = {
   borrador:              [],
   en_revision:           [
-    { estado: 'aprobado',  label: 'Aprobar' },
-    { estado: 'rechazado', label: 'Rechazar' },
+    { estado: 'aprobado', label: 'Aprobar' },
+    { estado: 'borrador', label: 'Reabrir a borrador' },
   ],
   rechazado:             [{ estado: 'borrador', label: 'Reabrir como borrador' }],
-  aprobado:              [{ estado: 'archivado', label: 'Archivar' }],
+  aprobado:              [],
   archivado:             [],
   enviado_a_cliente:     [],
   visto_por_cliente:     [],
-  aprobado_por_cliente:  [{ estado: 'archivado', label: 'Archivar' }],
+  aprobado_por_cliente:  [],
   rechazado_por_cliente: [],
-  con_observaciones:     [{ estado: 'borrador',  label: 'Reabrir como borrador' }],
+  con_observaciones:     [],
 };
 
 const TIPO_OBRA_LABELS: Record<string, string> = {
@@ -117,7 +118,7 @@ export function BudgetListItem({ budget, projectId, total, tipoObra, areaM2 }: B
   async function handleCambiarEstado(nuevoEstado: EstadoPresupuesto) {
     setErrorMsg('');
     setLoading(true);
-    const result = await cambiarEstadoPresupuesto(budget.id, nuevoEstado, projectId);
+    const result = await cambiarEstadoPresupuesto(budget.id, nuevoEstado);
     setLoading(false);
     if (!result.success) {
       console.error('[BudgetListItem] cambiarEstadoPresupuesto falló:', result.error);

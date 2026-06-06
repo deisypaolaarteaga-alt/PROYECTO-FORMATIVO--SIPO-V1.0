@@ -8,6 +8,9 @@ export interface KPIsGlobales {
   proyectos_por_estado: Record<string, number>;
   presupuestos_total: number;
   presupuestos_por_estado: Record<string, number>;
+  presupuestos_aprobados: number;
+  presupuestos_con_cliente: number;
+  presupuestos_rechazados: number;
   valor_total_oferta: number;
   valor_costo_directo: number;
   proximos_a_vencer: number;
@@ -43,12 +46,19 @@ export interface RangoOpts {
   hasta?: string; // ISO string
 }
 
+const ESTADOS_APROBADO     = ['aprobado', 'aprobado_por_cliente'];
+const ESTADOS_CON_CLIENTE  = ['enviado_a_cliente', 'visto_por_cliente', 'con_observaciones'];
+const ESTADOS_RECHAZADO    = ['rechazado', 'rechazado_por_cliente'];
+
 const VACIO_KPIS: KPIsGlobales = {
   proyectos_en_progreso: 0,
   proyectos_borrador: 0,
   proyectos_por_estado: {},
   presupuestos_total: 0,
   presupuestos_por_estado: {},
+  presupuestos_aprobados: 0,
+  presupuestos_con_cliente: 0,
+  presupuestos_rechazados: 0,
   valor_total_oferta: 0,
   valor_costo_directo: 0,
   proximos_a_vencer: 0,
@@ -119,12 +129,19 @@ export async function getKPIsGlobales(opts: RangoOpts = {}): Promise<KPIsGlobale
       return dias <= 30;
     }).length;
 
+    const presupuestosAprobados   = ESTADOS_APROBADO.reduce((s, e) => s + (presupuestosPorEstado[e] ?? 0), 0);
+    const presupuestosConCliente  = ESTADOS_CON_CLIENTE.reduce((s, e) => s + (presupuestosPorEstado[e] ?? 0), 0);
+    const presupuestosRechazados  = ESTADOS_RECHAZADO.reduce((s, e) => s + (presupuestosPorEstado[e] ?? 0), 0);
+
     return {
       proyectos_en_progreso: proyectosPorEstado['en_progreso'] ?? 0,
       proyectos_borrador: proyectosPorEstado['borrador'] ?? 0,
       proyectos_por_estado: proyectosPorEstado,
       presupuestos_total: presupuestos?.length ?? 0,
       presupuestos_por_estado: presupuestosPorEstado,
+      presupuestos_aprobados: presupuestosAprobados,
+      presupuestos_con_cliente: presupuestosConCliente,
+      presupuestos_rechazados: presupuestosRechazados,
       valor_total_oferta: resumenes.reduce((s, r) => s + Number(r.total_oferta ?? 0), 0),
       valor_costo_directo: resumenes.reduce((s, r) => s + Number(r.costo_directo ?? 0), 0),
       proximos_a_vencer: proximos,

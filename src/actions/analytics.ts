@@ -1,6 +1,8 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
+import Decimal from 'decimal.js';
+import type { ReporteUtilidad, ReporteTipoObra, ReporteCliente, ReporteTendencia } from '@/types';
 
 export interface KPIsGlobales {
   proyectos_en_progreso: number;
@@ -219,6 +221,283 @@ export async function getDistribucionCD(opts: RangoOpts = {}): Promise<Distribuc
       .slice(0, 8);
   } catch (err) {
     console.error('[getDistribucionCD]', err);
+    return [];
+  }
+}
+
+// ── Reportes financieros ─────────────────────────────────────────────────────
+
+const ESTADOS_APROBADO_REP  = ['aprobado', 'aprobado_por_cliente'] as const;
+const ESTADOS_RECHAZADO_REP = ['rechazado', 'rechazado_por_cliente'] as const;
+const ESTADOS_CARTERA_REP   = ['enviado_a_cliente', 'visto_por_cliente'] as const;
+const MESES_CORTOS_REP = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+type ReporteParams = { userId: string; desde?: string; hasta?: string };
+
+export async function getReporteUtilidad({ userId, desde, hasta }: ReporteParams): Promise<ReporteUtilidad> {
+  const VACIO: ReporteUtilidad = {
+    utilidad_generada: 0, margen_promedio: 0, total_oferta_aprobada: 0,
+    total_oferta_rechazada: 0, cartera_potencial: 0, tasa_cierre: 0,
+    tiempo_promedio_aprobacion: 0,
+  };
+  try {
+    const admin = createAdminClient();
+
+    let aprobadosQ = admin.from('budgets')
+      .select('id, utilidad_pct, created_at, updated_at')
+      .eq('user_id', userId).is('deleted_at', null)
+      .in('estado', [...ESTADOS_APROBADO_REP]);
+    if (desde) aprobadosQ = aprobadosQ.gte('updated_at', desde);
+    if (hasta) aprobadosQ = aprobadosQ.lte('updated_at', hasta);
+
+    let rechazadosQ = admin.from('budgets')
+      .select('id')
+      .eq('user_id', userId).is('deleted_at', null)
+      .in('estado', [...ESTADOS_RECHAZADO_REP]);
+    if (desde) rechazadosQ = rechazadosQ.gte('updated_at', desde);
+    if (hasta) rechazadosQ = rechazadosQ.lte('updated_at', hasta);
+
+    const carteraQ = admin.from('budgets')
+      .select('id')
+      .eq('user_id', userId).is('deleted_at', null)
+      .in('estado', [...ESTADOS_CARTERA_REP]);
+
+    const [{ data: aprobados }, { data: rechazados }, { data: cartera }] =
+      await Promise.all([aprobadosQ, rechazadosQ, carteraQ]);
+
+    const aprobadosIds  = (aprobados  ?? []).map((b) => b.id);
+    const rechazadosIds = (rechazados ?? []).map((b) => b.id);
+    const carteraIds    = (cartera    ?? []).map((b) => b.id);
+    const allIds = [...new Set([...aprobadosIds, ...rechazadosIds, ...carteraIds])];
+
+    let resumenMap = new Map<string, { total_oferta: number }>();
+    if (allIds.length > 0) {
+      const { data } = await admin.from('v_resumen_presupuesto')
+        .select('budget_id, total_oferta').in('budget_id', allIds);
+      resumenMap = new Map((data ?? []).map((r) => [r.budget_id, r]));
+    }
+
+    let utilidadGen    = new Decimal(0);
+    let ofertaAprobada = new Decimal(0);
+    let sumMargen      = new Decimal(0);
+    let sumDias        = new Decimal(0);
+    let cnt            = 0;
+
+    for (const b of aprobados ?? []) {
+      const r = resumenMap.get(b.id);
+      if (!r) continue;
+      const oferta  = new Decimal(r.total_oferta ?? 0);
+      const utilPct = new Decimal(b.utilidad_pct ?? 0);
+      ofertaAprobada = ofertaAprobada.plus(oferta);
+      utilidadGen    = utilidadGen.plus(oferta.times(utilPct).div(100));
+      sumMargen      = sumMargen.plus(utilPct);
+      sumDias        = sumDias.plus(
+        new Decimal(new Date(b.updated_at).getTime() - new Date(b.created_at).getTime())
+          .div(86400000)
+      );
+      cnt++;
+    }
+
+    let ofertaRechazada = new Decimal(0);
+    for (const b of rechazados ?? []) {
+      const r = resumenMap.get(b.id);
+      if (r) ofertaRechazada = ofertaRechazada.plus(new Decimal(r.total_oferta ?? 0));
+    }
+
+    let carteraPot = new Decimal(0);
+    for (const b of cartera ?? []) {
+      const r = resumenMap.get(b.id);
+      if (r) carteraPot = carteraPot.plus(new Decimal(r.total_oferta ?? 0));
+    }
+
+    const total = (aprobados?.length ?? 0) + (rechazados?.length ?? 0);
+    return {
+      utilidad_generada:           utilidadGen.toNumber(),
+      margen_promedio:             cnt > 0 ? sumMargen.div(cnt).toNumber() : 0,
+      total_oferta_aprobada:       ofertaAprobada.toNumber(),
+      total_oferta_rechazada:      ofertaRechazada.toNumber(),
+      cartera_potencial:           carteraPot.toNumber(),
+      tasa_cierre:                 total > 0 ? new Decimal(aprobados?.length ?? 0).div(total).times(100).toNumber() : 0,
+      tiempo_promedio_aprobacion:  cnt > 0 ? sumDias.div(cnt).toNumber() : 0,
+    };
+  } catch (err) {
+    console.error('[getReporteUtilidad]', err);
+    return VACIO;
+  }
+}
+
+export async function getReportePorTipoObra({ userId, desde, hasta }: ReporteParams): Promise<ReporteTipoObra[]> {
+  try {
+    const admin = createAdminClient();
+
+    let q = admin.from('budgets')
+      .select('id, utilidad_pct, project_id')
+      .eq('user_id', userId).is('deleted_at', null)
+      .in('estado', [...ESTADOS_APROBADO_REP]);
+    if (desde) q = q.gte('updated_at', desde);
+    if (hasta) q = q.lte('updated_at', hasta);
+
+    const { data: budgets } = await q;
+    if (!budgets || budgets.length === 0) return [];
+
+    const projectIds = [...new Set(budgets.map((b) => b.project_id))];
+    const { data: projects } = await admin.from('projects')
+      .select('id, tipo_obra').in('id', projectIds);
+    const proyectoMap = new Map((projects ?? []).map((p) => [p.id, p]));
+
+    const budgetIds = budgets.map((b) => b.id);
+    const { data: resumenes } = await admin.from('v_resumen_presupuesto')
+      .select('budget_id, total_oferta').in('budget_id', budgetIds);
+    const resumenMap = new Map((resumenes ?? []).map((r) => [r.budget_id, r]));
+
+    type Grupo = { total_oferta: Decimal; utilidad: Decimal; cantidad: number; sumMargen: Decimal };
+    const grupos: Record<string, Grupo> = {};
+
+    for (const b of budgets) {
+      const r = resumenMap.get(b.id);
+      if (!r) continue;
+      const tipoObra = proyectoMap.get(b.project_id)?.tipo_obra ?? 'otro';
+      const oferta   = new Decimal(r.total_oferta ?? 0);
+      const utilPct  = new Decimal(b.utilidad_pct ?? 0);
+      if (!grupos[tipoObra]) grupos[tipoObra] = { total_oferta: new Decimal(0), utilidad: new Decimal(0), cantidad: 0, sumMargen: new Decimal(0) };
+      grupos[tipoObra].total_oferta = grupos[tipoObra].total_oferta.plus(oferta);
+      grupos[tipoObra].utilidad     = grupos[tipoObra].utilidad.plus(oferta.times(utilPct).div(100));
+      grupos[tipoObra].cantidad++;
+      grupos[tipoObra].sumMargen    = grupos[tipoObra].sumMargen.plus(utilPct);
+    }
+
+    return Object.entries(grupos)
+      .map(([tipo_obra, g]) => ({
+        tipo_obra,
+        total_oferta:   g.total_oferta.toNumber(),
+        utilidad:       g.utilidad.toNumber(),
+        cantidad:       g.cantidad,
+        margen_promedio: g.cantidad > 0 ? g.sumMargen.div(g.cantidad).toNumber() : 0,
+      }))
+      .sort((a, b) => b.utilidad - a.utilidad);
+  } catch (err) {
+    console.error('[getReportePorTipoObra]', err);
+    return [];
+  }
+}
+
+export async function getReportePorCliente({ userId, desde, hasta }: ReporteParams): Promise<ReporteCliente[]> {
+  try {
+    const admin = createAdminClient();
+
+    let q = admin.from('budgets')
+      .select('id, utilidad_pct, project_id')
+      .eq('user_id', userId).is('deleted_at', null)
+      .in('estado', [...ESTADOS_APROBADO_REP]);
+    if (desde) q = q.gte('updated_at', desde);
+    if (hasta) q = q.lte('updated_at', hasta);
+
+    const { data: budgets } = await q;
+    if (!budgets || budgets.length === 0) return [];
+
+    const projectIds = [...new Set(budgets.map((b) => b.project_id))];
+    const { data: projects } = await admin.from('projects')
+      .select('id, cliente_id').in('id', projectIds);
+    const proyectoMap = new Map((projects ?? []).map((p) => [p.id, p]));
+
+    const clienteIds = [...new Set((projects ?? []).map((p) => p.cliente_id).filter(Boolean))] as string[];
+    let clienteMap = new Map<string, { nombre_razon_social: string }>();
+    if (clienteIds.length > 0) {
+      const { data: clientes } = await admin.from('clientes')
+        .select('id, nombre_razon_social').in('id', clienteIds);
+      clienteMap = new Map((clientes ?? []).map((c) => [c.id, c]));
+    }
+
+    const budgetIds = budgets.map((b) => b.id);
+    const { data: resumenes } = await admin.from('v_resumen_presupuesto')
+      .select('budget_id, total_oferta').in('budget_id', budgetIds);
+    const resumenMap = new Map((resumenes ?? []).map((r) => [r.budget_id, r]));
+
+    type Grupo = { nombre: string; total_oferta: Decimal; utilidad: Decimal; cantidad: number; sumMargen: Decimal };
+    const grupos: Record<string, Grupo> = {};
+
+    for (const b of budgets) {
+      const r = resumenMap.get(b.id);
+      if (!r) continue;
+      const proyecto      = proyectoMap.get(b.project_id);
+      const clienteId     = proyecto?.cliente_id ?? null;
+      const clienteNombre = (clienteId ? clienteMap.get(clienteId)?.nombre_razon_social : null) ?? 'Sin cliente asignado';
+      const key           = clienteId ?? '__sin_cliente__';
+      const oferta        = new Decimal(r.total_oferta ?? 0);
+      const utilPct       = new Decimal(b.utilidad_pct ?? 0);
+
+      if (!grupos[key]) grupos[key] = { nombre: clienteNombre, total_oferta: new Decimal(0), utilidad: new Decimal(0), cantidad: 0, sumMargen: new Decimal(0) };
+      grupos[key].total_oferta = grupos[key].total_oferta.plus(oferta);
+      grupos[key].utilidad     = grupos[key].utilidad.plus(oferta.times(utilPct).div(100));
+      grupos[key].cantidad++;
+      grupos[key].sumMargen    = grupos[key].sumMargen.plus(utilPct);
+    }
+
+    return Object.values(grupos)
+      .map((g) => ({
+        cliente_nombre:    g.nombre,
+        total_oferta:      g.total_oferta.toNumber(),
+        utilidad:          g.utilidad.toNumber(),
+        cantidad_proyectos: g.cantidad,
+        margen_promedio:   g.cantidad > 0 ? g.sumMargen.div(g.cantidad).toNumber() : 0,
+      }))
+      .sort((a, b) => b.utilidad - a.utilidad)
+      .slice(0, 8);
+  } catch (err) {
+    console.error('[getReportePorCliente]', err);
+    return [];
+  }
+}
+
+export async function getReporteTendencia({ userId }: { userId: string }): Promise<ReporteTendencia[]> {
+  try {
+    const admin  = createAdminClient();
+    const hoy    = new Date();
+    const desde  = new Date(hoy.getFullYear(), hoy.getMonth() - 5, 1).toISOString();
+
+    const { data: budgets } = await admin.from('budgets')
+      .select('id, utilidad_pct, updated_at')
+      .eq('user_id', userId).is('deleted_at', null)
+      .in('estado', [...ESTADOS_APROBADO_REP])
+      .gte('updated_at', desde);
+
+    const budgetIds = (budgets ?? []).map((b) => b.id);
+    let resumenMap = new Map<string, { total_oferta: number }>();
+    if (budgetIds.length > 0) {
+      const { data } = await admin.from('v_resumen_presupuesto')
+        .select('budget_id, total_oferta').in('budget_id', budgetIds);
+      resumenMap = new Map((data ?? []).map((r) => [r.budget_id, r]));
+    }
+
+    type GrupoMes = { utilidad: Decimal; total_oferta: Decimal; cantidad: number };
+    const grupos: Record<string, GrupoMes> = {};
+
+    for (const b of budgets ?? []) {
+      const r = resumenMap.get(b.id);
+      if (!r) continue;
+      const d   = new Date(b.updated_at);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const oferta  = new Decimal(r.total_oferta ?? 0);
+      const utilPct = new Decimal(b.utilidad_pct ?? 0);
+      if (!grupos[key]) grupos[key] = { utilidad: new Decimal(0), total_oferta: new Decimal(0), cantidad: 0 };
+      grupos[key].utilidad     = grupos[key].utilidad.plus(oferta.times(utilPct).div(100));
+      grupos[key].total_oferta = grupos[key].total_oferta.plus(oferta);
+      grupos[key].cantidad++;
+    }
+
+    return Array.from({ length: 6 }, (_, i) => {
+      const d   = new Date(hoy.getFullYear(), hoy.getMonth() - (5 - i), 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const g   = grupos[key];
+      return {
+        mes:         `${MESES_CORTOS_REP[d.getMonth()]} ${d.getFullYear()}`,
+        utilidad:    g ? g.utilidad.toNumber() : 0,
+        total_oferta: g ? g.total_oferta.toNumber() : 0,
+        cantidad:    g ? g.cantidad : 0,
+      };
+    });
+  } catch (err) {
+    console.error('[getReporteTendencia]', err);
     return [];
   }
 }

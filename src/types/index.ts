@@ -719,6 +719,46 @@ export interface SnapshotAPUItem {
 }
 
 // ── Ciudades de Colombia ──
+// ── Reportes financieros ──────────────────────────────────────────────────────
+
+export interface ReporteUtilidad {
+  utilidad_generada: number;
+  margen_promedio: number;
+  total_oferta_aprobada: number;
+  total_oferta_rechazada: number;
+  cartera_potencial: number;
+  tasa_cierre: number;
+  tiempo_promedio_aprobacion: number;
+}
+
+export interface ReporteTipoObra {
+  tipo_obra: string;
+  total_oferta: number;
+  utilidad: number;
+  cantidad: number;
+  margen_promedio: number;
+}
+
+export interface ReporteCliente {
+  cliente_nombre: string;
+  total_oferta: number;
+  utilidad: number;
+  cantidad_proyectos: number;
+  margen_promedio: number;
+}
+
+export interface ReporteTendencia {
+  mes: string;
+  utilidad: number;
+  total_oferta: number;
+  cantidad: number;
+}
+
+export interface PeriodoReporte {
+  desde: string | null;
+  hasta: string | null;
+}
+
 export const CIUDADES_COLOMBIA = [
   'Bogotá D.C.', 'Medellín', 'Cali', 'Barranquilla', 'Cartagena',
   'Bucaramanga', 'Pereira', 'Manizales', 'Santa Marta', 'Cúcuta',

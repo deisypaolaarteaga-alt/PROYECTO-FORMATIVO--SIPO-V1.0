@@ -21,6 +21,7 @@ import {
   ChevronDown,
   BookOpen,
   BookmarkCheck,
+  BarChart2,
 } from 'lucide-react';
 import { Logo } from '@/components/shared/Logo';
 import { cn } from '@/lib/utils';
@@ -65,6 +66,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/proyectos',    icon: FolderKanban, label: 'Proyectos'    },
       { href: '/presupuestos', icon: FileText,       label: 'Presupuestos' },
+      { href: '/reportes',     icon: BarChart2,     label: 'Reportes'     },
       { href: '/plantillas',   icon: BookmarkCheck, label: 'Plantillas'   },
       { href: '/clientes',     icon: Users,         label: 'Clientes'     },
       { href: '/proveedores',  icon: ShoppingBag,  label: 'Proveedores'  },

@@ -106,6 +106,9 @@ const migrationFiles = [
   'supabase/migrations/20260604100000_budget_snapshots_v2.sql',
   'supabase/migrations/20260605100000_budget_snapshots_motivo_envio.sql',
   'supabase/migrations/20260606100000_ia_apu_sugerencias.sql',
+  'supabase/migrations/20260605200000_budget_duracion_obra.sql',
+  'supabase/migrations/20260605210000_drop_duracion_obra_meses.sql',
+  'supabase/migrations/20260606200000_token_carta_ejecutiva.sql',
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

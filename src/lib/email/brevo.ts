@@ -14,10 +14,15 @@ export interface EmailPresupuestoParams {
   totalOferta: number;
   linkPresupuesto: string;
   vigenciaFecha: string;
+  cuerpoCorreoPersonalizado?: string;
 }
 
 function formatearCOP(valor: number): string {
   return new Decimal(valor).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+function escHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function generarHTMLEmail(params: EmailPresupuestoParams): string {
@@ -50,13 +55,15 @@ function generarHTMLEmail(params: EmailPresupuestoParams): string {
           <tr>
             <td style="background-color:#FFFFFF;padding:36px 36px 28px;">
 
-              <p style="margin:0 0 20px;font-size:16px;color:#374151;">Estimado/a <strong>${cliente}</strong>,</p>
-
+              ${params.cuerpoCorreoPersonalizado
+                ? `<p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.7;">${escHtml(params.cuerpoCorreoPersonalizado).replace(/\n/g, '<br>')}</p>`
+                : `<p style="margin:0 0 20px;font-size:16px;color:#374151;">Estimado/a <strong>${cliente}</strong>,</p>
               <p style="margin:0 0 24px;font-size:15px;color:#6B7280;line-height:1.6;">
                 Le compartimos el presupuesto de obra preparado especialmente para su proyecto.
                 Puede revisarlo en detalle, aprobarlo o dejarnos sus observaciones directamente
                 desde el siguiente enlace.
-              </p>
+              </p>`
+              }
 
               <!-- Tarjeta del presupuesto -->
               <table width="100%" cellpadding="0" cellspacing="0" border="0"

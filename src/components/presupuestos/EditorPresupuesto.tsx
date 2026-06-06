@@ -24,6 +24,7 @@ import {
   actualizarActividad, actualizarPresupuesto, actualizarCapitulo,
   eliminarActividad, eliminarCapitulo,
   aprobarPresupuesto, reabrirPresupuesto,
+  validarPresupuesto,
 } from '@/actions/presupuestos';
 import { corregirPresupuesto } from '@/actions/presupuesto-estados';
 import { formatearCOP } from '@/lib/utils/formato-cop';
@@ -89,6 +90,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
   const [tokenResumen, setTokenResumen] = useState<TokenResumen | null>(null);
   const [versiones, setVersiones] = useState<BudgetSnapshot[]>([]);
   const [isCorrigiendo, setIsCorrigiendo] = useState(false);
+  const [validandoAccion, setValidandoAccion] = useState(false);
 
   // Drag & drop (local reorder solo — sin persistir en BD)
   const [dragSrcActId, setDragSrcActId] = useState<string | null>(null);
@@ -301,10 +303,46 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
     if (res.success) router.refresh();
   };
 
+  async function mostrarErrorCapitulosVacios(capitulos_vacios: string[]) {
+    const lista = capitulos_vacios.map(n => `"${n}"`).join(', ');
+    setConfirmState({
+      title: 'Capítulos sin actividades',
+      description: `Este presupuesto tiene capítulos sin actividades: ${lista}. Agrega actividades o elimina los capítulos vacíos antes de continuar.`,
+      confirmLabel: 'Entendido',
+      variant: 'warning',
+      onConfirm: () => setConfirmState(null),
+    });
+  }
+
+  async function handleAbrirVistaPrevia() {
+    setValidandoAccion(true);
+    const res = await validarPresupuesto(budget.id);
+    setValidandoAccion(false);
+    if (!res.success) return;
+    if (!res.data?.valido) {
+      await mostrarErrorCapitulosVacios(res.data?.capitulos_vacios ?? []);
+      return;
+    }
+    setVistaPreviaOpen(true);
+  }
+
+  async function handleAbrirEnviarCliente() {
+    setValidandoAccion(true);
+    const res = await validarPresupuesto(budget.id);
+    setValidandoAccion(false);
+    if (!res.success) return;
+    if (!res.data?.valido) {
+      await mostrarErrorCapitulosVacios(res.data?.capitulos_vacios ?? []);
+      return;
+    }
+    setEnviarClienteOpen(true);
+  }
+
   const handleDeleteActivity = (actId: string, chId: string) => {
     askConfirm('¿Eliminar actividad?', 'Esta acción no se puede deshacer.', async () => {
       setConfirmState(null);
-      await eliminarActividad(actId, budget.id);
+      const res = await eliminarActividad(actId, budget.id);
+      if (!res.success) return;
       setBudget((prev: any) => ({
         ...prev,
         chapters: prev.chapters.map((c: any) =>
@@ -317,7 +355,8 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
   const handleDeleteChapter = (chId: string) => {
     askConfirm('¿Eliminar capítulo?', 'Se eliminarán también todas sus actividades.', async () => {
       setConfirmState(null);
-      await eliminarCapitulo(chId, budget.id);
+      const res = await eliminarCapitulo(chId, budget.id);
+      if (!res.success) return;
       setBudget((prev: any) => ({
         ...prev,
         chapters: prev.chapters.filter((c: any) => c.id !== chId),
@@ -500,10 +539,11 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
               )}
 
               <Button
-                onClick={() => setVistaPreviaOpen(true)}
+                onClick={handleAbrirVistaPrevia}
+                disabled={validandoAccion}
                 variant="ghost"
                 size="sm"
-                icon={<Eye className="h-4 w-4" />}
+                icon={validandoAccion ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
               >
                 Vista previa
               </Button>
@@ -1092,6 +1132,34 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                       : 'Sin vigencia definida — el presupuesto no vence.'}
                   </p>
                 </div>
+
+                {/* Duración estimada de la obra */}
+                <div className="space-y-2 border-t border-[#E8E4DE] pt-4">
+                  <label className="text-[10px] font-bold text-stone uppercase tracking-widest">
+                    Duración estimada de la obra (meses)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="1"
+                      max="60"
+                      step="1"
+                      value={budget.duracion_meses ?? ''}
+                      onChange={e => {
+                        const val = parseInt(e.target.value);
+                        handleUpdateBudget({
+                          duracion_meses: isNaN(val) ? null : Math.min(60, Math.max(1, val)),
+                        });
+                      }}
+                      className="w-full h-9 bg-[#F5F2EE] border border-[#E8E4DE] rounded-lg px-3 focus:ring-1 focus:ring-[#C84B1A]/40 font-semibold text-sm text-[#1C1814]"
+                      placeholder="ej: 6"
+                    />
+                    <span className="text-sm font-semibold text-[#6B7A8D] shrink-0">meses</span>
+                  </div>
+                  <p className="text-[10px] text-stone italic">
+                    Tiempo de ejecución de la obra. Usado por el asistente IA para flujo de caja.
+                  </p>
+                </div>
               </div>
 
               {/* Resumen rápido */}
@@ -1162,7 +1230,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
         profile={profile}
         onEnviarCliente={clienteEmail ? () => {
           setVistaPreviaOpen(false);
-          setEnviarClienteOpen(true);
+          handleAbrirEnviarCliente();
         } : undefined}
         onEnviado={() => router.refresh()}
       />
@@ -1256,7 +1324,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                   {!tokenResumen.cliente_accion && clienteEmail && (
                     <div className="pt-2">
                       <button
-                        onClick={() => { setEstadoEnvioOpen(false); setEnviarClienteOpen(true); }}
+                        onClick={() => { setEstadoEnvioOpen(false); handleAbrirEnviarCliente(); }}
                         className="w-full inline-flex items-center justify-center gap-2 h-9 px-4 text-sm font-semibold text-[#1E4D8C] bg-[#EBF2FA] hover:bg-[#DBEAFE] rounded-lg border border-[#BFDBFE] transition-colors"
                       >
                         <RefreshCw className="h-3.5 w-3.5" />

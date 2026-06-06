@@ -317,16 +317,22 @@ export async function eliminarCapitulo(chapterId: string, budgetId: string): Pro
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { success: false, error: 'No autorizado' };
 
-    const { error } = await supabase
+    // admin client: RLS bloquea el soft-delete (WITH CHECK copia USING que incluye deleted_at IS NULL)
+    const admin = createAdminClient();
+    const { error } = await admin
       .from('chapters')
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', chapterId)
       .eq('user_id', user.id);
 
+    console.log('eliminarCapitulo resultado:', { chapterId, error });
+    if (error) console.error('Error eliminando capítulo:', error);
+
     if (error) throw error;
     revalidatePath(`/presupuestos/${budgetId}`);
     return { success: true };
   } catch (error) {
+    console.error('[eliminarCapitulo] catch:', error);
     return { success: false, error: 'Error al eliminar capítulo.' };
   }
 }
@@ -365,7 +371,9 @@ export async function eliminarActividad(activityId: string, budgetId: string): P
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { success: false, error: 'No autorizado' };
 
-    const { error } = await supabase
+    // admin client: mismo motivo que eliminarCapitulo — RLS WITH CHECK bloquea el soft-delete
+    const admin = createAdminClient();
+    const { error } = await admin
       .from('activities')
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', activityId)
@@ -995,5 +1003,42 @@ export async function actualizarVigencia(
     return { success: true };
   } catch {
     return { success: false, error: 'No se pudo actualizar la vigencia.' };
+  }
+}
+
+/**
+ * Valida que todos los capítulos del presupuesto tengan al menos una actividad activa.
+ * Retorna la lista de nombres de capítulos vacíos.
+ */
+export async function validarPresupuesto(
+  budgetId: string
+): Promise<ActionResult<{ valido: boolean; capitulos_vacios: string[] }>> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'No autorizado.' };
+
+    const { data: chapters } = await supabase
+      .from('chapters')
+      .select('id, nombre, activities(id, deleted_at)')
+      .eq('budget_id', budgetId)
+      .eq('user_id', user.id)
+      .is('deleted_at', null);
+
+    const capitulos_vacios: string[] = [];
+    for (const ch of chapters ?? []) {
+      const activas = ((ch.activities ?? []) as { id: string; deleted_at: string | null }[])
+        .filter(a => !a.deleted_at);
+      if (activas.length === 0) {
+        capitulos_vacios.push(ch.nombre);
+      }
+    }
+
+    return {
+      success: true,
+      data: { valido: capitulos_vacios.length === 0, capitulos_vacios },
+    };
+  } catch {
+    return { success: false, error: 'Error al validar el presupuesto.' };
   }
 }

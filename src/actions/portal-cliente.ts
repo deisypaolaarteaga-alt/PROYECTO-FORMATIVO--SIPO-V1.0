@@ -56,7 +56,8 @@ function calcularTotalOferta(budget: {
  * Solo puede llamarlo el dueño del presupuesto (auth requerido).
  */
 export async function enviarPresupuestoAlCliente(
-  budgetId: string
+  budgetId: string,
+  opts?: { cuerpoCorreo?: string; cartaEjecutiva?: string }
 ): Promise<ActionResult<{ token: string }>> {
   try {
     const supabase = await createClient();
@@ -152,6 +153,7 @@ export async function enviarPresupuestoAlCliente(
           expires_at: expiresAt.toISOString(),
           cliente_email: clienteEmail,
           cliente_nombre: clienteNombre,
+          ...(opts?.cartaEjecutiva ? { carta_ejecutiva: opts.cartaEjecutiva } : {}),
         })
         .eq('token', tokenFinal);
     } else {
@@ -163,11 +165,13 @@ export async function enviarPresupuestoAlCliente(
           expires_at: expiresAt.toISOString(),
           cliente_email: clienteEmail,
           cliente_nombre: clienteNombre,
+          ...(opts?.cartaEjecutiva ? { carta_ejecutiva: opts.cartaEjecutiva } : {}),
         })
         .select('token')
         .single();
 
       if (nuevoErr || !nuevo) {
+        console.error('[enviarPresupuestoAlCliente] error al insertar token:', nuevoErr);
         return { success: false, error: 'No se pudo crear el token de acceso.' };
       }
       tokenFinal = nuevo.token;
@@ -187,6 +191,7 @@ export async function enviarPresupuestoAlCliente(
       totalOferta,
       linkPresupuesto,
       vigenciaFecha: vigenciaFechaStr,
+      cuerpoCorreoPersonalizado: opts?.cuerpoCorreo,
     });
 
     // ── Congelar snapshot de la versión que se envía ──
@@ -505,6 +510,7 @@ export interface TokenInfo {
   cliente_accion: 'aprobado' | 'rechazado' | 'comentado' | null;
   cliente_comentario: string | null;
   cliente_respondio_at: string | null;
+  carta_ejecutiva?: string | null;
   presupuesto: {
     id: string;
     titulo: string;
@@ -562,6 +568,7 @@ export async function getTokenInfo(
         cliente_accion,
         cliente_comentario,
         cliente_respondio_at,
+        carta_ejecutiva,
         budgets:budget_id (
           id,
           titulo,
@@ -662,6 +669,8 @@ export async function getTokenInfo(
         cliente_accion: tokenRow.cliente_accion as 'aprobado' | 'rechazado' | 'comentado' | null,
         cliente_comentario: tokenRow.cliente_comentario,
         cliente_respondio_at: tokenRow.cliente_respondio_at,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        carta_ejecutiva: (tokenRow as any).carta_ejecutiva ?? null,
         presupuesto: {
           id: budget.id,
           titulo: budget.titulo,

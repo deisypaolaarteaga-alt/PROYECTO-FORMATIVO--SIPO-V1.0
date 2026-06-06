@@ -32,7 +32,7 @@ export const updateBudgetSchema = z.object({
   imprevistos_pct: z.coerce.number().min(0).max(100).optional(),
   utilidad_pct: z.coerce.number().min(0).max(100).optional(),
   gastos_fijos_mensuales: z.coerce.number().min(0).optional(),
-  duracion_meses: z.coerce.number().min(1).optional(),
+  duracion_meses: z.coerce.number().int().min(1).max(60).nullable().optional(),
   metodo_iva: z.enum(['no_aplica', 'sobre_utilidad', 'sobre_aiu', 'sobre_total']).optional(),
   iva_porcentaje: z.coerce.number().min(0).max(100).optional(),
   mostrar_retenciones: z.boolean().optional(),

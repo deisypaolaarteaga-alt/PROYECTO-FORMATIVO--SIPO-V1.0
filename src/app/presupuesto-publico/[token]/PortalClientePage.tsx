@@ -450,6 +450,7 @@ function SeccionPartes({
 export function PortalClientePage({ token, tokenInfo, capitulos }: Props) {
   const { presupuesto, proyecto, empresa } = tokenInfo;
   const resumen = calcularResumen(presupuesto);
+  const capitulosConActividades = capitulos.filter(ch => ch.actividades.length > 0);
   const vigenciaFecha = formatFecha(tokenInfo.expires_at);
   const diasRestantes = Math.floor(
     (new Date(tokenInfo.expires_at).getTime() - Date.now()) / 86_400_000
@@ -539,11 +540,23 @@ export function PortalClientePage({ token, tokenInfo, capitulos }: Props) {
           </div>
         </div>
 
+        {/* Carta ejecutiva — si el constructor la generó al enviar */}
+        {tokenInfo.carta_ejecutiva && (
+          <div>
+            <h2 className="text-[11px] font-bold text-stone uppercase tracking-widest mb-3">Propuesta técnica</h2>
+            <div className="bg-white rounded-2xl border border-[#E8E4DE] p-6 shadow-sm">
+              <p className="text-sm text-[#374151] leading-relaxed whitespace-pre-wrap">
+                {tokenInfo.carta_ejecutiva}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Tabla de capítulos y actividades */}
-        {capitulos.length > 0 && (
+        {capitulosConActividades.length > 0 && (
           <div>
             <h2 className="text-[11px] font-bold text-stone uppercase tracking-widest mb-3">Detalle del presupuesto</h2>
-            <TablaCapitulos capitulos={capitulos} />
+            <TablaCapitulos capitulos={capitulosConActividades} />
           </div>
         )}
 

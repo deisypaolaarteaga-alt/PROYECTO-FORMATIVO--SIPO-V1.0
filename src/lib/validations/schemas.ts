@@ -293,6 +293,15 @@ export type ActualizarActividadCatalogoInput= z.infer<typeof actualizarActividad
 export type CrearCatalogoAPUItemInput       = z.infer<typeof crearCatalogoAPUItemSchema>;
 export type ActualizarCatalogoAPUItemInput  = z.infer<typeof actualizarCatalogoAPUItemSchema>;
 
+// ============ AIU Componentes schema ============
+
+export const aiuComponenteSchema = z.object({
+  nombre:        z.string().min(1, 'El nombre es obligatorio').max(200),
+  valor_mensual: z.coerce.number().min(0, 'El valor debe ser mayor o igual a 0'),
+});
+
+export type AIUComponenteInput = z.infer<typeof aiuComponenteSchema>;
+
 // ============ Backwards compatibility aliases ============
 export const presupuestoSchema = updateBudgetSchema;
 export const capituloSchema = createChapterSchema;

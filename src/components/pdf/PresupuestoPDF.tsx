@@ -15,6 +15,7 @@ import Decimal from 'decimal.js';
 import { formatDate } from '@/lib/utils';
 import { formatearCOP } from '@/lib/utils/formato-cop';
 import type { PresupuestoPDFData, ConfigPDFProfesional, PDFExportOptions } from '@/types/pdf';
+import type { AIUComponente } from '@/types';
 
 const TIPO_OBRA_LABEL: Record<string, string> = {
   residencial:     'Residencial',
@@ -226,6 +227,26 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
 
+  // AIU detallado — ítems de Administración indentados
+  aiuItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 2,
+    paddingLeft: 14,
+    paddingRight: 4,
+  },
+  aiuItemLabel: {
+    fontSize: 7.5,
+    color: '#6B7280',
+    fontStyle: 'italic',
+  },
+  aiuItemValue: {
+    fontSize: 7.5,
+    color: '#6B7280',
+    textAlign: 'right',
+  },
+
   // Retenciones
   retencionesSection: {
     marginTop: 30,
@@ -344,9 +365,11 @@ interface Props {
   profile: ConfigPDFProfesional;
   options?: PDFExportOptions;
   children?: React.ReactNode;
+  aiuComponentes?: AIUComponente[];
+  duracionMeses?: number;
 }
 
-export const PresupuestoPDF = ({ budget, profile, options, children }: Props) => {
+export const PresupuestoPDF = ({ budget, profile, options, children, aiuComponentes, duracionMeses }: Props) => {
   // === Cálculos con Decimal.js (precisión financiera) ===
   const D = (v: number | string | null | undefined) => new Decimal(Number(v) || 0);
 
@@ -395,6 +418,8 @@ export const PresupuestoPDF = ({ budget, profile, options, children }: Props) =>
   // Helper formato moneda: acepta Decimal o number
   const fmtD = (val: Decimal) => formatearCOP(val.toDecimalPlaces(0).toNumber());
   const formatoCOP = (val: number) => formatearCOP(Math.round(val));
+
+  const efectivoDuracion = duracionMeses ?? 0;
 
   const fechaEmision = new Date();
   const baseElaboracion = budget.created_at ? new Date(budget.created_at) : fechaEmision;
@@ -570,6 +595,15 @@ export const PresupuestoPDF = ({ budget, profile, options, children }: Props) =>
             <Text style={styles.summaryLabel}>Administración ({adminPct}%)</Text>
             <Text style={styles.summaryValue}>{fmtD(aiuAdmin)}</Text>
           </View>
+          {budget.metodo_aiu === 'detallado' && aiuComponentes && aiuComponentes.map((comp) => {
+            const compTotal = new Decimal(Number(comp.valor_mensual) || 0).times(efectivoDuracion);
+            return (
+              <View key={comp.id} style={styles.aiuItemRow}>
+                <Text style={styles.aiuItemLabel}>{comp.nombre}  ×{efectivoDuracion} meses</Text>
+                <Text style={styles.aiuItemValue}>{fmtD(compTotal)}</Text>
+              </View>
+            );
+          })}
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Imprevistos ({imprevPct}%)</Text>
             <Text style={styles.summaryValue}>{fmtD(aiuImprevistos)}</Text>

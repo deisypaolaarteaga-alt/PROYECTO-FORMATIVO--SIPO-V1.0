@@ -24,6 +24,12 @@ export const metadata: Metadata = {
     'software construcción',
   ],
   authors: [{ name: 'SIPO' }],
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico', sizes: 'any' },
+    ],
+  },
   openGraph: {
     title: 'SIPO — Presupuestos de Obra Inteligentes',
     description:

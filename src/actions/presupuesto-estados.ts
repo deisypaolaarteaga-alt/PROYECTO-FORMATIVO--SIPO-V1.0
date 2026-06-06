@@ -3,6 +3,8 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { guardarSnapshot } from '@/actions/versiones';
+import { generatePresupuestoPDFBuffer } from '@/lib/pdf/generate-pdf-server';
+import { enviarEmailConfirmacionCliente } from '@/lib/email/brevo';
 import type { ActionResult } from '@/types';
 
 type EstadoPresupuesto =
@@ -112,6 +114,61 @@ export async function cambiarEstadoPresupuesto(
     // Auto-avanzar proyecto cuando se aprueba el presupuesto
     if (nuevoEstado === 'aprobado' && budget.project_id) {
       await avanzarProyectoSiCorresponde(budget.project_id);
+    }
+
+    // Enviar email al cliente con PDF adjunto (fire-and-forget — no bloquea la aprobación)
+    if (nuevoEstado === 'aprobado') {
+      void (async () => {
+        try {
+          // 1. Buscar token del cliente (solo existe si el presupuesto fue enviado al portal)
+          const { data: token } = await admin
+            .from('presupuesto_tokens')
+            .select('cliente_email, cliente_nombre')
+            .eq('budget_id', budgetId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (!token?.cliente_email) return;
+
+          // 2. Obtener datos del presupuesto y perfil en paralelo
+          const [resumenResult, perfilResult, proyectoResult] = await Promise.all([
+            admin
+              .from('v_resumen_presupuesto')
+              .select('total_oferta, titulo')
+              .eq('budget_id', budgetId)
+              .maybeSingle(),
+            admin
+              .from('profiles')
+              .select('nombre_completo, empresa')
+              .eq('id', user.id)
+              .single(),
+            budget.project_id
+              ? admin.from('projects').select('nombre').eq('id', budget.project_id).single()
+              : Promise.resolve({ data: null }),
+          ]);
+
+          const totalOferta       = Number(resumenResult.data?.total_oferta ?? 0);
+          const nombreProyecto    = (proyectoResult as any).data?.nombre || resumenResult.data?.titulo || 'Proyecto';
+          const constructorNombre = perfilResult.data?.empresa || perfilResult.data?.nombre_completo || 'Constructor';
+
+          // 3. Generar PDF
+          const pdfBuffer = await generatePresupuestoPDFBuffer(budgetId, user.id);
+          if (!pdfBuffer) return;
+
+          // 4. Enviar email con PDF adjunto
+          await enviarEmailConfirmacionCliente({
+            clienteEmail:     token.cliente_email,
+            clienteNombre:    token.cliente_nombre || 'Cliente',
+            constructorNombre,
+            nombreProyecto,
+            totalOferta,
+            pdfBuffer,
+          });
+        } catch (err) {
+          console.error('[aprobarPresupuesto] Error enviando email al cliente:', err);
+        }
+      })();
     }
 
     revalidatePath(`/presupuestos/${budgetId}`);

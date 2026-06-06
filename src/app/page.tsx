@@ -2,57 +2,82 @@
 
 import Link from 'next/link';
 import {
-  Sparkles, CheckCircle2, BarChart3, Clock,
-  ShieldCheck, Smartphone, Zap, ArrowRight,
-  MessageSquare, Layout, HardHat,
+  ArrowRight, FileText, Calculator, Send, Download,
+  BookTemplate, Sparkles, ChevronRight, CheckCircle2,
+  Building2, HardHat, ClipboardList,
 } from 'lucide-react';
 import { Logo } from '@/components/shared/Logo';
 import { Button } from '@/components/shared/Button';
 
-/* ── Design rule: no gradients, no shadows, only borders ── */
+/* ── Regla de diseño: sin gradientes, sin sombras, solo bordes ── */
 
 const features = [
   {
-    title: 'Asistente IA Experto',
-    description: 'Genera presupuestos detallados en segundos hablando con nuestra IA especializada en construcción.',
-    icon: MessageSquare,
+    title: 'APU Detallado por Actividad',
+    description:
+      'Arma el Análisis de Precio Unitario con materiales, mano de obra y equipos. Precios de referencia del catálogo Colombia 2026 incluidos.',
+    icon: ClipboardList,
   },
   {
-    title: 'Análisis de APU',
-    description: 'Desglose técnico automático de materiales, mano de obra y equipos para cada actividad.',
-    icon: Layout,
+    title: 'AIU e Impuestos Colombianos',
+    description:
+      'Calcula Administración, Imprevistos y Utilidad en modo porcentaje o gastos fijos. Aplica IVA, ReteFuente, ReteICA y ReteIVA según la ciudad.',
+    icon: Calculator,
   },
   {
-    title: 'Base de Insumos 2025',
-    description: 'Acceso a precios de referencia actualizados para las principales ciudades de Colombia.',
-    icon: BarChart3,
+    title: 'Portal del Cliente',
+    description:
+      'Envía el presupuesto al cliente con un enlace seguro. El cliente puede aprobarlo, rechazarlo o dejar comentarios con firma digital.',
+    icon: Send,
   },
   {
-    title: 'Exportación Profesional',
-    description: 'Genera PDFs impecables con tu logo para enviar directamente a tus clientes.',
-    icon: Zap,
+    title: 'Exportación PDF y Excel',
+    description:
+      'Genera el PDF con tu logo listo para entregar. El Excel incluye 5 hojas: Resumen, Presupuesto, APUs, Insumos y Programa de Obra.',
+    icon: Download,
   },
   {
-    title: 'Seguridad Total',
-    description: 'Tus datos están protegidos con encriptación de grado bancario y respaldo en la nube.',
-    icon: ShieldCheck,
+    title: 'Plantillas Personales',
+    description:
+      'Guarda la estructura de tus presupuestos como plantilla y reutilízala en proyectos futuros. Con o sin precios, según lo necesites.',
+    icon: BookTemplate,
   },
   {
-    title: 'Multi-dispositivo',
-    description: 'Gestiona tus obras desde el computador, tablet o celular en cualquier lugar.',
-    icon: Smartphone,
+    title: 'Carta Ejecutiva con IA',
+    description:
+      'Al enviar al cliente, SIPO genera automáticamente una carta de presentación ejecutiva adaptada a tu presupuesto usando inteligencia artificial.',
+    icon: Sparkles,
   },
 ];
 
 const steps = [
-  { title: 'Habla con la IA', desc: 'Describe tu proyecto y recibe una propuesta técnica al instante.' },
-  { title: 'Ajusta los detalles', desc: 'Edita cantidades y precios en nuestro editor inteligente.' },
-  { title: 'Envía el PDF', desc: 'Descarga y comparte el presupuesto profesional con tu cliente.' },
+  {
+    title: 'Organiza por capítulos y actividades',
+    desc: 'Crea el presupuesto con la estructura estándar colombiana: capítulos como Cimentación, Mampostería, Acabados, y las actividades con sus cantidades.',
+  },
+  {
+    title: 'Configura APU, AIU e impuestos',
+    desc: 'Define el APU de cada actividad con insumos del catálogo. Configura el AIU y las retenciones fiscales según municipio.',
+  },
+  {
+    title: 'Envía al cliente y exporta',
+    desc: 'Comparte el presupuesto con un enlace al portal del cliente para aprobación digital. Descarga el PDF o el Excel con Programa de Obra incluido.',
+  },
+];
+
+const tiposObra = [
+  'Residencial',
+  'Comercial',
+  'Institucional',
+  'Industrial',
+  'Infraestructura',
+  'Hotelero',
 ];
 
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white font-sans">
+
       {/* ── Nav ── */}
       <nav className="sticky top-0 z-50 bg-steel-dark border-b border-white/10">
         <div className="max-w-6xl mx-auto px-6 h-[60px] flex items-center justify-between">
@@ -66,7 +91,7 @@ export default function LandingPage() {
             </Link>
             <Link href="/registro">
               <Button size="sm" variant="primary">
-                Pruébalo Gratis
+                Registrarse
               </Button>
             </Link>
           </div>
@@ -76,35 +101,39 @@ export default function LandingPage() {
       {/* ── Hero ── */}
       <section className="bg-steel-dark">
         <div className="max-w-6xl mx-auto px-6 pt-20 pb-28 text-center">
-          {/* Badge IA */}
+          {/* Badge tipo de sistema */}
           <span className="inline-flex items-center gap-2 px-3 py-1 rounded-[20px] bg-burn-pale text-burn-deep text-[11px] font-medium mb-8">
-            <Sparkles className="h-3 w-3" />
-            Presupuestos de obra con IA
+            <Building2 className="h-3 w-3" />
+            Sistema de presupuestación de obras — Colombia
           </span>
 
           <h1 className="text-[36px] md:text-[52px] font-semibold text-white tracking-tight leading-tight mb-6 max-w-3xl mx-auto">
-            Construye presupuestos{' '}
-            <span className="text-burn-orange">en minutos,</span>{' '}
-            no horas.
+            Presupuestos de construcción{' '}
+            <span className="text-burn-orange">precisos y profesionales.</span>
           </h1>
 
-          <p className="text-[15px] text-steel-light max-w-xl mx-auto mb-10 leading-relaxed">
-            SIPO es el asistente inteligente que ayuda a ingenieros, arquitectos y
-            maestros de obra a crear presupuestos técnicos precisos con IA.
+          <p className="text-[15px] text-steel-light max-w-2xl mx-auto mb-10 leading-relaxed">
+            SIPO es el sistema para ingenieros, arquitectos y constructores colombianos
+            que necesitan elaborar presupuestos con APU, AIU, retenciones fiscales y
+            enviarlos al cliente con aprobación digital.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link href="/registro">
               <Button size="lg" icon={<ArrowRight className="h-4 w-4" />}>
-                Empieza ahora — es gratis
+                Crear cuenta gratis
               </Button>
             </Link>
-            <p className="text-[13px] text-steel-light">Sin tarjeta de crédito</p>
+            <Link href="/login">
+              <button className="text-[14px] font-medium text-steel-light hover:text-white transition-colors duration-150 flex items-center gap-1.5">
+                Ya tengo cuenta <ChevronRight className="h-4 w-4" />
+              </button>
+            </Link>
           </div>
 
-          {/* App mockup */}
+          {/* Mockup de la app */}
           <div className="mt-16 mx-auto max-w-4xl rounded-[12px] border border-white/10 overflow-hidden">
-            {/* Browser chrome */}
+            {/* Chrome del navegador */}
             <div className="flex items-center gap-2 px-4 py-3 bg-steel-mid border-b border-white/10">
               <div className="flex gap-1.5">
                 <div className="w-2.5 h-2.5 rounded-full bg-white/20" />
@@ -113,43 +142,60 @@ export default function LandingPage() {
               </div>
               <div className="mx-auto w-1/3 h-4 bg-white/10 rounded" />
             </div>
-            {/* App content mock */}
+            {/* Contenido simulado */}
             <div className="bg-sand aspect-[16/8] flex gap-0 overflow-hidden">
-              {/* Sidebar mock */}
-              <div className="w-[200px] h-full bg-steel-dark flex-shrink-0 p-4 space-y-3">
+              {/* Sidebar */}
+              <div className="w-[180px] h-full bg-steel-dark flex-shrink-0 p-4 flex flex-col gap-3">
                 <div className="h-5 w-16 bg-burn-orange/80 rounded" />
-                <div className="h-px bg-white/10 my-3" />
-                <div className="space-y-1.5">
-                  {[70, 55, 80, 60].map((w, i) => (
+                <div className="h-px bg-white/10" />
+                <div className="flex flex-col gap-1.5">
+                  {[70, 55, 80, 60, 45].map((w, i) => (
                     <div key={i} className={`h-7 rounded flex items-center gap-2 px-2 ${i === 1 ? 'bg-steel-mid/50' : ''}`}>
                       <div className={`h-3 rounded ${i === 1 ? 'bg-white/60' : 'bg-white/20'}`} style={{ width: `${w}%` }} />
                     </div>
                   ))}
                 </div>
+                <div className="mt-auto h-px bg-white/10" />
+                <div className="h-6 w-24 bg-white/10 rounded" />
               </div>
-              {/* Content mock */}
-              <div className="flex-1 p-5 space-y-4">
-                <div className="flex justify-between items-start">
-                  <div className="space-y-1.5">
-                    <div className="h-4 w-40 bg-ink/20 rounded" />
-                    <div className="h-3 w-24 bg-stone/30 rounded" />
+              {/* Contenido del editor — flex col que llena el alto */}
+              <div className="flex-1 p-5 flex flex-col gap-3 min-h-0">
+                {/* Header */}
+                <div className="flex justify-between items-start shrink-0">
+                  <div className="flex flex-col gap-1.5">
+                    <div className="h-4 w-48 bg-ink/20 rounded" />
+                    <div className="h-3 w-32 bg-stone/30 rounded" />
                   </div>
-                  <div className="h-8 w-24 bg-burn-orange rounded-lg" />
+                  <div className="flex gap-2">
+                    <div className="h-8 w-20 bg-steel-fog rounded-lg border border-concrete" />
+                    <div className="h-8 w-24 bg-burn-orange rounded-lg" />
+                  </div>
                 </div>
-                <div className="grid grid-cols-4 gap-3">
-                  {[1, 2, 3, 4].map(i => (
-                    <div key={i} className="bg-white rounded-lg border border-concrete p-3 space-y-2">
-                      <div className="h-6 w-6 bg-steel-fog rounded" />
-                      <div className="h-3 w-full bg-concrete rounded" />
-                      <div className="h-4 w-2/3 bg-steel-mid/20 rounded" />
+                {/* Capítulos — ocupa el espacio disponible */}
+                <div className="flex flex-col gap-2 flex-1 min-h-0">
+                  {[
+                    { w: 72, val: 68 },
+                    { w: 55, val: 52 },
+                    { w: 88, val: 85 },
+                    { w: 60, val: 57 },
+                  ].map((c, i) => (
+                    <div key={i} className="bg-white rounded-lg border border-concrete flex-1 flex items-center px-3 gap-3 min-h-0">
+                      <div className="h-2.5 w-2.5 rounded-sm bg-burn-orange/40 shrink-0" />
+                      <div className="h-3 rounded bg-concrete flex-1" style={{ maxWidth: `${c.w}%` }} />
+                      <div className="ml-auto h-3 w-14 bg-success-bg rounded shrink-0" />
                     </div>
                   ))}
                 </div>
-                <div className="space-y-2">
-                  {[85, 65, 90].map((w, i) => (
-                    <div key={i} className="bg-white rounded-lg border border-concrete h-10 flex items-center px-3 gap-3">
-                      <div className="h-3 w-3 bg-concrete rounded-full" />
-                      <div className="h-3 rounded bg-concrete" style={{ width: `${w}%` }} />
+                {/* Resumen financiero — fijo abajo */}
+                <div className="grid grid-cols-3 gap-3 shrink-0">
+                  {[
+                    { color: 'bg-steel-fog', accent: false },
+                    { color: 'bg-steel-fog', accent: false },
+                    { color: 'bg-burn-orange/20', accent: true },
+                  ].map((card, i) => (
+                    <div key={i} className={`rounded-lg border p-3 ${card.accent ? 'border-burn-orange/30 bg-burn-pale' : 'border-concrete bg-white'}`}>
+                      <div className="h-2 w-14 bg-concrete/80 rounded mb-2" />
+                      <div className={`h-4 rounded ${card.color} ${card.accent ? 'w-full' : 'w-3/4'}`} />
                     </div>
                   ))}
                 </div>
@@ -159,32 +205,34 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Métricas rápidas ── */}
+      {/* ── Tipos de obra ── */}
       <section className="bg-white border-b border-concrete">
-        <div className="max-w-6xl mx-auto px-6 py-10 grid grid-cols-2 md:grid-cols-4 gap-0 divide-x divide-concrete">
-          {[
-            { value: '3x', label: 'Más rápido que Excel' },
-            { value: '98%', label: 'Precisión en APU' },
-            { value: '500+', label: 'Ingenieros activos' },
-            { value: '0 COP', label: 'Para empezar' },
-          ].map((m, i) => (
-            <div key={i} className="px-6 py-4 text-center first:pl-0 last:pr-0">
-              <p className="text-[28px] font-semibold text-steel-dark">{m.value}</p>
-              <p className="text-[13px] text-stone mt-1">{m.label}</p>
-            </div>
-          ))}
+        <div className="max-w-6xl mx-auto px-6 py-8">
+          <p className="text-[12px] font-medium text-stone uppercase tracking-widest mb-5 text-center">
+            Tipos de obra soportados
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {tiposObra.map((tipo) => (
+              <span
+                key={tipo}
+                className="px-4 py-1.5 rounded-[20px] border border-concrete text-[13px] text-charcoal bg-sand"
+              >
+                {tipo}
+              </span>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* ── Features ── */}
+      {/* ── Funcionalidades ── */}
       <section className="bg-sand py-24">
         <div className="max-w-6xl mx-auto px-6">
           <div className="mb-14">
             <h2 className="text-[28px] font-semibold text-ink mb-3">
-              Todo lo que necesitas para ganar licitaciones
+              Todo en un solo sistema
             </h2>
-            <p className="text-[15px] text-stone max-w-lg">
-              Herramientas profesionales diseñadas por ingenieros para constructores colombianos.
+            <p className="text-[15px] text-stone max-w-xl">
+              Desde el APU hasta la aprobación del cliente — sin hojas de Excel sueltas ni correos de ida y vuelta.
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -225,85 +273,138 @@ export default function LandingPage() {
                 ))}
               </div>
             </div>
-            {/* Testimonial */}
-            <div className="flex-1 bg-steel-dark rounded-[12px] border border-white/10 p-10 flex items-center justify-center text-center min-h-[280px]">
-              <div className="space-y-5">
-                <HardHat className="h-12 w-12 text-burn-orange mx-auto" />
-                <p className="text-white text-[15px] font-medium leading-relaxed italic max-w-sm">
-                  "SIPO me ahorró 3 días de trabajo en mi última cotización.
-                  El APU que generó la IA fue increíblemente preciso."
-                </p>
-                <p className="text-steel-light text-[13px]">— Ing. Alejandro M., Constructor</p>
+
+            {/* Qué incluye el presupuesto */}
+            <div className="flex-1 bg-steel-dark rounded-[12px] border border-white/10 p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <FileText className="h-6 w-6 text-burn-orange" />
+                <p className="text-white text-[15px] font-semibold">El presupuesto incluye</p>
               </div>
+              <ul className="space-y-3">
+                {[
+                  'Capítulos y actividades con cantidades y precios unitarios',
+                  'APU por actividad: materiales, mano de obra y equipos',
+                  'AIU en modo porcentaje o gastos fijos mensuales',
+                  'IVA según método (sobre utilidad, AIU o total)',
+                  'ReteFuente, ReteICA y ReteIVA por municipio',
+                  'Resumen financiero con costo directo y total oferta',
+                  'Programa de obra en el Excel exportado',
+                  'Carta ejecutiva generada por IA al enviar al cliente',
+                ].map((item, i) => (
+                  <li key={i} className="flex items-start gap-2.5">
+                    <CheckCircle2 className="h-4 w-4 text-burn-orange mt-0.5 shrink-0" />
+                    <span className="text-[13px] text-steel-light leading-relaxed">{item}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ── Pricing ── */}
-      <section className="bg-sand py-24">
+      {/* ── Catálogo de referencia ── */}
+      <section className="bg-sand py-20 border-t border-concrete border-b">
         <div className="max-w-6xl mx-auto px-6">
-          <div className="text-center mb-12">
-            <h2 className="text-[28px] font-semibold text-ink mb-3">
-              Planes simples para equipos en crecimiento
-            </h2>
-            <p className="text-[13px] text-stone">Sin sorpresas. Sin letra pequeña.</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
-            {/* Gratis */}
-            <div className="bg-white border border-concrete rounded-[12px] p-8">
-              <h3 className="text-[17px] font-semibold text-ink mb-1">Gratis</h3>
-              <div className="text-[28px] font-semibold text-ink mb-1">
-                $0{' '}
-                <span className="text-[13px] font-normal text-stone">/ siempre</span>
-              </div>
-              <p className="text-[11px] text-stone mb-6">Para empezar sin riesgos</p>
-              <ul className="text-[13px] text-charcoal space-y-3 mb-8">
-                {[
-                  '5 Proyectos activos',
-                  '20 Consultas IA diarias',
-                  'Exportación PDF básica',
-                  'Base de insumos limitada',
-                ].map((item, i) => (
-                  <li key={i} className="flex items-center gap-2.5">
-                    <CheckCircle2 className="h-4 w-4 text-success-text shrink-0" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <Link href="/registro">
-                <Button fullWidth variant="secondary">
-                  Comenzar gratis
-                </Button>
-              </Link>
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-10">
+            <div className="flex-1">
+              <h2 className="text-[24px] font-semibold text-ink mb-3">
+                Catálogo de referencia Colombia 2026
+              </h2>
+              <p className="text-[14px] text-stone leading-relaxed max-w-lg">
+                SIPO incluye un catálogo con{' '}
+                <span className="font-semibold text-ink">28 capítulos</span>,{' '}
+                <span className="font-semibold text-ink">164 actividades</span> y más de{' '}
+                <span className="font-semibold text-ink">800 insumos APU</span> con precios
+                de referencia actualizados para las principales ciudades de Colombia.
+                Úsalos como punto de partida y ajusta a tu mercado local.
+              </p>
             </div>
-            {/* Pro */}
-            <div className="bg-white border border-burn-orange rounded-[12px] p-8 relative">
-              <span className="absolute top-0 right-8 -translate-y-1/2 bg-burn-orange text-white text-[11px] font-medium px-3 py-1 rounded-[20px]">
-                Recomendado
+            <div className="grid grid-cols-2 gap-3 shrink-0">
+              {[
+                { value: '28', label: 'Capítulos' },
+                { value: '164', label: 'Actividades' },
+                { value: '800+', label: 'Insumos APU' },
+                { value: '6', label: 'Tipos de obra' },
+              ].map((m, i) => (
+                <div key={i} className="bg-white border border-concrete rounded-[12px] px-5 py-4 text-center">
+                  <p className="text-[24px] font-semibold text-steel-dark">{m.value}</p>
+                  <p className="text-[12px] text-stone mt-0.5">{m.label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Portal del cliente ── */}
+      <section className="bg-white py-24">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="flex flex-col lg:flex-row items-center gap-16">
+            {/* Texto */}
+            <div className="flex-1">
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-burn-deep bg-burn-pale px-3 py-1 rounded-[20px] mb-5">
+                <Send className="h-3 w-3" /> Portal del Cliente
               </span>
-              <h3 className="text-[17px] font-semibold text-ink mb-1">Profesional</h3>
-              <div className="text-[28px] font-semibold text-ink mb-1">
-                $99.000{' '}
-                <span className="text-[13px] font-normal text-stone">COP / mes</span>
-              </div>
-              <p className="text-[11px] text-stone mb-6">Próximamente disponible</p>
-              <ul className="text-[13px] text-charcoal space-y-3 mb-8">
+              <h2 className="text-[28px] font-semibold text-ink mb-4">
+                El cliente aprueba en línea, sin imprimir ni firmar a mano
+              </h2>
+              <p className="text-[14px] text-stone leading-relaxed mb-6 max-w-md">
+                Envía un enlace seguro al cliente. Él ve el resumen financiero, los capítulos
+                del presupuesto y los datos de tu empresa. Puede aprobar, rechazar o dejar
+                observaciones con su nombre como firma digital.
+              </p>
+              <ul className="space-y-2.5">
                 {[
-                  'Proyectos ilimitados',
-                  'Consultas IA ilimitadas',
-                  'PDF Premium con logo propio',
-                  'Soporte prioritario',
+                  'Enlace único con expiración configurable',
+                  'Vista del presupuesto sin acceso al editor',
+                  'Notificación al constructor por correo al responder',
+                  'Historial de versiones y snapshots automáticos',
                 ].map((item, i) => (
-                  <li key={i} className="flex items-center gap-2.5">
+                  <li key={i} className="flex items-center gap-2.5 text-[13px] text-charcoal">
                     <CheckCircle2 className="h-4 w-4 text-success-text shrink-0" />
                     {item}
                   </li>
                 ))}
               </ul>
-              <Button fullWidth disabled>
-                Muy pronto
-              </Button>
+            </div>
+
+            {/* Simulación del portal */}
+            <div className="flex-1 w-full max-w-md border border-concrete rounded-[12px] overflow-hidden bg-sand">
+              <div className="bg-steel-dark px-5 py-4 flex items-center gap-3">
+                <HardHat className="h-5 w-5 text-burn-orange" />
+                <div>
+                  <p className="text-white text-[13px] font-semibold">Constructora El Pino S.A.S.</p>
+                  <p className="text-steel-light text-[11px]">Presupuesto — Proyecto Residencial Palmera</p>
+                </div>
+              </div>
+              <div className="p-5 space-y-4">
+                <div className="grid grid-cols-3 gap-2">
+                  {['Costo Directo', 'Con AIU', 'Total Oferta'].map((label, i) => (
+                    <div key={i} className={`rounded-lg border p-3 text-center ${i === 2 ? 'border-burn-orange/30 bg-burn-pale' : 'border-concrete bg-white'}`}>
+                      <p className="text-[10px] text-stone mb-1">{label}</p>
+                      <div className={`h-3 rounded mx-auto ${i === 2 ? 'bg-burn-orange/30 w-4/5' : 'bg-concrete w-3/4'}`} />
+                    </div>
+                  ))}
+                </div>
+                <div className="space-y-1.5">
+                  {['Cimentación', 'Mampostería', 'Cubierta'].map((cap, i) => (
+                    <div key={i} className="bg-white border border-concrete rounded-lg h-9 flex items-center px-3 gap-3">
+                      <div className="h-2 w-2 rounded-full bg-burn-orange/40" />
+                      <span className="text-[12px] text-charcoal">{cap}</span>
+                      <div className="ml-auto h-2.5 w-20 bg-concrete rounded" />
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <div className="flex-1 h-9 rounded-lg border border-success-border bg-success-bg flex items-center justify-center gap-1.5">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-success-text" />
+                    <span className="text-[12px] font-medium text-success-text">Aprobar</span>
+                  </div>
+                  <div className="flex-1 h-9 rounded-lg border border-concrete bg-white flex items-center justify-center">
+                    <span className="text-[12px] text-stone">Rechazar</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -313,16 +414,24 @@ export default function LandingPage() {
       <section className="bg-steel-dark py-20">
         <div className="max-w-6xl mx-auto px-6 text-center">
           <h2 className="text-[28px] font-semibold text-white mb-4">
-            Empieza a presupuestar con inteligencia
+            Empieza a presupuestar como profesional
           </h2>
           <p className="text-[15px] text-steel-light mb-8 max-w-md mx-auto">
-            Únete a los ingenieros y arquitectos que ya usan SIPO para ganar más licitaciones.
+            Crea tu cuenta y elabora tu primer presupuesto con APU, AIU y retenciones colombianas
+            en cuestión de minutos.
           </p>
-          <Link href="/registro">
-            <Button size="lg" icon={<ArrowRight className="h-4 w-4" />}>
-              Crear cuenta gratis
-            </Button>
-          </Link>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link href="/registro">
+              <Button size="lg" icon={<ArrowRight className="h-4 w-4" />}>
+                Crear cuenta gratis
+              </Button>
+            </Link>
+            <Link href="/login">
+              <button className="text-[14px] font-medium text-steel-light hover:text-white transition-colors duration-150">
+                Ya tengo cuenta
+              </button>
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -335,7 +444,7 @@ export default function LandingPage() {
             <Link href="#" className="hover:text-white transition-colors">Términos</Link>
             <Link href="mailto:hola@sipo.com.co" className="hover:text-white transition-colors">Soporte</Link>
           </div>
-          <p className="text-[11px] text-stone">Hecho con ❤️ en Colombia</p>
+          <p className="text-[11px] text-stone">Hecho con orgullo en Colombia</p>
         </div>
       </footer>
     </div>

@@ -628,6 +628,17 @@ export interface CapituloPlantillaInput {
   actividades: { nombre: string; unidad: string; cantidad: number; precio_unitario: number }[]
 }
 
+// ── AIU Detallado — componentes de Administración ──
+export interface AIUComponente {
+  id: string
+  budget_id: string
+  user_id: string
+  nombre: string
+  valor_mensual: number
+  orden: number
+  created_at?: string
+}
+
 // ── Portal del Cliente ──
 export interface PresupuestoToken {
   id: string;

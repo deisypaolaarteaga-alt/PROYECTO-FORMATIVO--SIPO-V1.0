@@ -2,6 +2,7 @@ import { Workbook } from 'exceljs';
 import type { Cell, Row, Borders, Alignment } from 'exceljs';
 import Decimal from 'decimal.js';
 import type { PresupuestoPDFData, ConfigPDFProfesional } from '@/types/pdf';
+import type { AIUComponente } from '@/types';
 
 const D = (v: number | string | null | undefined) => new Decimal(Number(v) || 0);
 const fmt = (d: Decimal) => d.toDecimalPlaces(0).toNumber();
@@ -24,15 +25,17 @@ export interface ExportarExcelOptions {
 
 // ── Paleta ────────────────────────────────────────────────────────────────────
 const C = {
-  orange:    'FFE8571A',
-  darkHdr:   'FF1F2937',
-  chapterBg: 'FFF3F4F6',
-  white:     'FFFFFFFF',
-  black:     'FF000000',
-  amberBg:   'FFFEF3C7',
-  amberText: 'FF92400E',
-  altRow:    'FFF8F7F5',
-  border:    'FFD0D4DB',
+  orange:     'FFE8571A',
+  darkHdr:    'FF1F2937',
+  chapterBg:  'FFF3F4F6',
+  white:      'FFFFFFFF',
+  black:      'FF000000',
+  amberBg:    'FFFEF3C7',
+  amberText:  'FF92400E',
+  altRow:     'FFF8F7F5',
+  border:     'FFD0D4DB',
+  aiuItemBg:  'FFF9FAFB',
+  aiuItemFg:  'FF6B7280',
 } as const;
 
 const MF  = '"$"#,##0';
@@ -76,11 +79,12 @@ function sr(row: Row, n: number, base: CS, over?: Record<number, Partial<CS>>): 
 }
 
 export async function exportarPresupuestoExcel(
-  budget:  PresupuestoPDFData,
-  profile: ConfigPDFProfesional,
-  options: ExportarExcelOptions = {
+  budget:          PresupuestoPDFData,
+  profile:         ConfigPDFProfesional,
+  options:         ExportarExcelOptions = {
     incluirResumen: true, incluirPresupuesto: true, incluirAPUs: true, incluirInsumos: true, incluirProgramaObra: true,
-  }
+  },
+  aiuComponentes?: AIUComponente[]
 ): Promise<void> {
   // ── Cálculos ────────────────────────────────────────────────────────────────
   const sortedChapters = (budget.chapters || [])
@@ -206,21 +210,32 @@ export async function exportarPresupuestoExcel(
     const rHdr = ws.addRow(['CONCEPTO', 'VALOR (COP)']);
     sr(rHdr, 2, { bg: C.darkHdr, fg: C.white, bold: true, bdr: true, align: 'center' });
 
-    // Filas de valores COP
-    const moneyItems: [string, number][] = [
-      ['Costo Directo',                  fmt(costoDirecto)  ],
-      [`Administración (${adminPct}%)`,  fmt(aiuAdmin)      ],
-      [`Imprevistos (${imprevPct}%)`,    fmt(aiuImprevistos)],
-      [`Utilidad (${utilPct}%)`,         fmt(aiuUtilidad)   ],
-      ['AIU Total',                      fmt(aiuTotal)      ],
-      ['Subtotal (CD + AIU)',            fmt(subtotal)      ],
-      [ivaLabel,                         fmt(iva)           ],
-    ];
-    for (const [lbl, val] of moneyItems) {
+    // Filas de valores COP — helper local
+    const addResRow = (lbl: string, val: number) => {
       const r = ws.addRow([lbl, val]);
       sc(r.getCell(1), { bg: C.white, bold: true, bdr: true });
       sc(r.getCell(2), { bg: C.white, nf: MF, align: 'right', bdr: true });
+    };
+
+    addResRow('Costo Directo', fmt(costoDirecto));
+    addResRow(`Administración (${adminPct}%)`, fmt(aiuAdmin));
+
+    // Desglose AIU detallado — filas indentadas por ítem de gastos mensuales
+    if (budget.metodo_aiu === 'detallado' && aiuComponentes?.length) {
+      const durMeses = Number(budget.duracion_meses) || 0;
+      for (const comp of aiuComponentes) {
+        const totalComp = D(comp.valor_mensual).times(durMeses);
+        const r = ws.addRow([`    ${comp.nombre}`, fmt(totalComp)]);
+        sc(r.getCell(1), { bg: C.aiuItemBg, fg: C.aiuItemFg, bdr: true });
+        sc(r.getCell(2), { bg: C.aiuItemBg, fg: C.aiuItemFg, nf: MF, align: 'right', bdr: true });
+      }
     }
+
+    addResRow(`Imprevistos (${imprevPct}%)`, fmt(aiuImprevistos));
+    addResRow(`Utilidad (${utilPct}%)`, fmt(aiuUtilidad));
+    addResRow('AIU Total', fmt(aiuTotal));
+    addResRow('Subtotal (CD + AIU)', fmt(subtotal));
+    addResRow(ivaLabel, fmt(iva));
 
     // TOTAL OFERTA — naranja, blanco, bold
     const rTot = ws.addRow(['TOTAL OFERTA', fmt(totalOferta)]);

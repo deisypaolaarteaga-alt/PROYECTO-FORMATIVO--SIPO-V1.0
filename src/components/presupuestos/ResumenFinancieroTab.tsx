@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { useMemo, useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calculator, Receipt, ShieldCheck, PieChart,
   TrendingUp, BarChart3, Info,
@@ -9,6 +9,8 @@ import {
 import Decimal from 'decimal.js';
 import { formatearCOP } from '@/lib/utils/formato-cop';
 import { cn } from '@/lib/utils';
+import type { AIUComponente } from '@/types';
+import { getAIUComponentes } from '@/actions/aiu-componentes';
 
 interface ResumenFinancieroTabProps {
   budget: any;
@@ -17,6 +19,25 @@ interface ResumenFinancieroTabProps {
 
 export function ResumenFinancieroTab({ budget, subtotalDirecto }: ResumenFinancieroTabProps) {
   const D = (v: number | string | null | undefined) => new Decimal(Number(v) || 0);
+
+  // ── AIU Detallado — desglose colapsable ────────────────────────────────────
+  const esDetallado = budget.metodo_aiu === 'detallado';
+  const duracionMeses = Number(budget.duracion_meses) || 0;
+  const [aiuComponentes, setAiuComponentes] = useState<AIUComponente[]>([]);
+  const [desgloseAbierto, setDesgloseAbierto] = useState(false);
+
+  useEffect(() => {
+    if (!esDetallado || !budget.id) return;
+    getAIUComponentes(budget.id).then(setAiuComponentes);
+  }, [budget.id, esDetallado]);
+
+  const totalMensualComponentes = useMemo(
+    () => aiuComponentes.reduce(
+      (acc, c) => acc.plus(new Decimal(Number(c.valor_mensual) || 0)),
+      new Decimal(0)
+    ),
+    [aiuComponentes]
+  );
 
   // ── Desglose del Costo Directo ──────────────────────────────────────────────
   const desglose = useMemo(() => {
@@ -137,7 +158,53 @@ export function ResumenFinancieroTab({ budget, subtotalDirecto }: ResumenFinanci
           </h4>
 
           <div className="space-y-5">
-            <BarraAIU label="Administración"    pct={adminPct}    base={aiuBase} barClass="bg-[#2D5F8A]"   value={fmt(adminValor)} />
+            <div>
+              <BarraAIU
+                label="Administración"
+                pct={adminPct}
+                base={aiuBase}
+                barClass="bg-[#2D5F8A]"
+                value={fmt(adminValor)}
+                onToggle={esDetallado ? () => setDesgloseAbierto(p => !p) : undefined}
+                desgloseAbierto={desgloseAbierto}
+              />
+              <AnimatePresence>
+                {esDetallado && desgloseAbierto && aiuComponentes.length > 0 && (
+                  <motion.div
+                    key="desglose-admin"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.25, ease: 'easeInOut' }}
+                    className="overflow-hidden"
+                  >
+                    <div className="mt-2 rounded-lg border border-concrete bg-[#F9FAFB] px-3 py-2.5 space-y-1.5">
+                      {aiuComponentes.map(comp => {
+                        const total = D(comp.valor_mensual).times(duracionMeses);
+                        return (
+                          <div key={comp.id} className="flex justify-between items-center gap-4">
+                            <span className="text-[11px] text-stone truncate">{comp.nombre}</span>
+                            <span className="text-[11px] font-mono text-stone whitespace-nowrap shrink-0">
+                              {fmt(D(comp.valor_mensual))}/mes × {duracionMeses} = {fmt(total)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                      <div className="border-t border-concrete pt-1.5 mt-0.5">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[11px] font-bold text-stone">
+                            Total: {fmt(totalMensualComponentes)}/mes × {duracionMeses} meses
+                          </span>
+                          <span className="text-[11px] font-black font-mono text-ink">
+                            {fmt(totalMensualComponentes.times(duracionMeses))}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
             <BarraAIU label="Imprevistos"       pct={imprevPct}   base={aiuBase} barClass="bg-[#E8A937]"   value={fmt(imprevistosValor)} />
             <BarraAIU label="Utilidad (ROI Bruto)" pct={utilidadPct} base={aiuBase} barClass="bg-[#2D7A45]" value={fmt(utilidadValor)} valueClass="text-[#2D7A45] font-bold" />
 
@@ -263,13 +330,25 @@ function LegendItem({ label, value, pct, color }: { label: string; value: string
   );
 }
 
-function BarraAIU({ label, pct, base, barClass, value, valueClass }: {
+function BarraAIU({ label, pct, base, barClass, value, valueClass, onToggle, desgloseAbierto }: {
   label: string; pct: number; base: number; barClass: string; value: string; valueClass?: string;
+  onToggle?: () => void; desgloseAbierto?: boolean;
 }) {
   return (
     <div className="space-y-2">
       <div className="flex justify-between text-[11px] font-bold uppercase tracking-tight">
-        <span className="text-stone">{label}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-stone">{label}</span>
+          {onToggle && (
+            <button
+              type="button"
+              onClick={onToggle}
+              className="normal-case tracking-normal font-normal text-[#2D5F8A] underline underline-offset-2 hover:text-[#1F2937] transition-colors"
+            >
+              {desgloseAbierto ? 'ocultar ▲' : 'ver desglose ▼'}
+            </button>
+          )}
+        </div>
         <span className="text-ink">{pct}%</span>
       </div>
       <div className="h-2 bg-sand rounded-full overflow-hidden">

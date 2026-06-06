@@ -93,8 +93,16 @@ export function BotonExportarExcel({ budget, profile }: Props) {
     setModalOpen(false);
     setLoading(true);
     try {
+      // Obtener componentes AIU si el método es detallado
+      let aiuComponentes = undefined;
+      if (budget.metodo_aiu === 'detallado') {
+        const { getAIUComponentes } = await import('@/actions/aiu-componentes');
+        const comps = await getAIUComponentes(budget.id);
+        if (comps.length > 0) aiuComponentes = comps;
+      }
+
       const { exportarPresupuestoExcel } = await import('@/lib/excel/exportarPresupuestoExcel');
-      await exportarPresupuestoExcel(budget, profile, opciones);
+      await exportarPresupuestoExcel(budget, profile, opciones, aiuComponentes);
       const hojasSeleccionadas = HOJAS.filter(h => opciones[h.key]).length;
       toast.success(`Excel generado con ${hojasSeleccionadas} hoja${hojasSeleccionadas !== 1 ? 's' : ''}`);
     } catch (err: any) {

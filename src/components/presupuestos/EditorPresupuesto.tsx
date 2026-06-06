@@ -39,6 +39,7 @@ const EstrategiaFinancieraTab = dynamic(
 );
 import { ResumenFinanciero } from './ResumenFinanciero';
 import { ResumenFinancieroTab } from './ResumenFinancieroTab';
+import { ConfiguracionAIU } from './ConfiguracionAIU';
 import { ModalCatalogo } from './ModalCatalogo';
 import { EstadoBadge } from './EstadoBadge';
 import { ExplosionInsumosView } from './ExplosionInsumosView';
@@ -570,17 +571,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                 </Button>
               )}
 
-              {/* borrador: Enviar al cliente + Aprobar internamente */}
-              {estaBorrador && clienteEmail && (
-                <button
-                  onClick={handleAbrirEnviarCliente}
-                  disabled={validandoAccion}
-                  className="inline-flex items-center gap-1.5 h-8 px-3 text-[13px] font-semibold rounded-lg border border-[#2563EB] text-[#2563EB] hover:bg-[#2563EB] hover:text-white disabled:opacity-60 transition-colors"
-                >
-                  <Clock className="h-4 w-4" />
-                  Enviar al cliente
-                </button>
-              )}
+              {/* borrador: Aprobar internamente */}
               {estaBorrador && (
                 <button
                   onClick={handleAprobar}
@@ -1145,40 +1136,36 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                   <Settings className="text-stone h-4 w-4" /> Configuración de Cascada
                 </h3>
 
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-stone uppercase tracking-widest">
-                      AIU Total (%)
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        value={budget.aiu_porcentaje ?? 0}
-                        onChange={(e) => handleUpdateBudget({ aiu_porcentaje: parseFloat(e.target.value) || 0 })}
-                        className="w-full h-11 bg-[#F5F2EE] border border-[#E8E4DE] rounded-lg px-3 focus:ring-1 focus:ring-[#C84B1A]/40 font-semibold text-lg text-[#1C1814]"
-                      />
-                      <span className="text-lg font-semibold text-[#6B7A8D]">%</span>
-                    </div>
-                    <p className="text-[10px] text-stone italic">Se aplica sobre el costo directo total.</p>
-                  </div>
+                {/* Configuración AIU — Admin (porcentaje o detallado) + Imprevistos + Utilidad */}
+                <ConfiguracionAIU
+                  budgetId={budget.id}
+                  metodoAiu={budget.metodo_aiu ?? 'porcentaje'}
+                  administracionPct={Number(budget.administracion_pct ?? 10)}
+                  imprevistosPct={Number(budget.imprevistos_pct ?? 5)}
+                  utilidadPct={Number(budget.utilidad_pct ?? 10)}
+                  costoDirecto={subtotalDirecto}
+                  duracionMeses={budget.duracion_meses ?? null}
+                  bloqueado={bloqueado}
+                  onUpdateBudget={handleUpdateBudget}
+                />
 
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-stone uppercase tracking-widest">
-                      IVA sobre Utilidad
-                    </label>
-                    <button
-                      onClick={() => handleUpdateBudget({ iva_porcentaje: budget.iva_porcentaje > 0 ? 0 : 19 })}
-                      className={cn(
-                        'w-full h-11 rounded-lg font-semibold text-sm transition-all duration-150 border-2',
-                        budget.iva_porcentaje > 0
-                          ? 'bg-[#C84B1A] border-[#C84B1A] text-white'
-                          : 'bg-white border-[#E8E4DE] text-stone hover:border-[#C84B1A] hover:text-[#1C1814]'
-                      )}
-                    >
-                      {budget.iva_porcentaje > 0 ? '19% Activado' : 'Sin IVA (0%)'}
-                    </button>
-                    <p className="text-[10px] text-stone italic">Aplica 19% sobre la utilidad calculada.</p>
-                  </div>
+                {/* IVA */}
+                <div className="space-y-2 border-t border-[#E8E4DE] pt-4">
+                  <label className="text-[10px] font-bold text-stone uppercase tracking-widest">
+                    IVA sobre Utilidad
+                  </label>
+                  <button
+                    onClick={() => handleUpdateBudget({ iva_porcentaje: budget.iva_porcentaje > 0 ? 0 : 19 })}
+                    className={cn(
+                      'w-full h-9 rounded-lg font-semibold text-sm transition-all duration-150 border-2',
+                      budget.iva_porcentaje > 0
+                        ? 'bg-[#C84B1A] border-[#C84B1A] text-white'
+                        : 'bg-white border-[#E8E4DE] text-stone hover:border-[#C84B1A] hover:text-[#1C1814]'
+                    )}
+                  >
+                    {budget.iva_porcentaje > 0 ? '19% Activado' : 'Sin IVA (0%)'}
+                  </button>
+                  <p className="text-[10px] text-stone italic">Aplica 19% sobre la utilidad calculada.</p>
                 </div>
 
                 {/* ReteICA según ciudad de la obra */}

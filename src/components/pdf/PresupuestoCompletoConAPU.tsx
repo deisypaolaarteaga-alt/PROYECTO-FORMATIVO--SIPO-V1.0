@@ -3,12 +3,13 @@ import { Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import { PresupuestoPDF } from './PresupuestoPDF';
 import { APUDetallePDF } from './APUDetallePDF';
 import type { PresupuestoPDFData, ConfigPDFProfesional, PDFExportOptions } from '@/types/pdf';
-import type { Activity } from '@/types';
+import type { Activity, AIUComponente } from '@/types';
 
 interface Props {
   budget: PresupuestoPDFData;
   profile: ConfigPDFProfesional;
   options?: PDFExportOptions;
+  aiuComponentes?: AIUComponente[];
 }
 
 const stubStyles = StyleSheet.create({
@@ -88,7 +89,7 @@ const PaginaSinItems = ({ activities }: { activities: ActEntry[] }) => (
   </Page>
 );
 
-export const PresupuestoCompletoConAPU = ({ budget, profile, options }: Props) => {
+export const PresupuestoCompletoConAPU = ({ budget, profile, options, aiuComponentes }: Props) => {
   const projectName = budget.projects?.nombre || 'Proyecto SIPO';
 
   const conItems: ActEntry[] = [];
@@ -116,7 +117,13 @@ export const PresupuestoCompletoConAPU = ({ budget, profile, options }: Props) =
   });
 
   return (
-    <PresupuestoPDF budget={budget} profile={profile} options={options}>
+    <PresupuestoPDF
+      budget={budget}
+      profile={profile}
+      options={options}
+      aiuComponentes={aiuComponentes}
+      duracionMeses={Number(budget.duracion_meses) || undefined}
+    >
       {conItems.map((item, idx) => (
         <APUDetallePDF
           key={`apu-${item.activity.id}-${idx}`}

@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { obtenerPresupuesto } from '@/actions/presupuestos';
+import { getAIUComponentes } from '@/actions/aiu-componentes';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { PresupuestoPDF } from '@/components/pdf/PresupuestoPDF';
 import { PresupuestoCompletoConAPU } from '@/components/pdf/PresupuestoCompletoConAPU';
@@ -56,6 +57,11 @@ export async function generarPresupuestoPDF(
       }));
     }
 
+    // 4b. Obtener componentes AIU si el método es detallado
+    const aiuComponentes = (budget as any).metodo_aiu === 'detallado'
+      ? await getAIUComponentes(budgetId)
+      : [];
+
     // 4. Obtener Parámetros Fiscales Actuales
     const { data: paramFiscales } = await supabase
       .from('parametros_fiscales')
@@ -83,9 +89,11 @@ export async function generarPresupuestoPDF(
     const Component = finalOptions.incluirAPUs ? PresupuestoCompletoConAPU : PresupuestoPDF;
 
     const element = React.createElement(Component, {
-      budget: budget as any,
-      profile: profile as any,
-      options: finalOptions
+      budget:         budget as any,
+      profile:        profile as any,
+      options:        finalOptions,
+      aiuComponentes: aiuComponentes.length > 0 ? aiuComponentes : undefined,
+      duracionMeses:  Number((budget as any).duracion_meses) || undefined,
     });
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

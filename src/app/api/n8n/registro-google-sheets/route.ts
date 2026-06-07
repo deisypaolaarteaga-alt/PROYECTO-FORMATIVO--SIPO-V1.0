@@ -29,10 +29,10 @@ export async function POST(request: NextRequest) {
         id,
         user_id,
         costo_directo,
-        projects!inner (
+        projects:project_id (
           nombre,
           tipo_obra,
-          clientes ( nombre_razon_social )
+          clientes:cliente_id ( nombre_razon_social )
         )
       `)
       .eq('id', budget_id)

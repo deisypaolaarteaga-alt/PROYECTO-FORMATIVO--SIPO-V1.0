@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     // Obtener datos del presupuesto y proyecto
     const { data: budget, error: errBudget } = await supabase
       .from('budgets')
-      .select(`id, titulo, user_id, projects!inner ( nombre )`)
+      .select(`id, titulo, user_id, projects:project_id ( nombre )`)
       .eq('id', budget_id)
       .is('deleted_at', null)
       .single();

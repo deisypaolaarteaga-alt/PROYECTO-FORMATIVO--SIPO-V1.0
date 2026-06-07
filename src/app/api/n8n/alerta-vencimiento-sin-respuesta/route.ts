@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
         titulo,
         user_id,
         vigencia_hasta,
-        projects!inner ( nombre )
+        projects:project_id ( nombre )
       `)
       .lt('vigencia_hasta', ahora.split('T')[0])
       .in('estado', ['enviado_a_cliente', 'visto_por_cliente'])

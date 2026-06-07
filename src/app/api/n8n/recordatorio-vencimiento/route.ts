@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
         vigencia_hasta,
         estado,
         user_id,
-        projects!inner ( nombre )
+        projects:project_id ( nombre )
       `)
       .eq('vigencia_hasta', fechaISO)
       .in('estado', ['enviado_a_cliente', 'visto_por_cliente'])

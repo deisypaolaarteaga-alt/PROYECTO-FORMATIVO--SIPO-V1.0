@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
         cliente_email,
         cliente_nombre,
         visto_at,
-        budgets!inner ( id, titulo, user_id, estado, deleted_at, projects!inner ( nombre ) )
+        budgets:budget_id ( id, titulo, user_id, estado, deleted_at, projects:project_id ( nombre ) )
       `)
       .not('visto_at', 'is', null)
       .is('cliente_accion', null)

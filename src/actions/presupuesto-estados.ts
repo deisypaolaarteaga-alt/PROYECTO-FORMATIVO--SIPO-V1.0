@@ -48,7 +48,7 @@ export async function cambiarEstadoPresupuesto(
   budgetId: string,
   nuevoEstado: EstadoPresupuesto,
   notas?: string
-): Promise<ActionResult> {
+): Promise<ActionResult & { generado?: boolean }> {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -72,16 +72,20 @@ export async function cambiarEstadoPresupuesto(
       };
     }
 
-    // Guardar snapshot ANTES de transiciones críticas
+    // Guardar snapshot ANTES de transiciones críticas — capturar resultado para informar a la UI
+    let snapResult: { generado?: boolean } = {};
     if (nuevoEstado === 'aprobado') {
-      await guardarSnapshot(budgetId, 'aprobacion');
+      const r = await guardarSnapshot(budgetId, 'aprobacion');
+      snapResult = r;
     } else if (estadoActual === 'rechazado_por_cliente' && nuevoEstado === 'borrador') {
-      await guardarSnapshot(budgetId, 'rechazo_cliente');
+      const r = await guardarSnapshot(budgetId, 'rechazo_cliente');
+      snapResult = r;
     } else if (
       (estadoActual === 'con_observaciones' || estadoActual === 'aprobado') &&
       nuevoEstado === 'borrador'
     ) {
-      await guardarSnapshot(budgetId, 'reapertura_manual');
+      const r = await guardarSnapshot(budgetId, 'reapertura_manual');
+      snapResult = r;
     }
 
     // Admin client: necesario para actualizar presupuestos en estado aprobado (RLS budgets_update_lock)
@@ -176,7 +180,7 @@ export async function cambiarEstadoPresupuesto(
       revalidatePath(`/proyectos/${budget.project_id}`);
       revalidatePath('/proyectos');
     }
-    return { success: true };
+    return { success: true, ...snapResult };
   } catch {
     return { success: false, error: 'Error al cambiar el estado del presupuesto.' };
   }

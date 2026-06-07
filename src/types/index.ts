@@ -502,6 +502,7 @@ export interface ActionResult<T = unknown> {
   message?: string;
   data?: T;
   field?: string;
+  generado?: boolean;
 }
 
 // ── Explosión de Insumos (Lista Global de Materiales) ──

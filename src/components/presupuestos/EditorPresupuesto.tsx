@@ -45,6 +45,7 @@ import { EstadoBadge } from './EstadoBadge';
 import { ExplosionInsumosView } from './ExplosionInsumosView';
 import { ModalGuardarPlantilla } from './ModalGuardarPlantilla';
 import { ModalEnviarCliente } from './ModalEnviarCliente';
+import { toast } from 'sonner';
 import { getResumenTokenPresupuesto, type TokenResumen } from '@/actions/portal-cliente';
 import { getVersiones } from '@/actions/versiones';
 import { VersionesTab } from './VersionesTab';
@@ -316,7 +317,10 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
     setIsChangingEstado(true);
     const res = await cambiarEstadoPresupuesto(budget.id, 'aprobado');
     setIsChangingEstado(false);
-    if (res.success) router.refresh();
+    if (res.success) {
+      if (res.generado) toast.success('Nueva versión guardada');
+      router.refresh();
+    }
   };
 
   async function mostrarErrorCapitulosVacios(capitulos_vacios: string[]) {
@@ -474,9 +478,7 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
     { key: 'insumos',     label: '2. Explosión de Insumos',    icon: Package    },
     { key: 'estrategia',  label: '3. Estrategia Financiera',   icon: BarChart2  },
     { key: 'resumen',     label: '4. Resumen y Exportación',   icon: TrendingUp },
-    ...(versiones.length > 0
-      ? [{ key: 'versiones' as const, label: `Versiones (${versiones.length})`, icon: History }]
-      : []),
+    { key: 'versiones' as const, label: versiones.length > 0 ? `Versiones (${versiones.length})` : 'Versiones', icon: History },
   ] as const;
 
   return (
@@ -627,9 +629,13 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                       onConfirm: async () => {
                         setConfirmState(null);
                         setIsChangingEstado(true);
-                        await cambiarEstadoPresupuesto(budget.id, 'borrador');
+                        const res = await cambiarEstadoPresupuesto(budget.id, 'borrador');
                         setIsChangingEstado(false);
-                        router.refresh();
+                        if (res.success) {
+                          if (res.generado === true) toast.success('Nueva versión guardada');
+                          else if (res.generado === false) toast.warning('Sin cambios detectados — no se generó nueva versión');
+                          router.refresh();
+                        }
                       },
                     })}
                     disabled={isChangingEstado}
@@ -652,9 +658,12 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                     onConfirm: async () => {
                       setConfirmState(null);
                       setIsChangingEstado(true);
-                      await cambiarEstadoPresupuesto(budget.id, 'aprobado');
+                      const res = await cambiarEstadoPresupuesto(budget.id, 'aprobado');
                       setIsChangingEstado(false);
-                      router.refresh();
+                      if (res.success) {
+                        if (res.generado) toast.success('Nueva versión guardada');
+                        router.refresh();
+                      }
                     },
                   })}
                   disabled={isChangingEstado}
@@ -676,9 +685,13 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                     onConfirm: async () => {
                       setConfirmState(null);
                       setIsChangingEstado(true);
-                      await cambiarEstadoPresupuesto(budget.id, 'borrador');
+                      const res = await cambiarEstadoPresupuesto(budget.id, 'borrador');
                       setIsChangingEstado(false);
-                      router.refresh();
+                      if (res.success) {
+                        if (res.generado === true) toast.success('Nueva versión guardada');
+                        else if (res.generado === false) toast.warning('Sin cambios detectados — no se generó nueva versión');
+                        router.refresh();
+                      }
                     },
                   })}
                   disabled={isChangingEstado}
@@ -761,6 +774,17 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
         </div>
       )}
 
+      {/* ── BANNER ENVIADO / VISTO POR CLIENTE ──────────────────────────── */}
+      {(estadoPortal === 'enviado_a_cliente' || estadoPortal === 'visto_por_cliente') && (
+        <div className="bg-blue-50 border-b border-blue-200 px-6 py-3 flex items-center gap-3">
+          <Clock className="h-5 w-5 text-blue-600 shrink-0" />
+          <p className="text-sm text-blue-800 font-medium">
+            Este presupuesto fue enviado al cliente y está bloqueado para edición.
+            Si el cliente lo rechaza podrás corregirlo.
+          </p>
+        </div>
+      )}
+
       {/* ── BANNER APROBADO (flujo interno) ──────────────────────────────── */}
       {estaAprobado && (
         <div className="bg-success-bg border-b border-success-border px-6 py-3 flex items-center gap-3">
@@ -773,18 +797,26 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
       )}
 
       {/* ── BANNERS PORTAL DEL CLIENTE ────────────────────────────────────── */}
-      {aprobadoPorCliente && tokenResumen && (
+      {aprobadoPorCliente && (
         <div className="bg-emerald-50 border-b border-emerald-200 px-6 py-3 flex items-start gap-3">
           <CheckCheck className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
           <div className="text-sm text-emerald-800 space-y-0.5">
-            <p className="font-semibold">
-              {tokenResumen.cliente_nombre ?? 'El cliente'} aprobó este presupuesto
-              {tokenResumen.cliente_respondio_at && (
-                <> el <strong>{new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'America/Bogota' }).format(new Date(tokenResumen.cliente_respondio_at))}</strong></>
-              )}
-            </p>
-            {tokenResumen.cliente_firma_nombre && (
-              <p className="text-emerald-700">Firma: <strong>{tokenResumen.cliente_firma_nombre}</strong></p>
+            {tokenResumen ? (
+              <>
+                <p className="font-semibold">
+                  {tokenResumen.cliente_nombre ?? 'El cliente'} aprobó este presupuesto
+                  {tokenResumen.cliente_respondio_at && (
+                    <> el <strong>{new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'America/Bogota' }).format(new Date(tokenResumen.cliente_respondio_at))}</strong></>
+                  )}
+                </p>
+                {tokenResumen.cliente_firma_nombre && (
+                  <p className="text-emerald-700">Firma: <strong>{tokenResumen.cliente_firma_nombre}</strong></p>
+                )}
+              </>
+            ) : (
+              <p className="font-semibold">
+                El cliente aprobó este presupuesto. Usa &quot;Aprobar internamente&quot; para confirmar.
+              </p>
             )}
           </div>
         </div>
@@ -813,7 +845,11 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
               setIsCorrigiendo(true);
               const res = await cambiarEstadoPresupuesto(budget.id, 'borrador');
               setIsCorrigiendo(false);
-              if (res.success) router.refresh();
+              if (res.success) {
+                if (res.generado === true) toast.success('Nueva versión guardada');
+                else if (res.generado === false) toast.warning('Sin cambios detectados — no se generó nueva versión');
+                router.refresh();
+              }
             }}
             disabled={isCorrigiendo}
             className="inline-flex items-center gap-1.5 h-8 px-3 text-[13px] font-semibold rounded-lg bg-red-600 hover:bg-red-700 text-white disabled:opacity-60 transition-colors shrink-0"
@@ -847,7 +883,11 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
               setIsCorrigiendo(true);
               const res = await cambiarEstadoPresupuesto(budget.id, 'borrador');
               setIsCorrigiendo(false);
-              if (res.success) router.refresh();
+              if (res.success) {
+                if (res.generado === true) toast.success('Nueva versión guardada');
+                else if (res.generado === false) toast.warning('Sin cambios detectados — no se generó nueva versión');
+                router.refresh();
+              }
             }}
             disabled={isCorrigiendo}
             className="inline-flex items-center gap-1.5 h-8 px-3 text-[13px] font-semibold rounded-lg bg-amber-600 hover:bg-amber-700 text-white disabled:opacity-60 transition-colors shrink-0"

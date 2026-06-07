@@ -38,11 +38,13 @@ export function VersionesTab({ versiones, budgetId }: VersionesTabProps) {
 
   if (versiones.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-stone-400">
+      <div className="flex flex-col items-center justify-center py-20 text-stone-400 max-w-md mx-auto text-center">
         <History className="w-12 h-12 mb-3 opacity-40" />
-        <p className="text-sm">No hay versiones guardadas aún.</p>
-        <p className="text-xs mt-1 text-stone-400">
-          Las versiones se guardan automáticamente al aprobar, rechazar o reabrir el presupuesto.
+        <p className="text-sm font-medium text-stone-500">No hay versiones guardadas aún.</p>
+        <p className="text-xs mt-2 text-stone-400 leading-relaxed">
+          Las versiones se generan automáticamente cuando envías el presupuesto al cliente,
+          el cliente responde, o se aprueba formalmente. Solo se guarda una versión nueva
+          cuando hay cambios reales.
         </p>
       </div>
     );

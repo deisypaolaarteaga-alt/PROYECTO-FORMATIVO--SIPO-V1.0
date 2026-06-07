@@ -2,7 +2,7 @@
 
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import Decimal from 'decimal.js';
-import type { ActionResult, BudgetSnapshot } from '@/types';
+import type { ActionResult, BudgetSnapshot, SnapshotData } from '@/types';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -31,6 +31,97 @@ function calcularTotalOfertaLocal(budget: {
   return subtotalConAIU.plus(iva).toNumber();
 }
 
+// ── 1b. detectarCambios ───────────────────────────────────────────────────────
+
+/**
+ * Compara el estado actual del presupuesto contra el último snapshot guardado.
+ * Retorna true si hay cambios reales (precio, cantidad, actividades, AIU).
+ * Cambios que NO cuentan: titulo, vigencia_dias, area_m2, ciudad_ica.
+ */
+async function detectarCambios(
+  budgetId: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _userId: string
+): Promise<boolean> {
+  try {
+    const admin = createAdminClient();
+
+    // 1. Último snapshot con data JSONB
+    const { data: lastSnap } = await admin
+      .from('budget_snapshots')
+      .select('data')
+      .eq('budget_id', budgetId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // Sin snapshot previo → siempre hay cambio
+    if (!lastSnap?.data) return true;
+
+    // 2. Estado actual del presupuesto
+    const { data: budget } = await admin
+      .from('budgets')
+      .select(`
+        administracion_pct, imprevistos_pct, utilidad_pct,
+        chapters (
+          activities (
+            id, cantidad, precio_unitario, deleted_at
+          )
+        )
+      `)
+      .eq('id', budgetId)
+      .single();
+
+    if (!budget) return true;
+
+    const snap = lastSnap.data as SnapshotData;
+
+    // 3. Comparar AIU (Administración, Imprevistos, Utilidad)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const b = budget as any;
+    if (!new Decimal(b.administracion_pct ?? 0).eq(new Decimal(snap.administracion_pct ?? 0))) return true;
+    if (!new Decimal(b.imprevistos_pct    ?? 0).eq(new Decimal(snap.imprevistos_pct    ?? 0))) return true;
+    if (!new Decimal(b.utilidad_pct       ?? 0).eq(new Decimal(snap.utilidad_pct       ?? 0))) return true;
+
+    // 4. Actividades del snapshot → mapa por id
+    const snapActs = snap.capitulos.flatMap((c) => c.actividades);
+    const snapMap  = new Map(snapActs.map((a) => [a.id, a]));
+
+    // 5. Actividades actuales no eliminadas → mapa por id
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const currentActs: Array<{ id: string; cantidad: number; precio_unitario: number }> =
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (b.chapters ?? []).flatMap((ch: any) =>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ((ch.activities ?? []) as any[]).filter((a) => !a.deleted_at)
+      );
+    const currentMap = new Map(currentActs.map((a) => [a.id, a]));
+
+    // 6. Actividades eliminadas (en snapshot pero no en actual)
+    for (const id of snapMap.keys()) {
+      if (!currentMap.has(id)) return true;
+    }
+
+    // 7. Actividades nuevas (en actual pero no en snapshot)
+    for (const id of currentMap.keys()) {
+      if (!snapMap.has(id)) return true;
+    }
+
+    // 8. Cambios en cantidad o precio_unitario (usando decimal.js, nunca floats)
+    for (const [id, current] of currentMap.entries()) {
+      const snapAct = snapMap.get(id);
+      if (!snapAct) continue;
+      if (!new Decimal(current.precio_unitario ?? 0).eq(new Decimal(snapAct.precio_unitario ?? 0))) return true;
+      if (!new Decimal(current.cantidad         ?? 0).eq(new Decimal(snapAct.cantidad         ?? 0))) return true;
+    }
+
+    return false;
+  } catch {
+    // En caso de error, asumir que hay cambios (más conservador)
+    return true;
+  }
+}
+
 // ── 1. guardarSnapshot ────────────────────────────────────────────────────────
 
 /**
@@ -40,7 +131,7 @@ function calcularTotalOfertaLocal(budget: {
 export async function guardarSnapshot(
   budgetId: string,
   motivo: 'rechazo_cliente' | 'reapertura_manual' | 'aprobacion' | 'envio_cliente'
-): Promise<ActionResult> {
+): Promise<ActionResult & { generado?: boolean }> {
   try {
     // 1. Verificar ownership con cliente de usuario (RLS aplica)
     const supabase = await createClient();
@@ -55,6 +146,14 @@ export async function guardarSnapshot(
 
     if (!budgetOwner) return { success: false, error: 'Presupuesto no encontrado' };
     if (budgetOwner.user_id !== user.id) return { success: false, error: 'Sin permiso' };
+
+    // 1b. Verificar cambios reales (excepto envio_cliente y aprobacion — siempre guardan)
+    if (motivo !== 'envio_cliente' && motivo !== 'aprobacion') {
+      const hayCambios = await detectarCambios(budgetId, user.id);
+      if (!hayCambios) {
+        return { success: true, generado: false, message: 'Sin cambios detectados' };
+      }
+    }
 
     // 2. Leer jerarquía completa con admin client (evita problemas de JWT en server actions largas)
     const admin = createAdminClient();
@@ -184,7 +283,7 @@ export async function guardarSnapshot(
       return { success: false, error: 'Error al guardar el snapshot.' };
     }
 
-    return { success: true };
+    return { success: true, generado: true };
   } catch (err) {
     console.error('[guardarSnapshot]', err);
     return { success: false, error: 'Error al guardar la versión del presupuesto.' };

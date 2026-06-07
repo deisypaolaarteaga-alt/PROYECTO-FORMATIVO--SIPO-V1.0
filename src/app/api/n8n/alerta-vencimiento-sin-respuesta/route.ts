@@ -13,19 +13,19 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminClient();
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://proyecto-formativo-sipo-v1-0.vercel.app';
 
-    const ahora = new Date().toISOString();
+    const hoy = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }));
 
-    // Presupuestos que ya vencieron y nunca respondieron
-    const { data: presupuestos, error: errBudgets } = await supabase
+    // budgets no tiene vigencia_hasta — la fecha de vencimiento es created_at + vigencia_dias
+    const { data: candidatos, error: errBudgets } = await supabase
       .from('budgets')
       .select(`
         id,
         titulo,
         user_id,
-        vigencia_hasta,
+        created_at,
+        vigencia_dias,
         projects:project_id ( nombre )
       `)
-      .lt('vigencia_hasta', ahora.split('T')[0])
       .in('estado', ['enviado_a_cliente', 'visto_por_cliente'])
       .is('deleted_at', null);
 
@@ -34,7 +34,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Error interno al consultar presupuestos' }, { status: 500 });
     }
 
-    if (!presupuestos || presupuestos.length === 0) {
+    // Filtrar en JS los que ya vencieron sin respuesta del cliente
+    const presupuestos = (candidatos ?? []).filter(b => {
+      const fechaVenc = new Date(b.created_at);
+      fechaVenc.setDate(fechaVenc.getDate() + (b.vigencia_dias ?? 30));
+      return fechaVenc < hoy;
+    });
+
+    if (presupuestos.length === 0) {
       return NextResponse.json({ alertas: 0 });
     }
 
@@ -65,12 +72,12 @@ export async function POST(request: NextRequest) {
 
         const proyecto = (budget.projects as unknown as { nombre: string } | null);
 
-        // Calcular días vencido
-        const fechaVenc = new Date(budget.vigencia_hasta ?? '');
-        const hoy = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }));
+        // Calcular días vencido a partir de created_at + vigencia_dias
+        const fechaVencDate = new Date(budget.created_at);
+        fechaVencDate.setDate(fechaVencDate.getDate() + (budget.vigencia_dias ?? 30));
         const diasVencido = Math.max(
           1,
-          Math.floor((hoy.getTime() - fechaVenc.getTime()) / (1000 * 60 * 60 * 24))
+          Math.floor((hoy.getTime() - fechaVencDate.getTime()) / (1000 * 60 * 60 * 24))
         );
 
         await enviarEmailAlertaVencimiento({

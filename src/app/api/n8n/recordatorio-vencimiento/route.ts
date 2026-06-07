@@ -19,18 +19,18 @@ export async function POST(request: NextRequest) {
     en3Dias.setDate(en3Dias.getDate() + 3);
     const fechaISO = en3Dias.toISOString().split('T')[0]; // YYYY-MM-DD
 
-    // Buscar presupuestos que vencen exactamente en 3 días
-    const { data: presupuestos, error: errBudgets } = await supabase
+    // budgets no tiene vigencia_hasta — la fecha de vencimiento es created_at + vigencia_dias
+    const { data: candidatos, error: errBudgets } = await supabase
       .from('budgets')
       .select(`
         id,
         titulo,
-        vigencia_hasta,
+        created_at,
+        vigencia_dias,
         estado,
         user_id,
         projects:project_id ( nombre )
       `)
-      .eq('vigencia_hasta', fechaISO)
       .in('estado', ['enviado_a_cliente', 'visto_por_cliente'])
       .is('deleted_at', null);
 
@@ -39,7 +39,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Error interno al consultar presupuestos' }, { status: 500 });
     }
 
-    if (!presupuestos || presupuestos.length === 0) {
+    // Filtrar en JS los que vencen exactamente en 3 días
+    const presupuestos = (candidatos ?? []).filter(b => {
+      const fechaVenc = new Date(b.created_at);
+      fechaVenc.setDate(fechaVenc.getDate() + (b.vigencia_dias ?? 30));
+      return fechaVenc.toISOString().split('T')[0] === fechaISO;
+    });
+
+    if (presupuestos.length === 0) {
       return NextResponse.json({ enviados: 0, presupuestos: [] });
     }
 
@@ -70,7 +77,10 @@ export async function POST(request: NextRequest) {
         const emailConstructor = perfil?.email_empresa ?? authUser?.user?.email ?? '';
 
         const proyecto = (budget.projects as unknown as { nombre: string } | null);
-        const fechaVenc = new Date(budget.vigencia_hasta ?? '').toLocaleDateString('es-CO', {
+
+        const fechaVencDate = new Date(budget.created_at);
+        fechaVencDate.setDate(fechaVencDate.getDate() + (budget.vigencia_dias ?? 30));
+        const fechaVenc = fechaVencDate.toLocaleDateString('es-CO', {
           timeZone: 'America/Bogota',
           year: 'numeric',
           month: 'long',

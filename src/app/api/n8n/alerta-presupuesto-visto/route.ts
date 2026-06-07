@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     // Obtener datos del presupuesto y proyecto
     const { data: budget, error: errBudget } = await supabase
       .from('budgets')
-      .select(`id, nombre, user_id, projects!inner ( nombre )`)
+      .select(`id, titulo, user_id, projects!inner ( nombre )`)
       .eq('id', budget_id)
       .is('deleted_at', null)
       .single();
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
       nombreConstructor: perfil?.nombre_completo ?? 'Constructor',
       nombreCliente: cliente_nombre ?? cliente_email ?? 'Tu cliente',
       nombreProyecto: proyecto?.nombre ?? 'Sin nombre',
-      nombrePresupuesto: budget.nombre ?? 'Presupuesto',
+      nombrePresupuesto: budget.titulo ?? 'Presupuesto',
       horaApertura,
       linkEditor: `${appUrl}/presupuestos/${budget_id}`,
     });

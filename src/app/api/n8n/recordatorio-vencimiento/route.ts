@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
       .from('budgets')
       .select(`
         id,
-        nombre,
+        titulo,
         vigencia_hasta,
         estado,
         user_id,
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
           destinatario: tokenData.cliente_email,
           nombreCliente: tokenData.cliente_nombre ?? tokenData.cliente_email,
           nombreProyecto: proyecto?.nombre ?? 'Sin nombre',
-          nombrePresupuesto: budget.nombre ?? 'Presupuesto',
+          nombrePresupuesto: budget.titulo ?? 'Presupuesto',
           fechaVencimiento: fechaVenc,
           linkPortal: `${appUrl}/presupuesto-publico/${tokenData.token}`,
           nombreConstructor: perfil?.nombre_completo ?? 'Constructor',

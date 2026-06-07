@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
       .from('budgets')
       .select(`
         id,
-        nombre,
+        titulo,
         user_id,
         vigencia_hasta,
         projects!inner ( nombre )
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
           nombreConstructor: perfil?.nombre_completo ?? 'Constructor',
           nombreCliente: tokenData?.cliente_nombre ?? tokenData?.cliente_email ?? 'El cliente',
           nombreProyecto: proyecto?.nombre ?? 'Sin nombre',
-          nombrePresupuesto: budget.nombre ?? 'Presupuesto',
+          nombrePresupuesto: budget.titulo ?? 'Presupuesto',
           diasVencido,
           linkEditor: `${appUrl}/presupuestos/${budget.id}`,
         });

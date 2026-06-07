@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
         cliente_email,
         cliente_nombre,
         visto_at,
-        budgets!inner ( id, nombre, user_id, estado, deleted_at, projects!inner ( nombre ) )
+        budgets!inner ( id, titulo, user_id, estado, deleted_at, projects!inner ( nombre ) )
       `)
       .not('visto_at', 'is', null)
       .is('cliente_accion', null)
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
       try {
         const budget = token.budgets as unknown as {
           id: string;
-          nombre: string;
+          titulo: string;
           user_id: string;
           projects: { nombre: string } | null;
         };
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
           destinatario: token.cliente_email,
           nombreCliente: token.cliente_nombre ?? token.cliente_email,
           nombreProyecto: budget.projects?.nombre ?? 'Sin nombre',
-          nombrePresupuesto: budget.nombre ?? 'Presupuesto',
+          nombrePresupuesto: budget.titulo ?? 'Presupuesto',
           linkPortal: `${appUrl}/presupuesto-publico/${token.token}`,
           nombreConstructor: perfil?.nombre_completo ?? 'Constructor',
           emailConstructor: emailConstructor,

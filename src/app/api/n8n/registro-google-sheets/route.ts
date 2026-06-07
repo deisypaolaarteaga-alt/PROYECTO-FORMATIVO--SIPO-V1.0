@@ -27,7 +27,6 @@ export async function POST(request: NextRequest) {
       .from('budgets')
       .select(`
         id,
-        nombre,
         user_id,
         costo_directo,
         projects!inner (

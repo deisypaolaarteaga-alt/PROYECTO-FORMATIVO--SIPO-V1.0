@@ -3,6 +3,8 @@ import Decimal from 'decimal.js';
 import { createAdminClient } from '@/lib/supabase/server';
 import { verificarSecretoN8N } from '../_auth';
 
+export const dynamic = 'force-dynamic';
+
 interface BodyRegistroSheets {
   budget_id?: string;
   user_id?: string;

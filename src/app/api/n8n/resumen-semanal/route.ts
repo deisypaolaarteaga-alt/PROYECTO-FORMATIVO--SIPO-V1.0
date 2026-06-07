@@ -4,6 +4,8 @@ import { createAdminClient } from '@/lib/supabase/server';
 import { enviarEmailResumenSemanal } from '@/lib/email/brevo';
 import { verificarSecretoN8N } from '../_auth';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   const error401 = verificarSecretoN8N(request);
   if (error401) return error401;

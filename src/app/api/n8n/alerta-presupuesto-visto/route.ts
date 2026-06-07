@@ -3,6 +3,8 @@ import { createAdminClient } from '@/lib/supabase/server';
 import { enviarEmailAlertaPresupuestoVisto } from '@/lib/email/brevo';
 import { verificarSecretoN8N } from '../_auth';
 
+export const dynamic = 'force-dynamic';
+
 interface BodyAlertaVisto {
   token_id?: string;
   budget_id?: string;

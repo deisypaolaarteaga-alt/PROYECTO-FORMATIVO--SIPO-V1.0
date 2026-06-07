@@ -441,3 +441,507 @@ export async function enviarEmailNotificacionConstructor(
     ],
   });
 }
+
+// ════════════════════════════════════════════════════════════════════
+// EMAILS DE AUTOMATIZACIÓN n8n
+// ════════════════════════════════════════════════════════════════════
+
+// ── 1. Recordatorio de vencimiento (al cliente, 3 días antes) ────────
+
+export interface EmailRecordatorioVencimientoParams {
+  destinatario: string;
+  nombreCliente: string;
+  nombreProyecto: string;
+  nombrePresupuesto: string;
+  fechaVencimiento: string;
+  linkPortal: string;
+  nombreConstructor: string;
+  emailConstructor?: string;
+  telefonoConstructor?: string;
+}
+
+export async function enviarEmailRecordatorioVencimiento(
+  params: EmailRecordatorioVencimientoParams
+): Promise<void> {
+  const cliente    = escHtml(params.nombreCliente || 'Cliente');
+  const proyecto   = escHtml(params.nombreProyecto);
+  const constructor = escHtml(params.nombreConstructor || 'SIPO Presupuestos');
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Su presupuesto vence pronto</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F5F4F1;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F5F4F1;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;">
+        <tr>
+          <td style="background-color:#1A1A1A;border-radius:12px 12px 0 0;padding:28px 36px;">
+            <p style="margin:0;font-size:22px;font-weight:700;color:#FFFFFF;letter-spacing:-0.3px;">${constructor}</p>
+            <p style="margin:6px 0 0;font-size:13px;color:#A0A0A0;">Sistema Inteligente de Presupuestos de Obra</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background-color:#FFFFFF;padding:36px 36px 28px;">
+            <p style="margin:0 0 8px;font-size:28px;">📅</p>
+            <p style="margin:0 0 20px;font-size:18px;font-weight:700;color:#111827;">Su presupuesto vence en 3 días</p>
+            <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.7;">
+              Estimado/a <strong>${cliente}</strong>, le recordamos amablemente que el presupuesto
+              para su proyecto está próximo a vencer. Si aún no lo ha revisado, este es el momento ideal
+              para hacerlo y compartir su decisión.
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="background-color:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;margin-bottom:28px;">
+              <tr>
+                <td style="padding:24px 28px;">
+                  <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.8px;">Proyecto</p>
+                  <p style="margin:0 0 16px;font-size:17px;font-weight:700;color:#111827;">${proyecto}</p>
+                  <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.8px;">Presupuesto</p>
+                  <p style="margin:0 0 16px;font-size:15px;color:#374151;">${escHtml(params.nombrePresupuesto)}</p>
+                  <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.8px;">Fecha de vencimiento</p>
+                  <p style="margin:0;font-size:16px;font-weight:700;color:#D97706;">${escHtml(params.fechaVencimiento)}</p>
+                </td>
+              </tr>
+            </table>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:28px;">
+              <tr>
+                <td align="center">
+                  <a href="${params.linkPortal}"
+                     style="display:inline-block;background-color:#D95510;color:#FFFFFF;font-size:16px;font-weight:600;text-decoration:none;padding:14px 40px;border-radius:8px;">
+                    Revisar presupuesto
+                  </a>
+                </td>
+              </tr>
+            </table>
+            ${params.emailConstructor || params.telefonoConstructor ? `
+            <p style="margin:0 0 8px;font-size:14px;color:#6B7280;line-height:1.6;">
+              ¿Tiene alguna duda? Comuníquese directamente con nosotros:
+              ${params.telefonoConstructor ? `<br><strong>Tel:</strong> ${escHtml(params.telefonoConstructor)}` : ''}
+              ${params.emailConstructor ? `<br><strong>Email:</strong> ${escHtml(params.emailConstructor)}` : ''}
+            </p>` : ''}
+          </td>
+        </tr>
+        <tr>
+          <td style="background-color:#F9F8F6;border-top:1px solid #E5E1D8;border-radius:0 0 12px 12px;padding:20px 36px;">
+            <p style="margin:0;font-size:12px;color:#9CA3AF;line-height:1.6;">
+              Notificación automática de <strong>SIPO</strong> — Sistema Inteligente de Presupuestos de Obra.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  await brevo.transactionalEmails.sendTransacEmail({
+    subject: `Su presupuesto vence en 3 días — ${params.nombreProyecto}`,
+    htmlContent: html,
+    sender: { name: constructor, email: 'sipoproyecto@gmail.com' },
+    to: [{ email: params.destinatario, name: params.nombreCliente || params.destinatario }],
+  });
+}
+
+// ── 2. Alerta al constructor — cliente abrió el presupuesto ─────────
+
+export interface EmailAlertaPresupuestoVistoParams {
+  destinatario: string;
+  nombreConstructor: string;
+  nombreCliente: string;
+  nombreProyecto: string;
+  nombrePresupuesto: string;
+  horaApertura: string;
+  linkEditor: string;
+}
+
+export async function enviarEmailAlertaPresupuestoVisto(
+  params: EmailAlertaPresupuestoVistoParams
+): Promise<void> {
+  const constructor = escHtml(params.nombreConstructor || 'Constructor');
+  const cliente     = escHtml(params.nombreCliente || 'Tu cliente');
+  const proyecto    = escHtml(params.nombreProyecto);
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tu cliente vio el presupuesto</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F5F4F1;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F5F4F1;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;">
+        <tr>
+          <td style="background-color:#1A1A1A;border-radius:12px 12px 0 0;padding:28px 36px;">
+            <p style="margin:0;font-size:22px;font-weight:700;color:#FFFFFF;letter-spacing:-0.3px;">SIPO</p>
+            <p style="margin:6px 0 0;font-size:13px;color:#A0A0A0;">Sistema Inteligente de Presupuestos de Obra</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background-color:#FFFFFF;padding:36px 36px 28px;">
+            <p style="margin:0 0 8px;font-size:28px;">🔔</p>
+            <p style="margin:0 0 4px;font-size:20px;font-weight:700;color:#111827;">${cliente} acaba de ver tu presupuesto</p>
+            <p style="margin:0 0 24px;font-size:14px;color:#6B7280;">Hola, <strong>${constructor}</strong></p>
+            <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.7;">
+              ¡Buenas noticias! <strong>${cliente}</strong> acaba de abrir y revisar el presupuesto
+              que enviaste. Ahora es el mejor momento para hacer seguimiento y resolver cualquier
+              duda que pueda tener.
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="background-color:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;margin-bottom:28px;">
+              <tr>
+                <td style="padding:24px 28px;">
+                  <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.8px;">Proyecto</p>
+                  <p style="margin:0 0 12px;font-size:17px;font-weight:700;color:#111827;">${proyecto}</p>
+                  <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.8px;">Presupuesto</p>
+                  <p style="margin:0 0 12px;font-size:15px;color:#374151;">${escHtml(params.nombrePresupuesto)}</p>
+                  <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.8px;">Abierto a las</p>
+                  <p style="margin:0;font-size:15px;color:#374151;">${escHtml(params.horaApertura)}</p>
+                </td>
+              </tr>
+            </table>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
+              <tr>
+                <td align="center">
+                  <a href="${params.linkEditor}"
+                     style="display:inline-block;background-color:#16A34A;color:#FFFFFF;font-size:16px;font-weight:600;text-decoration:none;padding:14px 40px;border-radius:8px;">
+                    Ir al presupuesto
+                  </a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="background-color:#F9F8F6;border-top:1px solid #E5E1D8;border-radius:0 0 12px 12px;padding:20px 36px;">
+            <p style="margin:0;font-size:12px;color:#9CA3AF;line-height:1.6;">
+              Notificación automática de <strong>SIPO</strong> — Sistema Inteligente de Presupuestos de Obra.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  await brevo.transactionalEmails.sendTransacEmail({
+    subject: `🔔 ${params.nombreCliente} acaba de ver tu presupuesto`,
+    htmlContent: html,
+    sender: { name: 'SIPO — Presupuestos de Obra', email: 'sipoproyecto@gmail.com' },
+    to: [{ email: params.destinatario, name: params.nombreConstructor || params.destinatario }],
+  });
+}
+
+// ── 3. Recordatorio al cliente — sin respuesta 72h ───────────────────
+
+export interface EmailRecordatorioSinRespuestaParams {
+  destinatario: string;
+  nombreCliente: string;
+  nombreProyecto: string;
+  nombrePresupuesto: string;
+  linkPortal: string;
+  nombreConstructor: string;
+  emailConstructor?: string;
+  telefonoConstructor?: string;
+}
+
+export async function enviarEmailRecordatorioSinRespuesta(
+  params: EmailRecordatorioSinRespuestaParams
+): Promise<void> {
+  const cliente     = escHtml(params.nombreCliente || 'Cliente');
+  const proyecto    = escHtml(params.nombreProyecto);
+  const constructor = escHtml(params.nombreConstructor || 'SIPO Presupuestos');
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>¿Tiene alguna pregunta?</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F5F4F1;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F5F4F1;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;">
+        <tr>
+          <td style="background-color:#1A1A1A;border-radius:12px 12px 0 0;padding:28px 36px;">
+            <p style="margin:0;font-size:22px;font-weight:700;color:#FFFFFF;letter-spacing:-0.3px;">${constructor}</p>
+            <p style="margin:6px 0 0;font-size:13px;color:#A0A0A0;">Sistema Inteligente de Presupuestos de Obra</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background-color:#FFFFFF;padding:36px 36px 28px;">
+            <p style="margin:0 0 8px;font-size:28px;">💬</p>
+            <p style="margin:0 0 20px;font-size:18px;font-weight:700;color:#111827;">¿Tiene alguna pregunta sobre el presupuesto?</p>
+            <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.7;">
+              Estimado/a <strong>${cliente}</strong>, notamos que ya tuvo oportunidad de revisar
+              el presupuesto para su proyecto. Si tiene alguna duda o necesita ajustes antes de
+              tomar una decisión, con gusto le atendemos.
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="background-color:#F9F8F6;border:1px solid #E5E1D8;border-radius:8px;margin-bottom:28px;">
+              <tr>
+                <td style="padding:24px 28px;">
+                  <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.8px;">Proyecto</p>
+                  <p style="margin:0 0 12px;font-size:17px;font-weight:700;color:#111827;">${proyecto}</p>
+                  <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.8px;">Presupuesto</p>
+                  <p style="margin:0;font-size:15px;color:#374151;">${escHtml(params.nombrePresupuesto)}</p>
+                </td>
+              </tr>
+            </table>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:28px;">
+              <tr>
+                <td align="center">
+                  <a href="${params.linkPortal}"
+                     style="display:inline-block;background-color:#D95510;color:#FFFFFF;font-size:16px;font-weight:600;text-decoration:none;padding:14px 40px;border-radius:8px;">
+                    Ver presupuesto
+                  </a>
+                </td>
+              </tr>
+            </table>
+            ${params.emailConstructor || params.telefonoConstructor ? `
+            <p style="margin:0;font-size:14px;color:#6B7280;line-height:1.6;">
+              También puede contactarnos directamente:
+              ${params.telefonoConstructor ? `<br><strong>Tel:</strong> ${escHtml(params.telefonoConstructor)}` : ''}
+              ${params.emailConstructor ? `<br><strong>Email:</strong> ${escHtml(params.emailConstructor)}` : ''}
+            </p>` : ''}
+          </td>
+        </tr>
+        <tr>
+          <td style="background-color:#F9F8F6;border-top:1px solid #E5E1D8;border-radius:0 0 12px 12px;padding:20px 36px;">
+            <p style="margin:0;font-size:12px;color:#9CA3AF;line-height:1.6;">
+              Notificación automática de <strong>SIPO</strong> — Sistema Inteligente de Presupuestos de Obra.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  await brevo.transactionalEmails.sendTransacEmail({
+    subject: `¿Tiene alguna pregunta sobre el presupuesto de ${params.nombreProyecto}?`,
+    htmlContent: html,
+    sender: { name: constructor, email: 'sipoproyecto@gmail.com' },
+    to: [{ email: params.destinatario, name: params.nombreCliente || params.destinatario }],
+  });
+}
+
+// ── 4. Alerta al constructor — presupuesto venció sin respuesta ──────
+
+export interface EmailAlertaVencimientoParams {
+  destinatario: string;
+  nombreConstructor: string;
+  nombreCliente: string;
+  nombreProyecto: string;
+  nombrePresupuesto: string;
+  diasVencido: number;
+  linkEditor: string;
+}
+
+export async function enviarEmailAlertaVencimiento(
+  params: EmailAlertaVencimientoParams
+): Promise<void> {
+  const constructor = escHtml(params.nombreConstructor || 'Constructor');
+  const cliente     = escHtml(params.nombreCliente || 'El cliente');
+  const proyecto    = escHtml(params.nombreProyecto);
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Presupuesto vencido sin respuesta</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F5F4F1;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F5F4F1;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;">
+        <tr>
+          <td style="background-color:#1A1A1A;border-radius:12px 12px 0 0;padding:28px 36px;">
+            <p style="margin:0;font-size:22px;font-weight:700;color:#FFFFFF;letter-spacing:-0.3px;">SIPO</p>
+            <p style="margin:6px 0 0;font-size:13px;color:#A0A0A0;">Sistema Inteligente de Presupuestos de Obra</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background-color:#FFFFFF;padding:36px 36px 28px;">
+            <p style="margin:0 0 8px;font-size:28px;">⚠️</p>
+            <p style="margin:0 0 4px;font-size:20px;font-weight:700;color:#111827;">Presupuesto vencido sin respuesta</p>
+            <p style="margin:0 0 24px;font-size:14px;color:#6B7280;">Hola, <strong>${constructor}</strong></p>
+            <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.7;">
+              El presupuesto enviado a <strong>${cliente}</strong> para el proyecto
+              <strong>${proyecto}</strong> venció hace
+              <strong>${params.diasVencido} ${params.diasVencido === 1 ? 'día' : 'días'}</strong>
+              sin recibir respuesta. Te sugerimos realizar seguimiento directo con el cliente
+              para entender su situación y, si es necesario, renovar el presupuesto con una
+              nueva vigencia.
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="background-color:#FEF2F2;border:1px solid #FECACA;border-radius:8px;margin-bottom:28px;">
+              <tr>
+                <td style="padding:24px 28px;">
+                  <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.8px;">Proyecto</p>
+                  <p style="margin:0 0 12px;font-size:17px;font-weight:700;color:#111827;">${proyecto}</p>
+                  <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.8px;">Cliente</p>
+                  <p style="margin:0 0 12px;font-size:15px;color:#374151;">${cliente}</p>
+                  <p style="margin:0 0 4px;font-size:11px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.8px;">Vencido hace</p>
+                  <p style="margin:0;font-size:16px;font-weight:700;color:#DC2626;">${params.diasVencido} ${params.diasVencido === 1 ? 'día' : 'días'}</p>
+                </td>
+              </tr>
+            </table>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
+              <tr>
+                <td align="center">
+                  <a href="${params.linkEditor}"
+                     style="display:inline-block;background-color:#DC2626;color:#FFFFFF;font-size:16px;font-weight:600;text-decoration:none;padding:14px 40px;border-radius:8px;">
+                    Revisar presupuesto
+                  </a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="background-color:#F9F8F6;border-top:1px solid #E5E1D8;border-radius:0 0 12px 12px;padding:20px 36px;">
+            <p style="margin:0;font-size:12px;color:#9CA3AF;line-height:1.6;">
+              Notificación automática de <strong>SIPO</strong> — Sistema Inteligente de Presupuestos de Obra.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  await brevo.transactionalEmails.sendTransacEmail({
+    subject: `⚠️ Presupuesto vencido sin respuesta — ${params.nombreProyecto}`,
+    htmlContent: html,
+    sender: { name: 'SIPO — Presupuestos de Obra', email: 'sipoproyecto@gmail.com' },
+    to: [{ email: params.destinatario, name: params.nombreConstructor || params.destinatario }],
+  });
+}
+
+// ── 5. Resumen semanal al constructor ────────────────────────────────
+
+export interface EmailResumenSemanalParams {
+  destinatario: string;
+  nombreConstructor: string;
+  fechaSemana: string;
+  presupuestosEnviados: number;
+  presupuestosAprobados: number;
+  presupuestosRechazados: number;
+  utilidadGenerada: number;
+  carteraPotencial: number;
+  presupuestosPorVencer: number;
+}
+
+export async function enviarEmailResumenSemanal(
+  params: EmailResumenSemanalParams
+): Promise<void> {
+  const constructor = escHtml(params.nombreConstructor || 'Constructor');
+  const appUrl      = process.env.NEXT_PUBLIC_APP_URL || 'https://proyecto-formativo-sipo-v1-0.vercel.app';
+
+  const filaMetrica = (icono: string, label: string, valor: string, color = '#111827') =>
+    `<tr>
+      <td style="padding:10px 0;border-bottom:1px solid #F3F4F6;">
+        <span style="font-size:16px;">${icono}</span>&nbsp;
+        <span style="font-size:14px;color:#6B7280;">${label}</span>
+      </td>
+      <td style="padding:10px 0;border-bottom:1px solid #F3F4F6;text-align:right;font-size:15px;font-weight:700;color:${color};">
+        ${valor}
+      </td>
+    </tr>`;
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tu semana en SIPO</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F5F4F1;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F5F4F1;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;">
+        <tr>
+          <td style="background-color:#1A1A1A;border-radius:12px 12px 0 0;padding:28px 36px;">
+            <p style="margin:0;font-size:22px;font-weight:700;color:#FFFFFF;letter-spacing:-0.3px;">SIPO</p>
+            <p style="margin:6px 0 0;font-size:13px;color:#A0A0A0;">Resumen semanal — ${escHtml(params.fechaSemana)}</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background-color:#FFFFFF;padding:36px 36px 28px;">
+            <p style="margin:0 0 6px;font-size:20px;font-weight:700;color:#111827;">Tu semana en SIPO</p>
+            <p style="margin:0 0 28px;font-size:14px;color:#6B7280;">Hola, <strong>${constructor}</strong> — aquí está el resumen de tu actividad.</p>
+
+            <!-- Actividad semanal -->
+            <p style="margin:0 0 12px;font-size:13px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:0.6px;">Actividad de la semana</p>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:28px;">
+              ${filaMetrica('📤', 'Presupuestos enviados', `${params.presupuestosEnviados}`)}
+              ${filaMetrica('✅', 'Aprobados', `${params.presupuestosAprobados}`, '#16A34A')}
+              ${filaMetrica('❌', 'Rechazados', `${params.presupuestosRechazados}`, '#DC2626')}
+              ${filaMetrica('💰', 'Utilidad generada', `$${formatearCOP(params.utilidadGenerada)} COP`, '#D95510')}
+            </table>
+
+            <!-- Cartera actual -->
+            <p style="margin:0 0 12px;font-size:13px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:0.6px;">Cartera actual</p>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:28px;">
+              ${filaMetrica('📊', 'Presupuestos activos (enviados/vistos)', `$${formatearCOP(params.carteraPotencial)} COP`, '#1E6FB8')}
+            </table>
+
+            ${params.presupuestosPorVencer > 0 ? `
+            <!-- Alertas -->
+            <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="background-color:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;margin-bottom:28px;">
+              <tr>
+                <td style="padding:20px 24px;">
+                  <p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#92400E;text-transform:uppercase;letter-spacing:0.6px;">⚠️ Atención</p>
+                  <p style="margin:0;font-size:15px;color:#374151;line-height:1.6;">
+                    Tienes <strong>${params.presupuestosPorVencer}</strong>
+                    ${params.presupuestosPorVencer === 1 ? 'presupuesto que vence' : 'presupuestos que vencen'}
+                    en los próximos 7 días. Revisa tu dashboard para hacer seguimiento.
+                  </p>
+                </td>
+              </tr>
+            </table>` : ''}
+
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:8px;">
+              <tr>
+                <td align="center">
+                  <a href="${appUrl}/dashboard"
+                     style="display:inline-block;background-color:#D95510;color:#FFFFFF;font-size:16px;font-weight:600;text-decoration:none;padding:14px 40px;border-radius:8px;">
+                    Ir al dashboard
+                  </a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="background-color:#F9F8F6;border-top:1px solid #E5E1D8;border-radius:0 0 12px 12px;padding:20px 36px;">
+            <p style="margin:0;font-size:12px;color:#9CA3AF;line-height:1.6;">
+              Resumen automático de <strong>SIPO</strong> — Sistema Inteligente de Presupuestos de Obra.<br>
+              Recibes este correo cada lunes a las 7:30 a.m. hora Colombia.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  await brevo.transactionalEmails.sendTransacEmail({
+    subject: `Tu semana en SIPO — ${params.fechaSemana}`,
+    htmlContent: html,
+    sender: { name: 'SIPO — Presupuestos de Obra', email: 'sipoproyecto@gmail.com' },
+    to: [{ email: params.destinatario, name: params.nombreConstructor || params.destinatario }],
+  });
+}

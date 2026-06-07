@@ -16,6 +16,7 @@ import { eliminarPlantilla, actualizarTipoObraPlantilla } from '@/actions/planti
 import { toast } from 'sonner';
 import { ModalRenombrarPlantilla } from './ModalRenombrarPlantilla';
 import { DrawerDetallePlantilla } from './DrawerDetallePlantilla';
+import { ModalNuevoPresupuesto } from '@/components/presupuestos/ModalNuevoPresupuesto';
 import type { UserPlantilla } from '@/types';
 
 interface PlantillasClientProps {
@@ -78,6 +79,7 @@ export function PlantillasClient({ initialPlantillas }: PlantillasClientProps) {
   const [plantillaDetalle, setPlantillaDetalle]     = useState<UserPlantilla | null>(null);
   const [plantillaEditarTipo, setPlantillaEditarTipo] = useState<UserPlantilla | null>(null);
   const [guardandoTipo, setGuardandoTipo] = useState(false);
+  const [plantillaParaUsar, setPlantillaParaUsar] = useState<UserPlantilla | null>(null);
 
   const filtered = useMemo(() => {
     return plantillas.filter(pt => {
@@ -289,6 +291,17 @@ export function PlantillasClient({ initialPlantillas }: PlantillasClientProps) {
                   </div>
                 </div>
 
+                {/* Usar plantilla → abre ModalNuevoPresupuesto */}
+                <div className="relative z-10 px-3 pb-3 bg-[#FAFAF8]">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setPlantillaParaUsar(pt); }}
+                    className="w-full h-8 rounded-lg bg-[#C84B1A] text-white text-[12px] font-semibold hover:bg-[#A83A14] active:bg-[#8E2E0E] transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Usar plantilla
+                  </button>
+                </div>
+
                 {/* Clic invisible → abre drawer */}
                 <button
                   onClick={() => setPlantillaDetalle(pt)}
@@ -312,6 +325,11 @@ export function PlantillasClient({ initialPlantillas }: PlantillasClientProps) {
         nombreInicial={plantillaDetalle?.nombre ?? ''}
         isOpen={!!plantillaDetalle}
         onClose={() => setPlantillaDetalle(null)}
+      />
+      <ModalNuevoPresupuesto
+        isOpen={!!plantillaParaUsar}
+        onClose={() => setPlantillaParaUsar(null)}
+        initialPlantillaId={plantillaParaUsar?.id}
       />
 
       {/* Modal cambiar tipo de obra */}

@@ -72,6 +72,8 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
   useEffect(() => {
     setBudget(initialBudget);
     setExpanded(new Set(initialBudget.chapters?.map((c) => c.id) || []));
+    const v = (initialBudget as any).area_m2 ?? (initialBudget as any).projects?.area_m2;
+    setAreaM2Input(v != null ? String(v) : '');
   }, [initialBudget]);
 
   const [activeTab, setActiveTab] = useState<'estructura' | 'insumos' | 'estrategia' | 'resumen' | 'versiones'>('estructura');
@@ -95,6 +97,10 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
   const [versiones, setVersiones] = useState<BudgetSnapshot[]>([]);
   const [isCorrigiendo, setIsCorrigiendo] = useState(false);
   const [validandoAccion, setValidandoAccion] = useState(false);
+  const [areaM2Input, setAreaM2Input] = useState<string>(() => {
+    const v = (initialBudget as any).area_m2 ?? (initialBudget as any).projects?.area_m2;
+    return v != null ? String(v) : '';
+  });
 
   // Drag & drop (local reorder solo — sin persistir en BD)
   const [dragSrcActId, setDragSrcActId] = useState<string | null>(null);
@@ -501,14 +507,32 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
                   fechaActualizacion={budget.updated_at}
                 />
               </div>
-              {(tipoObraLabel || (budget as any).projects?.area_m2 || fechaElaboracion || fechaValidezFormateada) && (
+              {(tipoObraLabel || (budget.area_m2 ?? budget.projects?.area_m2) || !bloqueado || fechaElaboracion || fechaValidezFormateada) && (
                 <div className="flex items-center gap-4 text-[11px] text-[#6B7A8D] mt-1 flex-wrap">
                   {tipoObraLabel && (
                     <span className="font-medium text-[#5A5248]">{tipoObraLabel}</span>
                   )}
-                  {(budget as any).projects?.area_m2 && (
+                  {/* Área m² — editable en modo borrador, solo lectura cuando bloqueado */}
+                  {!bloqueado ? (
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        value={areaM2Input}
+                        onChange={e => setAreaM2Input(e.target.value)}
+                        onBlur={() => {
+                          const val = areaM2Input === '' ? null : parseFloat(areaM2Input) || null;
+                          handleUpdateBudget({ area_m2: val });
+                        }}
+                        className="w-16 h-5 text-[10px] font-semibold bg-[#EBF2FA] text-[#1E4D8C] border border-[#BFDBFE] rounded px-1.5 focus:outline-none focus:ring-1 focus:ring-[#1E4D8C]/40 tabular-nums"
+                        placeholder="Área"
+                      />
+                      <span className="text-[10px] font-semibold text-[#1E4D8C]">m²</span>
+                    </div>
+                  ) : (budget.area_m2 ?? budget.projects?.area_m2) != null && (
                     <span className="px-1.5 py-0.5 rounded bg-[#EBF2FA] text-[#1E4D8C] font-semibold text-[10px]">
-                      {(budget as any).projects.area_m2} m²
+                      {budget.area_m2 ?? budget.projects?.area_m2} m²
                     </span>
                   )}
                   {fechaElaboracion && (

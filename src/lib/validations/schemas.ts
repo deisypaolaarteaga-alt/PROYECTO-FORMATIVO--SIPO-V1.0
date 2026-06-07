@@ -41,6 +41,7 @@ export const updateBudgetSchema = z.object({
   reteiva_pct: z.coerce.number().min(0).max(100).optional(),
   ciudad_ica: z.string().optional(),
   vigencia_dias: z.coerce.number().min(1).optional(),
+  area_m2: z.coerce.number().positive('El área debe ser mayor a 0').nullable().optional(),
 });
 
 // ============ Chapter schemas ============

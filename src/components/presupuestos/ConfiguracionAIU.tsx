@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Plus, Trash2, Check, X } from 'lucide-react';
+import { Plus, Trash2, Check, X, Pencil } from 'lucide-react';
 import Decimal from 'decimal.js';
 import { formatearCOP } from '@/lib/utils/formato-cop';
 import {
@@ -59,7 +59,12 @@ export function ConfiguracionAIU({
   const [formValor, setFormValor] = useState('');
   const [guardando, setGuardando] = useState(false);
   const [eliminando, setEliminando] = useState<string | null>(null);
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [editNombre, setEditNombre] = useState('');
+  const [editValor, setEditValor] = useState('');
+  const [guardandoEdit, setGuardandoEdit] = useState(false);
   const nombreInputRef = useRef<HTMLInputElement>(null);
+  const editNombreRef = useRef<HTMLInputElement>(null);
 
   // Cargar componentes al entrar en modo detallado y sincronizar administracion_pct
   useEffect(() => {
@@ -150,6 +155,47 @@ export function ConfiguracionAIU({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') handleGuardar();
     if (e.key === 'Escape') cerrarForm();
+  };
+
+  const abrirEdicion = (c: AIUComponente) => {
+    setEditandoId(c.id);
+    setEditNombre(c.nombre);
+    setEditValor(String(c.valor_mensual));
+    setTimeout(() => editNombreRef.current?.focus(), 50);
+  };
+
+  const cancelarEdicion = () => {
+    setEditandoId(null);
+    setEditNombre('');
+    setEditValor('');
+  };
+
+  const handleGuardarEdicion = async () => {
+    if (!editandoId) return;
+    const nombre = editNombre.trim();
+    const valor = parseFloat(editValor);
+    if (!nombre || isNaN(valor) || valor < 0) return;
+
+    setGuardandoEdit(true);
+    const res = await upsertAIUComponente({
+      id: editandoId,
+      budget_id: budgetId,
+      nombre,
+      valor_mensual: valor,
+    });
+    setGuardandoEdit(false);
+
+    if (res.success && res.data) {
+      const nuevos = componentes.map(c => (c.id === editandoId ? res.data! : c));
+      setComponentes(nuevos);
+      recalcular(nuevos);
+      cancelarEdicion();
+    }
+  };
+
+  const handleKeyDownEdit = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleGuardarEdicion();
+    if (e.key === 'Escape') cancelarEdicion();
   };
 
   const meses = duracionMeses ?? 1;
@@ -245,35 +291,94 @@ export function ConfiguracionAIU({
           {/* Lista de ítems */}
           {!loadingComponentes && componentes.length > 0 && (
             <div className="border border-[#E5E1D8] rounded-lg divide-y divide-[#F0EDE8] overflow-hidden">
-              {componentes.map(c => (
-                <div
-                  key={c.id}
-                  className="flex items-center gap-2 px-3 py-2 bg-white hover:bg-[#F8F7F5] transition-colors group"
-                >
-                  <span className="flex-1 text-[12px] text-[#1C1814] truncate">{c.nombre}</span>
-                  <span
-                    className="text-[12px] font-semibold text-[#1C1814] tabular-nums shrink-0"
-                    style={{ fontFamily: 'var(--font-mono)' }}
+              {componentes.map(c =>
+                editandoId === c.id ? (
+                  /* ── Modo edición inline ── */
+                  <div
+                    key={c.id}
+                    className="px-3 py-2 bg-[#FFF9F7] space-y-2"
                   >
-                    {formatearCOP(c.valor_mensual)}
-                  </span>
-                  {!bloqueado && (
-                    <button
-                      type="button"
-                      onClick={() => handleEliminar(c.id)}
-                      disabled={eliminando === c.id}
-                      className="opacity-0 group-hover:opacity-100 text-stone hover:text-[#991B1B] transition-all disabled:opacity-40"
-                      title="Eliminar gasto"
+                    <input
+                      ref={editNombreRef}
+                      type="text"
+                      value={editNombre}
+                      onChange={e => setEditNombre(e.target.value)}
+                      onKeyDown={handleKeyDownEdit}
+                      className="w-full h-8 bg-white border border-[#C84B1A]/40 rounded px-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#C84B1A]/40 text-[#1C1814]"
+                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        value={editValor}
+                        onChange={e => setEditValor(e.target.value)}
+                        onKeyDown={handleKeyDownEdit}
+                        min="0"
+                        className="flex-1 h-8 bg-white border border-[#C84B1A]/40 rounded px-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#C84B1A]/40 text-[#1C1814]"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleGuardarEdicion}
+                        disabled={guardandoEdit || !editNombre.trim() || !editValor}
+                        title="Guardar cambios"
+                        className="h-8 w-8 flex items-center justify-center rounded bg-[#C84B1A] text-white disabled:opacity-40 hover:bg-[#A83A14] transition-colors shrink-0"
+                      >
+                        {guardandoEdit ? (
+                          <span className="h-3.5 w-3.5 border border-white/40 border-t-white rounded-full animate-spin block" />
+                        ) : (
+                          <Check className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={cancelarEdicion}
+                        title="Cancelar edición"
+                        className="h-8 w-8 flex items-center justify-center rounded border border-[#E5E1D8] text-stone hover:text-[#1C1814] hover:border-[#1C1814] transition-colors shrink-0"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* ── Modo vista ── */
+                  <div
+                    key={c.id}
+                    className="flex items-center gap-2 px-3 py-2 bg-white hover:bg-[#F8F7F5] transition-colors group"
+                  >
+                    <span className="flex-1 text-[12px] text-[#1C1814] truncate">{c.nombre}</span>
+                    <span
+                      className="text-[12px] font-semibold text-[#1C1814] tabular-nums shrink-0"
+                      style={{ fontFamily: 'var(--font-mono)' }}
                     >
-                      {eliminando === c.id ? (
-                        <span className="h-3.5 w-3.5 border border-stone/40 border-t-stone rounded-full animate-spin block" />
-                      ) : (
-                        <Trash2 className="h-3.5 w-3.5" />
-                      )}
-                    </button>
-                  )}
-                </div>
-              ))}
+                      {formatearCOP(c.valor_mensual)}
+                    </span>
+                    {!bloqueado && (
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                        <button
+                          type="button"
+                          onClick={() => abrirEdicion(c)}
+                          title="Editar gasto"
+                          className="text-stone hover:text-[#C84B1A] transition-colors"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleEliminar(c.id)}
+                          disabled={eliminando === c.id}
+                          title="Eliminar gasto"
+                          className="text-stone hover:text-[#991B1B] transition-colors disabled:opacity-40"
+                        >
+                          {eliminando === c.id ? (
+                            <span className="h-3.5 w-3.5 border border-stone/40 border-t-stone rounded-full animate-spin block" />
+                          ) : (
+                            <Trash2 className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )
+              )}
             </div>
           )}
 

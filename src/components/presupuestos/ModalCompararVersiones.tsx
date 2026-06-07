@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { X, Loader2, TrendingUp, TrendingDown } from 'lucide-react';
+import { X, Loader2, TrendingUp, TrendingDown, AlertCircle } from 'lucide-react';
 import Decimal from 'decimal.js';
 import { cn } from '@/lib/utils';
 import { formatearCOP } from '@/lib/utils/formato-cop';
@@ -9,7 +9,7 @@ import { getDetalleVersion, getVersiones } from '@/actions/versiones';
 import type { BudgetSnapshot, SnapshotData, SnapshotActividad } from '@/types';
 
 interface ModalCompararVersionesProps {
-  snapshotId: string;  // versión antigua
+  snapshotId: string;  // versión seleccionada por el usuario
   budgetId: string;
   onClose: () => void;
 }
@@ -108,34 +108,34 @@ function FilaDiff({ diff }: { diff: ActividadDiff }) {
 
   return (
     <tr className={rowCls}>
-      {/* Columna antigua */}
-      <td className="px-3 py-2.5 w-1/2 border-r border-[#E8E4DE]">
-        <div className="flex justify-between items-center gap-2">
+      {/* Columna antigua — w-1/2 enforced by table-fixed on parent */}
+      <td className="px-3 py-2.5 border-r border-[#E8E4DE]">
+        <div className="flex items-center gap-2">
           <span className={cn(
-            'text-stone-700 truncate max-w-[55%]',
+            'min-w-0 flex-1 truncate text-stone-700',
             diff.estado === 'solo_antigua' && 'line-through text-red-500',
           )}>
             {diff.estado !== 'solo_nueva' ? diff.nombre : '—'}
           </span>
           {diff.antiguaSubtotal != null && (
-            <span className="tabular-nums text-stone-600 shrink-0">
+            <span className="tabular-nums text-stone-600 shrink-0 text-right">
               {formatearCOP(diff.antiguaSubtotal)}
             </span>
           )}
         </div>
       </td>
       {/* Columna nueva */}
-      <td className="px-3 py-2.5 w-1/2">
-        <div className="flex justify-between items-center gap-2">
+      <td className="px-3 py-2.5">
+        <div className="flex items-center gap-2">
           <span className={cn(
-            'text-stone-700 truncate max-w-[55%]',
+            'min-w-0 flex-1 truncate text-stone-700',
             diff.estado === 'solo_nueva' && 'text-green-700 font-medium',
           )}>
             {diff.estado !== 'solo_antigua' ? diff.nombre : '—'}
           </span>
           <div className="flex items-center gap-2 shrink-0">
             {diff.nuevaSubtotal != null && (
-              <span className="tabular-nums text-stone-600">
+              <span className="tabular-nums text-stone-600 text-right">
                 {formatearCOP(diff.nuevaSubtotal)}
               </span>
             )}
@@ -152,14 +152,26 @@ function FilaDiff({ diff }: { diff: ActividadDiff }) {
 // ── Componente principal ──────────────────────────────────────────────────────
 
 export function ModalCompararVersiones({ snapshotId, budgetId, onClose }: ModalCompararVersionesProps) {
-  const [antiguo,  setAntiguo]  = useState<BudgetSnapshot | null>(null);
-  const [actual,   setActual]   = useState<SnapshotData | null>(null);
-  const [actualMeta, setActualMeta] = useState<{ version: number; created_at: string } | null>(null);
-  const [loading,  setLoading]  = useState(true);
-  const [error,    setError]    = useState<string | null>(null);
+  // antiguo = versión seleccionada por el usuario
+  // actualSnapshot = versión con la que se compara (más reciente, o segunda más reciente si
+  //                  la seleccionada ya es la más reciente)
+  const [antiguo,        setAntiguo]        = useState<BudgetSnapshot | null>(null);
+  const [actualSnapshot, setActualSnapshot] = useState<BudgetSnapshot | null>(null);
+  const [loading,        setLoading]        = useState(true);
+  const [error,          setError]          = useState<string | null>(null);
+
+  // Derivados — evita estados paralelos que pueden desincronizarse
+  const actual     = actualSnapshot?.data ?? null;
+  const actualMeta = actualSnapshot
+    ? { version: actualSnapshot.version, created_at: actualSnapshot.created_at }
+    : null;
 
   useEffect(() => {
     setLoading(true);
+    setError(null);
+    setAntiguo(null);
+    setActualSnapshot(null);
+
     Promise.all([
       getDetalleVersion(snapshotId),
       getVersiones(budgetId),
@@ -171,47 +183,61 @@ export function ModalCompararVersiones({ snapshotId, budgetId, onClose }: ModalC
       }
       setAntiguo(snapRes.snapshot);
 
-      // La versión "actual" es la más reciente (v más alta) — si hay sólo 1 snapshot
-      // usamos sus datos como proxy del estado actual del editor.
-      if (versRes.success && versRes.versiones && versRes.versiones.length > 0) {
-        const masReciente = versRes.versiones[0]; // ya vienen ordenadas DESC
-        if (masReciente.id !== snapshotId) {
-          // Cargar el snapshot más reciente como "actual"
-          getDetalleVersion(masReciente.id).then((latestRes) => {
-            if (latestRes.success && latestRes.snapshot?.data) {
-              setActual(latestRes.snapshot.data);
-              setActualMeta({ version: latestRes.snapshot.version, created_at: latestRes.snapshot.created_at });
-            }
-            setLoading(false);
-          });
-          return;
-        }
+      if (!versRes.success || !versRes.versiones || versRes.versiones.length === 0) {
+        setError('No hay versiones disponibles para comparar.');
+        setLoading(false);
+        return;
       }
-      // Si el snapshot solicitado es el único o el más reciente, comparar consigo mismo como fallback
-      setActual(snapRes.snapshot.data ?? null);
-      setActualMeta({ version: snapRes.snapshot.version, created_at: snapRes.snapshot.created_at });
-      setLoading(false);
+
+      // Si el usuario seleccionó la versión más reciente → comparar contra la segunda más
+      // reciente, para evitar comparar un snapshot consigo mismo.
+      // En cualquier otro caso → comparar contra la más reciente.
+      const masReciente = versRes.versiones[0]; // ordenadas DESC
+      const target = masReciente.id === snapshotId
+        ? versRes.versiones[1]   // segunda más reciente
+        : masReciente;           // más reciente
+
+      if (!target) {
+        setError('Esta es la única versión guardada. No hay otra versión con qué comparar.');
+        setLoading(false);
+        return;
+      }
+
+      getDetalleVersion(target.id).then((targetRes) => {
+        if (targetRes.success && targetRes.snapshot) {
+          setActualSnapshot(targetRes.snapshot);
+        } else {
+          setError(targetRes.error ?? 'Error al cargar la versión de comparación.');
+        }
+        setLoading(false);
+      });
     });
   }, [snapshotId, budgetId]);
 
   const diffs = useMemo((): ActividadDiff[] => {
-    if (!antiguo?.data || !actual) return [];
-    const antiguasFlat  = antiguo.data.capitulos.flatMap((c) => c.actividades);
-    const nuevasFlat    = actual.capitulos.flatMap((c) => c.actividades);
+    if (!antiguo?.data || !actualSnapshot?.data) return [];
+    const antiguasFlat = antiguo.data.capitulos.flatMap((c) => c.actividades);
+    const nuevasFlat   = actualSnapshot.data.capitulos.flatMap((c) => c.actividades);
     return diffActividades(antiguasFlat, nuevasFlat);
-  }, [antiguo, actual]);
+  }, [antiguo, actualSnapshot]);
 
   const totalesDiff = useMemo(() => {
-    if (!antiguo?.data || !actual) return null;
-    const cdAntiguo = new Decimal(antiguo.data.costo_directo ?? 0);
-    const cdActual  = new Decimal(actual.costo_directo ?? 0);
-    const toAntiguo = calcTotalOferta(antiguo.data);
-    const toActual  = calcTotalOferta(actual);
+    if (!antiguo || !actualSnapshot) return null;
+    // Usar los campos escalares del snapshot (siempre disponibles, incluso si data es null).
+    // Recalcular desde data solo como último recurso.
+    const cdAntiguo = new Decimal(antiguo.costo_directo ?? 0);
+    const cdActual  = new Decimal(actualSnapshot.costo_directo ?? 0);
+    const toAntiguo = new Decimal(antiguo.total_oferta || 0).gt(0)
+      ? new Decimal(antiguo.total_oferta!)
+      : antiguo.data ? calcTotalOferta(antiguo.data) : cdAntiguo;
+    const toActual  = new Decimal(actualSnapshot.total_oferta || 0).gt(0)
+      ? new Decimal(actualSnapshot.total_oferta!)
+      : actualSnapshot.data ? calcTotalOferta(actualSnapshot.data) : cdActual;
     return {
       cdAntiguo, cdActual, deltaCd: cdActual.minus(cdAntiguo),
       toAntiguo, toActual, deltaTo: toActual.minus(toAntiguo),
     };
-  }, [antiguo, actual]);
+  }, [antiguo, actualSnapshot]);
 
   const countBadge = useMemo(() => {
     const igual   = diffs.filter((d) => d.estado === 'igual').length;
@@ -221,9 +247,14 @@ export function ModalCompararVersiones({ snapshotId, budgetId, onClose }: ModalC
     return { igual, cambio, solAnt, solNva };
   }, [diffs]);
 
+  // Alguno de los dos snapshots fue creado antes de que el sistema guardara data JSONB
+  const sinDatosDetalle =
+    (antiguo != null && !antiguo.data) ||
+    (actualSnapshot != null && !actualSnapshot.data);
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm overflow-y-auto py-8">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl mx-4 flex flex-col max-h-[92vh]">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl mx-4 flex flex-col max-h-[92vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8E4DE] shrink-0">
           <div>
@@ -250,58 +281,73 @@ export function ModalCompararVersiones({ snapshotId, budgetId, onClose }: ModalC
 
           {error && <div className="text-center py-16 text-red-500">{error}</div>}
 
-          {!loading && !error && antiguo && actual && (
+          {!loading && !error && antiguo && actualSnapshot && (
             <>
-              {/* Leyenda */}
-              <div className="flex flex-wrap gap-3 text-xs">
-                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-[#E8E4DE] text-stone-600">
-                  <span className="w-2.5 h-2.5 rounded-full bg-stone-200 inline-block" />
-                  Sin cambios ({countBadge.igual})
-                </span>
-                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700">
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />
-                  Precio distinto ({countBadge.cambio})
-                </span>
-                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 border border-red-200 text-red-700">
-                  <span className="w-2.5 h-2.5 rounded-full bg-red-400 inline-block" />
-                  Eliminada ({countBadge.solAnt})
-                </span>
-                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-50 border border-green-200 text-green-700">
-                  <span className="w-2.5 h-2.5 rounded-full bg-green-400 inline-block" />
-                  Nueva ({countBadge.solNva})
-                </span>
-              </div>
+              {/* Aviso cuando algún snapshot no tiene detalle de actividades */}
+              {sinDatosDetalle && (
+                <div className="flex items-start gap-2 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <span>
+                    Una o ambas versiones fueron creadas antes de que el sistema guardara el
+                    detalle de actividades. Solo se pueden comparar los totales financieros.
+                  </span>
+                </div>
+              )}
 
-              {/* Tabla comparación */}
-              <div className="rounded-xl border border-[#E8E4DE] overflow-hidden">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-[#F5F2EE] text-xs uppercase tracking-wide text-stone-500 border-b border-[#E8E4DE]">
-                      <th className="px-3 py-3 text-left font-semibold w-1/2 border-r border-[#E8E4DE]">
-                        v{antiguo.version} — {formatearFechaCorta(antiguo.created_at)}
-                      </th>
-                      <th className="px-3 py-3 text-left font-semibold w-1/2">
-                        {actualMeta
-                          ? `v${actualMeta.version} — ${formatearFechaCorta(actualMeta.created_at)}`
-                          : 'Versión actual'}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {diffs.length === 0 ? (
-                      <tr>
-                        <td colSpan={2} className="px-4 py-8 text-center text-stone-400 text-sm">
-                          Las dos versiones son idénticas.
-                        </td>
+              {/* Leyenda — solo cuando ambas versiones tienen datos de actividades */}
+              {!sinDatosDetalle && (
+                <div className="flex flex-wrap gap-3 text-xs">
+                  <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-[#E8E4DE] text-stone-600">
+                    <span className="w-2.5 h-2.5 rounded-full bg-stone-200 inline-block" />
+                    Sin cambios ({countBadge.igual})
+                  </span>
+                  <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />
+                    Precio distinto ({countBadge.cambio})
+                  </span>
+                  <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 border border-red-200 text-red-700">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-400 inline-block" />
+                    Eliminada ({countBadge.solAnt})
+                  </span>
+                  <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-50 border border-green-200 text-green-700">
+                    <span className="w-2.5 h-2.5 rounded-full bg-green-400 inline-block" />
+                    Nueva ({countBadge.solNva})
+                  </span>
+                </div>
+              )}
+
+              {/* Tabla comparación — solo cuando ambos snapshots tienen data */}
+              {!sinDatosDetalle && (
+                <div className="rounded-xl border border-[#E8E4DE] overflow-hidden">
+                  <table className="w-full table-fixed">
+                    <thead>
+                      <tr className="bg-[#F5F2EE] text-xs uppercase tracking-wide text-stone-500 border-b border-[#E8E4DE]">
+                        <th className="px-3 py-3 text-left font-semibold w-1/2 border-r border-[#E8E4DE]">
+                          v{antiguo.version} — {formatearFechaCorta(antiguo.created_at)}
+                        </th>
+                        <th className="px-3 py-3 text-left font-semibold w-1/2">
+                          {actualMeta
+                            ? `v${actualMeta.version} — ${formatearFechaCorta(actualMeta.created_at)}`
+                            : 'Versión actual'}
+                        </th>
                       </tr>
-                    ) : (
-                      diffs.map((d, i) => <FilaDiff key={i} diff={d} />)
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {diffs.length === 0 ? (
+                        <tr>
+                          <td colSpan={2} className="px-4 py-8 text-center text-stone-400 text-sm">
+                            Las dos versiones son idénticas.
+                          </td>
+                        </tr>
+                      ) : (
+                        diffs.map((d, i) => <FilaDiff key={i} diff={d} />)
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
-              {/* Footer totales */}
+              {/* Footer totales — siempre visible cuando hay dos snapshots cargados */}
               {totalesDiff && (
                 <div className="rounded-xl border border-[#E8E4DE] overflow-hidden">
                   <div className="bg-[#F5F2EE] px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-stone-500">

@@ -486,10 +486,10 @@ export const PresupuestoPDF = ({ budget, profile, options, children, aiuComponen
               </Text>
             </View>
           )}
-          {(budget.projects as any)?.area_m2 && (
+          {((budget as any).area_m2 ?? (budget.projects as any)?.area_m2) && (
             <View style={styles.projectRow}>
               <Text style={styles.projectLabel}>Área:</Text>
-              <Text style={styles.projectValue}>{(budget.projects as any).area_m2} m²</Text>
+              <Text style={styles.projectValue}>{(budget as any).area_m2 ?? (budget.projects as any).area_m2} m²</Text>
             </View>
           )}
           <View style={styles.projectRow}>

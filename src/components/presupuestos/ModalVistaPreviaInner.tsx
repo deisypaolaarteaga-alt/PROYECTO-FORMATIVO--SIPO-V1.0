@@ -202,7 +202,7 @@ export default function ModalVistaPreviaInner({ open, onClose, budget, chapters,
     setLoadingExcel(true);
     try {
       const { exportarPresupuestoExcel } = await import('@/lib/excel/exportarPresupuestoExcel');
-      await exportarPresupuestoExcel(budgetCompleto, profile, hojasExcel);
+      await exportarPresupuestoExcel(budgetCompleto, profile, hojasExcel, aiuComponentes.length > 0 ? aiuComponentes : undefined);
       toast.success('Excel generado correctamente');
     } catch (err: any) {
       toast.error(err?.message || 'No se pudo generar el Excel');

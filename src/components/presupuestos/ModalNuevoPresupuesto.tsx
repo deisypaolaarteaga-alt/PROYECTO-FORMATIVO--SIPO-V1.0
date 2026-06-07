@@ -69,6 +69,7 @@ interface ModalNuevoPresupuestoProps {
   proyectoNombre?: string;
   proyectoTipoObra?: string;
   proyectoUbicacion?: string | null;
+  initialPlantillaId?: string;
 }
 
 export function ModalNuevoPresupuesto({
@@ -78,6 +79,7 @@ export function ModalNuevoPresupuesto({
   proyectoNombre,
   proyectoTipoObra,
   proyectoUbicacion,
+  initialPlantillaId,
 }: ModalNuevoPresupuestoProps) {
   const proyectoFijo = !!proyectoId;
 
@@ -115,11 +117,11 @@ export function ModalNuevoPresupuesto({
       setStep(proyectoFijo ? 2 : 1);
       setSelectedProjectId(proyectoId ?? '');
       setBudgetName('');
-      setStartingPoint('blank');
+      setStartingPoint(initialPlantillaId ? 'plantilla_propia' : 'blank');
       setSelectedTipoObra(normalizarTipo(proyectoTipoObra));
       setCustomChapters([]);
       setCiudadObra(proyectoUbicacion || '');
-      setSelectedPlantillaId('');
+      setSelectedPlantillaId(initialPlantillaId ?? '');
       setModoPlantilla('estructura');
       setMostrarTodasPlantillas(false);
       if (!proyectoFijo) loadProjects();

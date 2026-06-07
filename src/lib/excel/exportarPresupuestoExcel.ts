@@ -147,7 +147,7 @@ export async function exportarPresupuestoExcel(
   const tipoObraExcel = (budget.projects as any)?.tipo_obra
     ? (TIPO_OBRA_LABEL[(budget.projects as any).tipo_obra] ?? (budget.projects as any).tipo_obra)
     : '';
-  const areaM2Excel = (budget.projects as any)?.area_m2 as number | null | undefined;
+  const areaM2Excel = ((budget as any)?.area_m2 ?? (budget.projects as any)?.area_m2) as number | null | undefined;
 
   const fmtFecha = (d: Date) =>
     new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'America/Bogota' }).format(d);

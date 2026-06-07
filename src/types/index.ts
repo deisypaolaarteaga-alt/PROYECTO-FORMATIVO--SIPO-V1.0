@@ -171,6 +171,7 @@ export interface Budget {
   reteiva_pct: number;              // % sobre el valor del IVA
   ciudad_ica: string;
 
+  area_m2: number | null;        // Área específica de este presupuesto (puede diferir del proyecto)
   moneda: string;
   aprobado_en: string | null;   // Timestamp auto-rellenado por trigger al aprobar
   created_at: string;
@@ -359,6 +360,7 @@ export type BudgetCompleto = Budget & {
   projects?: {
     nombre: string;
     ubicacion: string | null;
+    area_m2: number | null;
     cliente_id: string | null;
     cliente_nombre: string | null;
     tipo_obra: string | null;

@@ -111,6 +111,7 @@ const migrationFiles = [
   'supabase/migrations/20260606200000_token_carta_ejecutiva.sql',
   'supabase/migrations/20260607100000_aiu_componentes.sql',
   'supabase/migrations/20260606300000_fix_v_resumen_detallado.sql',
+  'supabase/migrations/20260607200000_area_m2_budget.sql',
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

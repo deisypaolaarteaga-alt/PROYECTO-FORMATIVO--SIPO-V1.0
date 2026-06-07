@@ -335,7 +335,7 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
 
                 <div className="space-y-3">
                   {itemsMO.map(({ item, idx }) => (
-                    <div key={`mo-${idx}-${item.id ?? item.nombre ?? ''}`} className="space-y-1">
+                    <div key={`mo-${item.id ?? idx}`} className="space-y-1">
                       <div className="flex items-center gap-2 group">
                         <InputEditable
                           value={item.nombre}
@@ -423,7 +423,7 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
 
                 <div className="space-y-2">
                   {itemsMat.map(({ item, idx }) => (
-                    <div key={`mat-${idx}-${item.id ?? item.nombre ?? ''}`}>
+                    <div key={`mat-${item.id ?? idx}`}>
                       <div className="flex items-center gap-2 group">
                         <InputEditable
                           value={item.nombre}
@@ -492,7 +492,7 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
 
                 <div className="space-y-2">
                   {itemsEq.map(({ item, idx }) => (
-                    <div key={`eq-${idx}-${item.id ?? item.nombre ?? ''}`} className="flex items-center gap-2 group">
+                    <div key={`eq-${item.id ?? idx}`} className="flex items-center gap-2 group">
                       <InputEditable
                         value={item.nombre}
                         onChange={(val) => updateItem(idx, { nombre: val })}

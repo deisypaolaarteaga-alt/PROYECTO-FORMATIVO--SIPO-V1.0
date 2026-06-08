@@ -36,13 +36,14 @@ export default async function PresupuestoPublicoPage({ params }: Props) {
     );
   }
 
-  const { tokenInfo, capitulos } = result.data!;
+  const { tokenInfo, capitulos, aiuComponentes } = result.data!;
 
   return (
     <PortalClientePage
       token={token}
       tokenInfo={tokenInfo}
       capitulos={capitulos}
+      aiuComponentes={aiuComponentes}
     />
   );
 }

@@ -513,6 +513,8 @@ export interface TokenInfo {
     administracion_pct: number;
     imprevistos_pct: number;
     utilidad_pct: number;
+    metodo_aiu: string;
+    duracion_meses: number | null;
     metodo_iva: string;
     iva_porcentaje: number;
     vigencia_dias: number;
@@ -571,6 +573,8 @@ export async function getTokenInfo(
           administracion_pct,
           imprevistos_pct,
           utilidad_pct,
+          metodo_aiu,
+          duracion_meses,
           metodo_iva,
           iva_porcentaje,
           vigencia_dias,
@@ -601,6 +605,8 @@ export async function getTokenInfo(
       administracion_pct: number;
       imprevistos_pct: number;
       utilidad_pct: number;
+      metodo_aiu: string;
+      duracion_meses: number | null;
       metodo_iva: string;
       iva_porcentaje: number;
       vigencia_dias: number;
@@ -673,6 +679,8 @@ export async function getTokenInfo(
           administracion_pct: budget.administracion_pct,
           imprevistos_pct: budget.imprevistos_pct,
           utilidad_pct: budget.utilidad_pct,
+          metodo_aiu: budget.metodo_aiu ?? 'porcentaje',
+          duracion_meses: budget.duracion_meses ?? null,
           metodo_iva: budget.metodo_iva,
           iva_porcentaje: budget.iva_porcentaje,
           vigencia_dias: budget.vigencia_dias,
@@ -773,13 +781,19 @@ export interface CapituloPublico {
   }[];
 }
 
+export interface AiuComponentePublico {
+  nombre: string;
+  valor_mensual: number;
+  orden: number;
+}
+
 /**
  * Retorna los capítulos y actividades del presupuesto para la página pública.
  * No expone datos de usuario. Valida el token antes de retornar.
  */
 export async function getPresupuestoPublico(
   token: string
-): Promise<ActionResult<{ tokenInfo: TokenInfo; capitulos: CapituloPublico[] }>> {
+): Promise<ActionResult<{ tokenInfo: TokenInfo; capitulos: CapituloPublico[]; aiuComponentes: AiuComponentePublico[] }>> {
   try {
     const admin = createAdminClient();
 
@@ -831,9 +845,25 @@ export async function getPresupuestoPublico(
         })),
     }));
 
+    // Fetch AIU componentes cuando el método es detallado
+    let aiuComponentes: AiuComponentePublico[] = [];
+    if (tokenInfoResult.data.presupuesto.metodo_aiu === 'detallado') {
+      const { data: componentes } = await admin
+        .from('aiu_componentes')
+        .select('nombre, valor_mensual, orden')
+        .eq('budget_id', tokenRow.budget_id)
+        .order('orden', { ascending: true });
+
+      aiuComponentes = (componentes ?? []).map((c: any) => ({
+        nombre: c.nombre as string,
+        valor_mensual: Number(c.valor_mensual) || 0,
+        orden: (c.orden as number) ?? 0,
+      }));
+    }
+
     return {
       success: true,
-      data: { tokenInfo: tokenInfoResult.data, capitulos },
+      data: { tokenInfo: tokenInfoResult.data, capitulos, aiuComponentes },
     };
   } catch (err) {
     console.error('[getPresupuestoPublico]', err);

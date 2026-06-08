@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { CheckCircle2, XCircle, MessageSquare, ChevronDown, ChevronRight, AlertCircle } from 'lucide-react';
-import { registrarVistaToken, responderPresupuesto, type TokenInfo, type CapituloPublico } from '@/actions/portal-cliente';
+import { registrarVistaToken, responderPresupuesto, type TokenInfo, type CapituloPublico, type AiuComponentePublico } from '@/actions/portal-cliente';
 import Decimal from 'decimal.js';
 
 // ── Helpers financieros ────────────────────────────────────────────────────
@@ -29,6 +29,9 @@ function calcularResumen(p: TokenInfo['presupuesto']) {
 
   return {
     costoDirecto:   cd.toNumber(),
+    administracion: adm.toNumber(),
+    imprevistos:    imp.toNumber(),
+    utilidad:       util.toNumber(),
     aiu:            aiu.toNumber(),
     iva:            iva.toNumber(),
     totalOferta:    sub.plus(iva).toNumber(),
@@ -47,6 +50,7 @@ interface Props {
   token: string;
   tokenInfo: TokenInfo;
   capitulos: CapituloPublico[];
+  aiuComponentes: AiuComponentePublico[];
 }
 
 // ── Sección de respuesta ───────────────────────────────────────────────────
@@ -447,7 +451,7 @@ function SeccionPartes({
 
 // ── Componente principal ───────────────────────────────────────────────────
 
-export function PortalClientePage({ token, tokenInfo, capitulos }: Props) {
+export function PortalClientePage({ token, tokenInfo, capitulos, aiuComponentes }: Props) {
   const { presupuesto, proyecto, empresa } = tokenInfo;
   const resumen = calcularResumen(presupuesto);
   const capitulosConActividades = capitulos.filter(ch => ch.actividades.length > 0);
@@ -539,6 +543,84 @@ export function PortalClientePage({ token, tokenInfo, capitulos }: Props) {
             ))}
           </div>
         </div>
+
+        {/* Desglose AIU detallado */}
+        {presupuesto.metodo_aiu === 'detallado' && aiuComponentes.length > 0 && (
+          <div>
+            <h2 className="text-[11px] font-bold text-stone uppercase tracking-widest mb-3">
+              Composición del AIU (modo detallado)
+            </h2>
+            <div className="bg-white rounded-xl border border-[#E8E4DE] overflow-hidden shadow-sm">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-[9px] uppercase tracking-wide text-stone bg-[#F8F6F3] border-b border-[#E8E4DE]">
+                    <th className="px-4 py-2 text-left font-semibold">Concepto</th>
+                    <th className="hidden sm:table-cell px-3 py-2 text-right font-semibold w-36">Valor / mes</th>
+                    <th className="hidden sm:table-cell px-3 py-2 text-center font-semibold w-20">Meses</th>
+                    <th className="px-3 py-2 text-right font-semibold w-36">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#F0EDE8]">
+                  {/* Ítems de Administración desde aiu_componentes */}
+                  <tr className="bg-[#FAFAF9]">
+                    <td colSpan={4} className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-stone">
+                      Administración
+                    </td>
+                  </tr>
+                  {aiuComponentes.map((comp, idx) => {
+                    const meses = presupuesto.duracion_meses ?? 1;
+                    const total = new Decimal(comp.valor_mensual).mul(meses).toNumber();
+                    return (
+                      <tr key={idx} className="hover:bg-[#FAFAF9] align-middle">
+                        <td className="px-4 py-2.5 text-[#1C1814] text-sm leading-snug pl-7">{comp.nombre}</td>
+                        <td className="hidden sm:table-cell px-3 py-2.5 text-right text-xs tabular-nums text-stone">
+                          {formatearCOP(comp.valor_mensual)}
+                        </td>
+                        <td className="hidden sm:table-cell px-3 py-2.5 text-center text-xs tabular-nums text-stone">
+                          {meses}
+                        </td>
+                        <td className="px-3 py-2.5 text-right text-sm tabular-nums font-semibold text-[#1C1814]">
+                          {formatearCOP(total)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {/* Imprevistos y Utilidad — calculados desde porcentaje × CD (igual que la vista) */}
+                  <tr className="hover:bg-[#FAFAF9] align-middle border-t border-[#E8E4DE]">
+                    <td className="px-4 py-2.5 text-[#1C1814] text-sm leading-snug">
+                      Imprevistos ({presupuesto.imprevistos_pct}%)
+                    </td>
+                    <td className="hidden sm:table-cell px-3 py-2.5 text-right text-xs tabular-nums text-[#C4BAB0]">—</td>
+                    <td className="hidden sm:table-cell px-3 py-2.5 text-center text-xs tabular-nums text-[#C4BAB0]">—</td>
+                    <td className="px-3 py-2.5 text-right text-sm tabular-nums font-semibold text-[#1C1814]">
+                      {formatearCOP(resumen.imprevistos)}
+                    </td>
+                  </tr>
+                  <tr className="hover:bg-[#FAFAF9] align-middle">
+                    <td className="px-4 py-2.5 text-[#1C1814] text-sm leading-snug">
+                      Utilidad ({presupuesto.utilidad_pct}%)
+                    </td>
+                    <td className="hidden sm:table-cell px-3 py-2.5 text-right text-xs tabular-nums text-[#C4BAB0]">—</td>
+                    <td className="hidden sm:table-cell px-3 py-2.5 text-center text-xs tabular-nums text-[#C4BAB0]">—</td>
+                    <td className="px-3 py-2.5 text-right text-sm tabular-nums font-semibold text-[#1C1814]">
+                      {formatearCOP(resumen.utilidad)}
+                    </td>
+                  </tr>
+                </tbody>
+                <tfoot>
+                  <tr className="bg-[#F5F0EA] border-t border-[#E8E4DE]">
+                    <td colSpan={3} className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-stone">
+                      Total AIU
+                    </td>
+                    <td className="px-3 py-2.5 text-right text-sm tabular-nums font-bold text-[#1C1814]">
+                      {formatearCOP(resumen.aiu)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Carta ejecutiva — si el constructor la generó al enviar */}
         {tokenInfo.carta_ejecutiva && (

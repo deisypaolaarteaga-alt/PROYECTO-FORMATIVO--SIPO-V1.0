@@ -140,9 +140,7 @@ Cuando te pregunten por el orden lógico de actividades, sugiere una secuencia c
 
 Pregunta del constructor: ${mensaje}`;
 
-    console.log('Prompt length:', prompt.length);
     const respuesta = await generarTexto(prompt);
-    console.log('Groq respuesta:', respuesta);
     if (!respuesta) return { error: 'No se obtuvo respuesta de la IA. Intenta nuevamente.' };
 
     return { respuesta };

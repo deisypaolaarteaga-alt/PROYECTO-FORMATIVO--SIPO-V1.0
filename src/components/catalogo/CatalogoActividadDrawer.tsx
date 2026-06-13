@@ -14,7 +14,7 @@ import type { CatalogoActividad, CatalogoApuItem } from '@/types';
 
 const TIPO_CONFIG: Record<string, { label: string; color: string; bg: string; icon: React.ElementType }> = {
   material:          { label: 'Material',         color: 'text-[#D95510]',  bg: 'bg-orange-50 border-orange-200',  icon: PackagePlus  },
-  mano_obra:         { label: 'Mano de obra',      color: 'text-blue-700',   bg: 'bg-blue-50 border-blue-200',      icon: HardHat      },
+  mano_obra:         { label: 'Mano de obra',      color: 'text-info-600',   bg: 'bg-info-50 border-[#A8C4DC]',     icon: HardHat      },
   equipo:            { label: 'Equipo',            color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200',  icon: Wrench       },
   herramienta_menor: { label: 'Herr. menor',       color: 'text-amber-700',  bg: 'bg-amber-50 border-amber-200',   icon: Zap          },
   epp:               { label: 'EPP',               color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200', icon: ShieldCheck },

@@ -20,7 +20,7 @@ import { ModalCrearActividad } from './ModalCrearActividad';
 
 const TIPOS_OBRA = [
   { id: 'residencial',     label: 'Residencial',     color: 'bg-orange-100 text-orange-700 border-orange-200' },
-  { id: 'comercial',       label: 'Comercial',       color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  { id: 'comercial',       label: 'Comercial',       color: 'bg-info-50 text-info-600 border-[#A8C4DC]' },
   { id: 'industrial',      label: 'Industrial',      color: 'bg-slate-100 text-slate-700 border-slate-200' },
   { id: 'infraestructura', label: 'Infraestructura', color: 'bg-amber-100 text-amber-700 border-amber-200' },
   { id: 'institucional',   label: 'Institucional',   color: 'bg-purple-100 text-purple-700 border-purple-200' },

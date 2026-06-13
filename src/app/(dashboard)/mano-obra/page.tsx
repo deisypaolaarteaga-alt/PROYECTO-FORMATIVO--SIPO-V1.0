@@ -397,7 +397,7 @@ export default function ManoObraPage() {
                         <span className="flex items-center gap-2 flex-wrap">
                           {t.especialidad}
                           {esPropio ? (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700 uppercase tracking-wide">
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-info-50 text-info-600 uppercase tracking-wide">
                               Propio
                             </span>
                           ) : (

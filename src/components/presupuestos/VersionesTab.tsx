@@ -20,7 +20,7 @@ const MOTIVO_CONFIG: Record<
   rechazo_cliente:  { label: 'Rechazo cliente',  badge: 'bg-red-100 text-red-700 border border-red-200'   },
   reapertura_manual:{ label: 'Reapertura manual', badge: 'bg-amber-100 text-amber-700 border border-amber-200' },
   aprobacion:       { label: 'Aprobación',        badge: 'bg-green-100 text-green-700 border border-green-200' },
-  envio_cliente:    { label: 'Envío al cliente',  badge: 'bg-blue-100 text-blue-700 border border-blue-200'  },
+  envio_cliente:    { label: 'Envío al cliente',  badge: 'bg-info-50 text-info-600 border border-[#A8C4DC]'  },
 };
 
 function formatearFecha(iso: string): string {

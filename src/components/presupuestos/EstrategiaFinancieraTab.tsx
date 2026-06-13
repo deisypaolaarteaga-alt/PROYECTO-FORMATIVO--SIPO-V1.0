@@ -34,8 +34,8 @@ const ESCENARIOS = [
   {
     nombre:    'Competitivo',
     pct:       10,
-    badgeCls:  'bg-blue-100 text-blue-700 border-blue-300',
-    activeCls: 'border-blue-400 bg-blue-50',
+    badgeCls:  'bg-info-50 text-info-600 border-[#A8C4DC]',
+    activeCls: 'border-[#A8C4DC] bg-info-50',
   },
   {
     nombre:    'Límite',

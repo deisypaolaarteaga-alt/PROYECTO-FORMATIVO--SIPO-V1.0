@@ -122,14 +122,14 @@ export function FiscalForm({ initialData, municipios }: FiscalFormProps) {
           </h3>
           <div className={cn(
             "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest",
-            isAIUOverLimit ? "bg-red-50 text-red-600" : "bg-blue-50 text-blue-600"
+            isAIUOverLimit ? "bg-danger-50 text-danger-600" : "bg-info-50 text-info-600"
           )}>
             Total AIU: {totalAIU.toFixed(1)}%
           </div>
         </div>
         <div className="p-6 space-y-8">
           {[
-            { label: 'Administración (%)', key: 'aiu_admin_default' as const, color: 'bg-blue-600' },
+            { label: 'Administración (%)', key: 'aiu_admin_default' as const, color: 'bg-[#2E4A63]' },
             { label: 'Imprevistos (%)', key: 'aiu_imprev_default' as const, color: 'bg-orange-500' },
             { label: 'Utilidad (%)', key: 'aiu_utilidad_default' as const, color: 'bg-emerald-600' },
           ].map((item) => (

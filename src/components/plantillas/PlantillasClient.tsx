@@ -33,7 +33,7 @@ const TIPO_CONFIG: Record<string, {
   label: string;
 }> = {
   residencial:    { headerBg: 'bg-orange-50',  iconBg: 'bg-orange-100',  iconColor: 'text-orange-600',  pillBg: 'bg-orange-50',  pillText: 'text-orange-700',  pillBorder: 'border-orange-200',  label: 'Residencial'    },
-  comercial:      { headerBg: 'bg-blue-50',    iconBg: 'bg-blue-100',    iconColor: 'text-[#1E6FB8]',   pillBg: 'bg-blue-50',    pillText: 'text-blue-700',    pillBorder: 'border-blue-200',    label: 'Comercial'      },
+  comercial:      { headerBg: 'bg-info-50',    iconBg: 'bg-info-50',     iconColor: 'text-info-600',    pillBg: 'bg-info-50',    pillText: 'text-info-600',    pillBorder: 'border-[#A8C4DC]',   label: 'Comercial'      },
   institucional:  { headerBg: 'bg-green-50',   iconBg: 'bg-green-100',   iconColor: 'text-green-700',   pillBg: 'bg-green-50',   pillText: 'text-green-700',   pillBorder: 'border-green-200',   label: 'Institucional'  },
   industrial:     { headerBg: 'bg-gray-100',   iconBg: 'bg-gray-200',    iconColor: 'text-gray-600',    pillBg: 'bg-gray-100',   pillText: 'text-gray-700',    pillBorder: 'border-gray-300',    label: 'Industrial'     },
   hotelero:       { headerBg: 'bg-purple-50',  iconBg: 'bg-purple-100',  iconColor: 'text-purple-700',  pillBg: 'bg-purple-50',  pillText: 'text-purple-700',  pillBorder: 'border-purple-200',  label: 'Hotelero'       },

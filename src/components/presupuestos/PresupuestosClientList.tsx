@@ -61,7 +61,7 @@ const GRUPOS_ESTADO: Record<string, string[]> = {
 const TABS = [
   { key: 'todos',       label: 'Todos',       dot: '' },
   { key: 'borrador',    label: 'Borrador',    dot: 'bg-[#D1D5DB]' },
-  { key: 'con_cliente', label: 'Con cliente', dot: 'bg-[#2563EB]' },
+  { key: 'con_cliente', label: 'Con cliente', dot: 'bg-[#1C4A72]' },
   { key: 'aprobado',    label: 'Aprobado',    dot: 'bg-[#16A34A]' },
   { key: 'rechazado',   label: 'Rechazado',   dot: 'bg-[#DC2626]' },
   { key: 'archivado',   label: 'Archivado',   dot: 'bg-[#9CA3AF]' },

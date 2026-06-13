@@ -712,8 +712,8 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
               {/* Indicador de estado del portal — clic abre detalle */}
               {ESTADOS_PORTAL.includes(estadoPortal) && (() => {
                 const configs: Record<string, { icon: React.ReactNode; text: string; cls: string }> = {
-                  enviado_a_cliente:     { icon: <Clock className="h-3 w-3" />,          text: 'Enviado — pendiente de ver',   cls: 'bg-blue-50 text-blue-700 border-blue-200' },
-                  visto_por_cliente:     { icon: <Eye className="h-3 w-3" />,             text: 'Visto por el cliente',          cls: 'bg-sky-50 text-sky-700 border-sky-200' },
+                  enviado_a_cliente:     { icon: <Clock className="h-3 w-3" />,          text: 'Enviado — pendiente de ver',   cls: 'bg-info-50 text-info-600 border-[#A8C4DC]' },
+                  visto_por_cliente:     { icon: <Eye className="h-3 w-3" />,             text: 'Visto por el cliente',          cls: 'bg-info-50 text-info-600 border-[#A8C4DC]' },
                   con_observaciones:     { icon: <MessageSquare className="h-3 w-3" />,   text: 'El cliente dejó comentarios',   cls: 'bg-amber-50 text-amber-700 border-amber-200' },
                   aprobado_por_cliente:  { icon: <CheckCheck className="h-3 w-3" />,      text: 'Aprobado por el cliente',       cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
                   rechazado_por_cliente: { icon: <XCircle className="h-3 w-3" />,         text: 'Rechazado por el cliente',      cls: 'bg-red-50 text-red-700 border-red-200' },
@@ -776,9 +776,9 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
 
       {/* ── BANNER ENVIADO / VISTO POR CLIENTE ──────────────────────────── */}
       {(estadoPortal === 'enviado_a_cliente' || estadoPortal === 'visto_por_cliente') && (
-        <div className="bg-blue-50 border-b border-blue-200 px-6 py-3 flex items-center gap-3">
-          <Clock className="h-5 w-5 text-blue-600 shrink-0" />
-          <p className="text-sm text-blue-800 font-medium">
+        <div className="bg-info-50 border-b border-[#A8C4DC] px-6 py-3 flex items-center gap-3">
+          <Clock className="h-5 w-5 text-info-600 shrink-0" />
+          <p className="text-sm text-info-600 font-medium">
             Este presupuesto fue enviado al cliente y está bloqueado para edición.
             Si el cliente lo rechaza podrás corregirlo.
           </p>

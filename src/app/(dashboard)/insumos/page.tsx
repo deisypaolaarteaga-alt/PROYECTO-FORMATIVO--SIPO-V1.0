@@ -738,13 +738,13 @@ export default function InsumosPage() {
 
       {/* Aviso cuadrillas */}
       {tab === 'crews' && (
-        <div className="flex items-center justify-between gap-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded-xl">
-          <p className="text-sm text-blue-800 font-medium">
+        <div className="flex items-center justify-between gap-4 px-4 py-3 bg-info-50 border border-[#A8C4DC] rounded-xl">
+          <p className="text-sm text-info-600 font-medium">
             Las cuadrillas agrupan trabajadores. Para editar tarifas salariales ve a Tarifas Salariales.
           </p>
           <Link
             href="/mano-obra"
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-700 text-white text-xs font-semibold rounded-lg hover:bg-blue-800 transition-colors whitespace-nowrap shrink-0"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1C4A72] text-white text-xs font-semibold rounded-lg hover:bg-[#2E4A63] transition-colors whitespace-nowrap shrink-0"
           >
             Gestionar trabajadores <ArrowRight className="h-3.5 w-3.5" />
           </Link>
@@ -1343,7 +1343,7 @@ function MatRow({
         <span className="flex items-center gap-2 flex-wrap">
           {item.nombre}
           {item.esPropio ? (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700 uppercase tracking-wide">Propio</span>
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-info-50 text-info-600 uppercase tracking-wide">Propio</span>
           ) : (
             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#F3F4F6] text-[#6B7280] uppercase tracking-wide">Referencia</span>
           )}
@@ -1425,7 +1425,7 @@ function EqRow({
         <span className="flex items-center gap-2 flex-wrap">
           {item.nombre}
           {item.esPropio ? (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700 uppercase tracking-wide">Propio</span>
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-info-50 text-info-600 uppercase tracking-wide">Propio</span>
           ) : (
             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#F3F4F6] text-[#6B7280] uppercase tracking-wide">Referencia</span>
           )}

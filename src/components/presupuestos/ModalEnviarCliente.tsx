@@ -121,8 +121,8 @@ export function ModalEnviarCliente({
           </div>
 
           {/* Info */}
-          <div className="bg-[#EBF5FF] rounded-xl border border-[#BFDBFE] p-4">
-            <p className="text-xs text-[#1E40AF] leading-relaxed">
+          <div className="bg-info-50 rounded-xl border border-[#A8C4DC] p-4">
+            <p className="text-xs text-info-600 leading-relaxed">
               El cliente recibirá un enlace único para ver el presupuesto, aprobarlo o dejar
               observaciones. El enlace tendrá la misma vigencia configurada en el presupuesto.
             </p>

@@ -228,7 +228,7 @@ export async function resetPassword(formData: FormData): Promise<ActionResult> {
 
   const supabase = await createClient();
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/nueva-contrasena`,
+    redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/recuperar`,
   });
 
   if (error) {

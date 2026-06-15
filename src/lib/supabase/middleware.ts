@@ -42,7 +42,7 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Rutas públicas que no requieren autenticación
-  const publicRoutes = ['/', '/login', '/registro', '/recuperar-contrasena', '/nueva-contrasena'];
+  const publicRoutes = ['/', '/login', '/registro', '/recuperar-contrasena', '/nueva-contrasena', '/recuperar'];
   const isPublicRoute = publicRoutes.includes(pathname);
   const isAuthCallback = pathname.startsWith('/auth/callback');
   const isApiRoute = pathname.startsWith('/api');

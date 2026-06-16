@@ -6,6 +6,7 @@ import {
   X, ChevronDown, ChevronRight, Trash2, Plus, Loader2, Pencil, Check, AlertCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { SelectDropdown } from '@/components/shared/SelectDropdown';
 import { getDetallePlantilla, actualizarEstructuraPlantilla } from '@/actions/plantillas';
 import { toast } from 'sonner';
 import { UNIDADES_MEDIDA } from '@/types';
@@ -296,15 +297,12 @@ export function DrawerDetallePlantilla({ plantillaId, nombreInicial, isOpen, onC
                                     className="flex-1 h-8 px-2.5 text-[12px] border border-[#D1D5DB] rounded-lg focus:border-[#D95510] outline-none bg-white"
                                     placeholder="Nombre actividad"
                                   />
-                                  <select
+                                  <SelectDropdown
                                     value={act.unidad}
-                                    onChange={e => updateActUnidad(capIdx, actIdx, e.target.value)}
-                                    className="h-8 px-2 text-[11px] border border-[#D1D5DB] rounded-lg focus:border-[#D95510] outline-none bg-white"
-                                  >
-                                    {UNIDADES_MEDIDA.map(u => (
-                                      <option key={u} value={u}>{u}</option>
-                                    ))}
-                                  </select>
+                                    onChange={v => updateActUnidad(capIdx, actIdx, v)}
+                                    options={UNIDADES_MEDIDA.map(u => ({ value: u, label: u }))}
+                                    size="sm"
+                                  />
                                   <button
                                     onClick={() => eliminarActividad(capIdx, actIdx)}
                                     className="p-1.5 text-[#EF4444] hover:bg-red-50 rounded-lg transition-colors shrink-0"

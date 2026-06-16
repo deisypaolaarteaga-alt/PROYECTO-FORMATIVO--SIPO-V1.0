@@ -7,6 +7,7 @@ import { Card } from '@/components/shared/Card';
 import { Button } from '@/components/shared/Button';
 import { Input } from '@/components/shared/Input';
 import { EmptyState } from '@/components/shared/EmptyState';
+import { SelectDropdown } from '@/components/shared/SelectDropdown';
 import { createUserMaterial, deleteUserMaterial } from '@/actions/insumos';
 import { toast } from 'sonner';
 
@@ -51,6 +52,7 @@ export function InsumosClient({ materials, labor, equipment, userMaterials }: In
   const [categoria, setCategoria] = useState('Todos');
   const [showAddForm, setShowAddForm] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
+  const [tipoInsumo, setTipoInsumo] = useState('material');
 
   const filteredMaterials = materials.filter(m =>
     m.nombre.toLowerCase().includes(search.toLowerCase()) &&
@@ -121,13 +123,11 @@ export function InsumosClient({ materials, labor, equipment, userMaterials }: In
           />
         </div>
         {activeTab === 'materiales' && (
-          <select
+          <SelectDropdown
             value={categoria}
-            onChange={(e) => setCategoria(e.target.value)}
-            className="px-3 py-2.5 bg-white border border-neutral-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500/20 outline-none"
-          >
-            {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
+            onChange={setCategoria}
+            options={CATEGORIAS.map(c => ({ value: c, label: c }))}
+          />
         )}
       </div>
 
@@ -138,11 +138,16 @@ export function InsumosClient({ materials, labor, equipment, userMaterials }: In
             <Input name="nombre" label="Nombre *" placeholder="Cemento Argos" required />
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-neutral-700">Tipo *</label>
-              <select name="tipo" required className="w-full p-2.5 border border-neutral-200 rounded-xl text-sm">
-                <option value="material">Material</option>
-                <option value="mano_obra">Mano de obra</option>
-                <option value="equipo">Equipo</option>
-              </select>
+              <SelectDropdown
+                value={tipoInsumo}
+                onChange={setTipoInsumo}
+                options={[
+                  { value: 'material', label: 'Material' },
+                  { value: 'mano_obra', label: 'Mano de obra' },
+                  { value: 'equipo', label: 'Equipo' },
+                ]}
+                name="tipo"
+              />
             </div>
             <Input name="unidad" label="Unidad *" placeholder="kg" required />
             <Input name="precio_unitario" label="Precio *" type="number" placeholder="25000" required />

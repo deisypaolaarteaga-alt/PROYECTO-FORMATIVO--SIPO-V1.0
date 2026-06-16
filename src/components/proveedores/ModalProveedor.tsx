@@ -9,9 +9,11 @@ import { proveedorSchema } from '@/lib/validations/schemas';
 import { crearProveedor, actualizarProveedor } from '@/actions/proveedores';
 import { toast } from 'sonner';
 import type { Proveedor } from '@/types';
-import { CATEGORIA_PROVEEDOR_LABELS, CIUDADES_COLOMBIA } from '@/types';
+import { CATEGORIA_PROVEEDOR_LABELS } from '@/types';
+import { MunicipioCombobox } from '@/components/clientes/MunicipioCombobox';
 import { Building2, User, Phone, Mail, Globe, FileText, Tag } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { SelectDropdown } from '@/components/shared/SelectDropdown';
 
 interface ModalProveedorProps {
   isOpen: boolean;
@@ -119,7 +121,7 @@ export function ModalProveedor({ isOpen, onClose, proveedor, onSuccess }: ModalP
             <ErrorMessage message={formError} onDismiss={() => setFormError(null)} />
           )}
           {/* Tipo selector */}
-          <div className="flex p-1 bg-steel-fog rounded-lg w-fit">
+          <div className="flex p-1 bg-sand rounded-lg w-fit">
             {(['persona', 'empresa'] as const).map((t) => (
               <button
                 key={t}
@@ -127,7 +129,7 @@ export function ModalProveedor({ isOpen, onClose, proveedor, onSuccess }: ModalP
                 onClick={() => setFormData(prev => ({ ...prev, tipo: t }))}
                 className={cn(
                   'flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all',
-                  formData.tipo === t ? 'bg-white text-stone shadow-sm' : 'text-mortar hover:text-stone'
+                  formData.tipo === t ? 'bg-[#E8571A] text-white shadow-sm' : 'text-mortar hover:text-stone'
                 )}
               >
                 {t === 'persona' ? <User className="h-4 w-4" /> : <Building2 className="h-4 w-4" />}
@@ -176,30 +178,18 @@ export function ModalProveedor({ isOpen, onClose, proveedor, onSuccess }: ModalP
                   <Tag className="h-3.5 w-3.5 text-[var(--accent-primary)]" />
                   Categoría
                 </label>
-                <select
+                <SelectDropdown
                   value={formData.categoria}
-                  onChange={set('categoria')}
-                  className="w-full h-10 px-3 bg-white border border-concrete rounded-lg text-sm outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/20 focus:border-[var(--accent-primary)] transition-all"
-                >
-                  {(Object.entries(CATEGORIA_PROVEEDOR_LABELS) as [Proveedor['categoria'], string][]).map(([val, label]) => (
-                    <option key={val} value={val}>{label}</option>
-                  ))}
-                </select>
+                  onChange={(v) => setFormData(prev => ({ ...prev, categoria: v as Proveedor['categoria'] }))}
+                  options={(Object.entries(CATEGORIA_PROVEEDOR_LABELS) as [Proveedor['categoria'], string][]).map(([val, label]) => ({ value: val, label }))}
+                />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-stone">Ciudad</label>
-                <select
-                  value={formData.ciudad}
-                  onChange={set('ciudad')}
-                  className="w-full h-10 px-3 bg-white border border-concrete rounded-lg text-sm outline-none focus:ring-2 focus:ring-[var(--accent-primary)]/20 focus:border-[var(--accent-primary)] transition-all"
-                >
-                  <option value="">Selecciona ciudad...</option>
-                  {CIUDADES_COLOMBIA.map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-              </div>
+              <MunicipioCombobox
+                value={formData.ciudad}
+                onChange={(ciudad) => setFormData(prev => ({ ...prev, ciudad }))}
+                label="Ciudad"
+              />
             </div>
 
             {/* Columna derecha: contacto */}

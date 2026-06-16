@@ -6,6 +6,7 @@ import { Button } from '@/components/shared/Button';
 import { crearCapitulo } from '@/actions/catalogo';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import { SelectDropdown } from '@/components/shared/SelectDropdown';
 
 const TIPOS_OBRA = [
   { id: 'residencial',     label: 'Residencial',     prefijo: 'RES' },
@@ -101,15 +102,12 @@ export function ModalCrearCapitulo({ isOpen, onClose, tipoObraInicial = 'residen
             <label className="block text-[12px] font-semibold text-slate-600 mb-1">
               Tipo de obra <span className="text-red-500">*</span>
             </label>
-            <select
+            <SelectDropdown
               value={tipoObra}
-              onChange={e => setTipoObra(e.target.value as TipoObra)}
-              className="w-full h-9 px-3 text-[13px] border border-[#E5E1D8] rounded-lg focus:outline-none focus:border-[#D95510] bg-[#F8F7F5]"
-            >
-              {TIPOS_OBRA.map(t => (
-                <option key={t.id} value={t.id}>{t.label}</option>
-              ))}
-            </select>
+              onChange={(v) => setTipoObra(v as TipoObra)}
+              options={TIPOS_OBRA.map(t => ({ value: t.id, label: t.label }))}
+              size="sm"
+            />
           </div>
 
           {/* Código — generado automáticamente */}

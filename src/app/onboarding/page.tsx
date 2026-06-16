@@ -24,6 +24,7 @@ import { Logo } from '@/components/shared/Logo';
 import { saveEmpresa, uploadLogo, createFirstProject } from '@/actions/onboarding';
 import { CIUDADES_COLOMBIA } from '@/types';
 import { cn, getInitials } from '@/lib/utils';
+import { SelectDropdown } from '@/components/shared/SelectDropdown';
 
 const TOTAL_STEPS = 3;
 
@@ -33,6 +34,7 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [empresaNombre, setEmpresaNombre] = useState('');
+  const [ciudadOnb, setCiudadOnb] = useState('');
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -150,25 +152,17 @@ export default function OnboardingPage() {
                 />
 
                 <div className="w-full space-y-1.5">
-                  <label htmlFor="ciudad-onb" className="block text-sm font-medium text-neutral-700">
+                  <label className="block text-sm font-medium text-neutral-700">
                     Ciudad
                   </label>
-                  <div className="relative">
-                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none">
-                      <MapPin className="h-4 w-4" />
-                    </div>
-                    <select
-                      id="ciudad-onb"
-                      name="ciudad"
-                      required
-                      className="w-full h-10 pl-10 pr-3 text-sm rounded-lg border border-neutral-200 bg-white hover:border-neutral-300 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200 appearance-none cursor-pointer"
-                    >
-                      <option value="">Selecciona una ciudad</option>
-                      {CIUDADES_COLOMBIA.map((c) => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <SelectDropdown
+                    id="ciudad-onb"
+                    value={ciudadOnb}
+                    onChange={setCiudadOnb}
+                    options={CIUDADES_COLOMBIA.map((c) => ({ value: c, label: c }))}
+                    placeholder="Selecciona una ciudad"
+                    name="ciudad"
+                  />
                 </div>
 
                 <Input

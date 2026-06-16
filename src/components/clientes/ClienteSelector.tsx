@@ -79,7 +79,7 @@ export function ClienteSelector({ selectedId, onSelect, initialCliente, required
       </label>
 
       {selectedCliente ? (
-        <div className="flex items-center justify-between p-3 bg-steel-fog rounded-lg border border-concrete animate-in fade-in zoom-in duration-200">
+        <div className="flex items-center justify-between p-3 bg-[#FFF4EF] rounded-lg border border-[#E8571A]/20 animate-in fade-in zoom-in duration-200">
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 rounded-full bg-white flex items-center justify-center text-[var(--accent-primary)] shadow-sm">
               <User className="h-4 w-4" />
@@ -131,9 +131,9 @@ export function ClienteSelector({ selectedId, onSelect, initialCliente, required
                   <button
                     type="button"
                     onClick={() => handleSelect(cliente)}
-                    className="w-full flex items-center gap-3 p-3 hover:bg-steel-fog text-left transition-colors"
+                    className="w-full flex items-center gap-3 p-3 hover:bg-[#FFF4EF] text-left transition-colors"
                   >
-                    <div className="h-8 w-8 rounded-full bg-steel-fog flex items-center justify-center text-mortar shrink-0">
+                    <div className="h-8 w-8 rounded-full bg-sand flex items-center justify-center text-mortar shrink-0">
                       <Building2 className="h-4 w-4" />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -149,7 +149,7 @@ export function ClienteSelector({ selectedId, onSelect, initialCliente, required
           )}
 
           {isFocused && query.length >= 1 && results.length === 0 && !blurError && (
-            <div className="flex items-center justify-between gap-2 px-3 py-2 bg-steel-fog border border-concrete rounded-lg">
+            <div className="flex items-center justify-between gap-2 px-3 py-2 bg-sand border border-concrete rounded-lg">
               <div className="flex items-center gap-2 text-mortar text-[12px]">
                 <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                 <span>No se encontró ningún cliente — ¿deseas crearlo?</span>

@@ -6,6 +6,7 @@ import { Save, Info, AlertTriangle, CheckCircle2, ChevronRight } from 'lucide-re
 import { updateConfigFiscalUsuario, type ConfigFiscal } from '@/actions/configuracion-fiscal';
 import { Button } from '@/components/shared/Button';
 import { cn } from '@/lib/utils';
+import { SelectDropdown } from '@/components/shared/SelectDropdown';
 
 interface FiscalFormProps {
   initialData: any;
@@ -89,26 +90,22 @@ export function FiscalForm({ initialData, municipios }: FiscalFormProps) {
           </div>
           <div className="space-y-2">
             <label className="text-[10px] font-black text-[#1C2B3A] uppercase tracking-widest">Régimen Tributario</label>
-            <select
+            <SelectDropdown
               value={formData.regimen_tributario}
-              onChange={(e) => setFormData({ ...formData, regimen_tributario: e.target.value as any })}
-              className="w-full h-11 px-4 border border-[#E2DDD6] rounded-[8px] text-sm bg-white focus:border-[#E8571A] focus:ring-0 outline-none appearance-none cursor-pointer transition-all"
-            >
-              <option value="no_responsable">No Responsable de IVA</option>
-              <option value="responsable_iva">Responsable de IVA</option>
-            </select>
+              onChange={(v) => setFormData({ ...formData, regimen_tributario: v as any })}
+              options={[
+                { value: 'no_responsable', label: 'No Responsable de IVA' },
+                { value: 'responsable_iva', label: 'Responsable de IVA' },
+              ]}
+            />
           </div>
           <div className="space-y-2">
             <label className="text-[10px] font-black text-[#1C2B3A] uppercase tracking-widest">Municipio Principal</label>
-            <select
+            <SelectDropdown
               value={formData.municipio}
-              onChange={(e) => setFormData({ ...formData, municipio: e.target.value })}
-              className="w-full h-11 px-4 border border-[#E2DDD6] rounded-[8px] text-sm bg-white focus:border-[#E8571A] focus:ring-0 outline-none appearance-none cursor-pointer transition-all"
-            >
-              {municipios.map((m) => (
-                <option key={m.id} value={m.nombre}>{m.nombre} (ReteICA: {m.reteica_pct}%)</option>
-              ))}
-            </select>
+              onChange={(v) => setFormData({ ...formData, municipio: v })}
+              options={municipios.map((m) => ({ value: m.nombre, label: `${m.nombre} (ReteICA: ${m.reteica_pct}%)` }))}
+            />
           </div>
         </div>
       </div>
@@ -177,17 +174,17 @@ export function FiscalForm({ initialData, municipios }: FiscalFormProps) {
                 Nivel de Riesgo ARL
                 <Info className="h-3 w-3 text-slate-400" />
               </label>
-              <select
-                value={formData.nivel_riesgo_arl}
-                onChange={(e) => setFormData({ ...formData, nivel_riesgo_arl: Number(e.target.value) })}
-                className="w-full h-11 px-4 border border-[#E2DDD6] rounded-[8px] text-sm bg-white focus:border-[#E8571A] focus:ring-0 outline-none appearance-none cursor-pointer transition-all"
-              >
-                <option value={1}>Clase I (0.522%) - Administrativos</option>
-                <option value={2}>Clase II (1.044%) - Manufactura, Acabados</option>
-                <option value={3}>Clase III (2.436%) - Obras Civiles Medianas</option>
-                <option value={4}>Clase IV (4.350%) - Construcción Edificios</option>
-                <option value={5}>Clase V (6.960%) - Alturas, Demolición</option>
-              </select>
+              <SelectDropdown
+                value={String(formData.nivel_riesgo_arl)}
+                onChange={(v) => setFormData({ ...formData, nivel_riesgo_arl: Number(v) })}
+                options={[
+                  { value: '1', label: 'Clase I (0.522%) - Administrativos' },
+                  { value: '2', label: 'Clase II (1.044%) - Manufactura, Acabados' },
+                  { value: '3', label: 'Clase III (2.436%) - Obras Civiles Medianas' },
+                  { value: '4', label: 'Clase IV (4.350%) - Construcción Edificios' },
+                  { value: '5', label: 'Clase V (6.960%) - Alturas, Demolición' },
+                ]}
+              />
             </div>
             <p className="text-[10px] text-slate-400 leading-relaxed italic">
               Este nivel determina el factor prestacional que se aplicará a la mano de obra en todos tus presupuestos por defecto.

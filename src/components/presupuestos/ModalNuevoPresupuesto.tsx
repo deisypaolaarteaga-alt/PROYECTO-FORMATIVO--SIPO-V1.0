@@ -239,10 +239,10 @@ export function ModalNuevoPresupuesto({
       <div className="absolute inset-0 bg-steel-dark/60 backdrop-blur-sm animate-fade-in" onClick={() => { if (!loading) onClose(); }} />
 
       {/* Modal */}
-      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-scale-in">
+      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl flex flex-col max-h-[90vh] animate-scale-in">
 
         {/* Header */}
-        <div className="px-6 py-4 border-b border-concrete flex items-center justify-between bg-steel-fog/50">
+        <div className="px-6 py-4 border-b border-concrete flex items-center justify-between bg-sand rounded-t-2xl">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-burn-orange/10 flex items-center justify-center">
               <Plus className="h-4 w-4 text-burn-orange" />
@@ -266,7 +266,7 @@ export function ModalNuevoPresupuesto({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-6">
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6">
 
           {step === 1 && (
             <div className="space-y-6 animate-slide-right">
@@ -294,7 +294,7 @@ export function ModalNuevoPresupuesto({
                             "flex items-center gap-3 p-3 rounded-xl border text-left transition-all",
                             selectedProjectId === p.id
                               ? "border-burn-orange bg-burn-orange/5 ring-1 ring-burn-orange"
-                              : "border-concrete hover:border-steel-light hover:bg-steel-fog/30"
+                              : "border-concrete hover:border-[#E8571A]/20 hover:bg-[#FFF4EF]"
                           )}
                         >
                           <Building2 className={cn("h-4 w-4", selectedProjectId === p.id ? "text-burn-orange" : "text-stone")} />
@@ -337,7 +337,7 @@ export function ModalNuevoPresupuesto({
               <div className="space-y-4">
                 {/* Proyecto prellenado (no editable) cuando viene desde la página del proyecto */}
                 {proyectoFijo && (
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-steel-fog/40 border border-concrete">
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-sand border border-concrete">
                     <Building2 className="h-4 w-4 text-burn-orange shrink-0" />
                     <div>
                       <p className="text-[12px] text-stone uppercase tracking-wider font-medium">Proyecto</p>
@@ -383,13 +383,13 @@ export function ModalNuevoPresupuesto({
                           "flex items-center gap-4 p-4 rounded-2xl border text-left transition-all",
                           startingPoint === opt.id
                             ? "border-burn-orange bg-burn-orange/5 ring-1 ring-burn-orange shadow-md"
-                            : "border-concrete hover:border-steel-light hover:bg-steel-fog/30",
+                            : "border-concrete hover:border-[#E8571A]/20 hover:bg-[#FFF4EF]",
                           opt.disabled && "opacity-50 cursor-not-allowed grayscale"
                         )}
                       >
                         <div className={cn(
                           "h-10 w-10 rounded-xl flex items-center justify-center shrink-0",
-                          startingPoint === opt.id ? "bg-burn-orange text-white" : "bg-steel-fog text-stone"
+                          startingPoint === opt.id ? "bg-burn-orange text-white" : "bg-sand text-stone"
                         )}>
                           <opt.icon className="h-5 w-5" />
                         </div>
@@ -434,12 +434,12 @@ export function ModalNuevoPresupuesto({
                             "flex items-center gap-3 p-3 rounded-xl border text-left transition-all",
                             selectedPlantillaId === pt.id
                               ? "border-burn-orange bg-burn-orange/5 ring-1 ring-burn-orange shadow-md"
-                              : "border-concrete hover:border-steel-light hover:bg-steel-fog/30"
+                              : "border-concrete hover:border-[#E8571A]/20 hover:bg-[#FFF4EF]"
                           )}
                         >
                           <div className={cn(
                             "h-9 w-9 rounded-xl flex items-center justify-center shrink-0",
-                            selectedPlantillaId === pt.id ? "bg-burn-orange text-white" : "bg-steel-fog text-stone"
+                            selectedPlantillaId === pt.id ? "bg-burn-orange text-white" : "bg-sand text-stone"
                           )}>
                             <BookmarkCheck className="h-4 w-4" />
                           </div>
@@ -516,7 +516,7 @@ export function ModalNuevoPresupuesto({
 
                     {/* Selector de modo — aparece al seleccionar una plantilla propia */}
                     {selectedPlantillaId && (
-                      <div className="mt-3 space-y-2 border border-concrete rounded-xl p-3 bg-steel-fog/20">
+                      <div className="mt-3 space-y-2 border border-concrete rounded-xl p-3 bg-sand/40">
                         <p className="text-[12px] font-bold text-ink">Modo de copia</p>
                         <div className="grid grid-cols-1 gap-2">
                           {([
@@ -585,7 +585,7 @@ export function ModalNuevoPresupuesto({
                           "flex flex-col items-center gap-1.5 p-3 rounded-xl border text-center transition-all",
                           active
                             ? "border-burn-orange bg-burn-orange/5 ring-1 ring-burn-orange"
-                            : "border-concrete hover:border-steel-light hover:bg-steel-fog/30"
+                            : "border-concrete hover:border-[#E8571A]/20 hover:bg-[#FFF4EF]"
                         )}
                       >
                         <Icon className={cn("h-5 w-5", active ? "text-burn-orange" : "text-stone")} />
@@ -627,7 +627,7 @@ export function ModalNuevoPresupuesto({
                   <div className="space-y-2 max-h-[260px] overflow-y-auto pr-2 custom-scrollbar">
                     {customChapters.map((ch, idx) => (
                       <div key={idx} className="flex items-center gap-2 group">
-                        <div className="h-8 w-8 rounded bg-steel-fog flex items-center justify-center shrink-0 text-[11px] font-bold text-stone">
+                        <div className="h-8 w-8 rounded bg-sand flex items-center justify-center shrink-0 text-[11px] font-bold text-stone">
                           {String(idx + 1).padStart(2, '0')}
                         </div>
                         <input

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Card } from '@/components/shared/Card';
 import { Button } from '@/components/shared/Button';
+import { SelectDropdown } from '@/components/shared/SelectDropdown';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -147,11 +148,15 @@ export default function ParametrosFiscalesPage() {
             <div className={cn("p-6 space-y-4 bg-white transition-opacity", !aplicarIva && "opacity-50 pointer-events-none")}>
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-[#6B7A8D] uppercase">Porcentaje de IVA</label>
-                <select value={ivaPct} onChange={e => setIvaPct(Number(e.target.value))} className={inputClass}>
-                  <option value={0}>0% — Sin IVA</option>
-                  <option value={5}>5% — IVA Reducido</option>
-                  <option value={19}>19% — IVA General</option>
-                </select>
+                <SelectDropdown
+                  value={String(ivaPct)}
+                  onChange={v => setIvaPct(Number(v))}
+                  options={[
+                    { value: '0', label: '0% — Sin IVA' },
+                    { value: '5', label: '5% — IVA Reducido' },
+                    { value: '19', label: '19% — IVA General' },
+                  ]}
+                />
               </div>
               <div className="p-4 bg-[#EBF2FA] rounded-lg border border-[#A8C4DC] space-y-2">
                 <p className="text-sm font-bold text-[#1E4D8C]">Base de Aplicación</p>
@@ -202,14 +207,19 @@ export default function ParametrosFiscalesPage() {
               <div className="space-y-1.5 border-t border-[#D0D4DB] pt-4">
                 <label className="text-xs font-bold text-[#6B7A8D] uppercase">ReteICA por defecto (si ciudad no está registrada)</label>
                 <div className="flex gap-3">
-                  <select value={ciudadIca} onChange={handleCiudadChange} className={cn(inputClass, "flex-1")}>
-                    <option value="Bogotá">Bogotá (0.414%)</option>
-                    <option value="Medellín">Medellín (0.7%)</option>
-                    <option value="Cali">Cali (0.6%)</option>
-                    <option value="Barranquilla">Barranquilla (0.6%)</option>
-                    <option value="Bucaramanga">Bucaramanga (0.5%)</option>
-                    <option value="Otra">Otra ciudad...</option>
-                  </select>
+                  <SelectDropdown
+                    value={ciudadIca}
+                    onChange={v => { setCiudadIca(v); switch (v) { case 'Bogotá': setIcaPct(0.414); break; case 'Medellín': setIcaPct(0.7); break; case 'Cali': setIcaPct(0.6); break; case 'Barranquilla': setIcaPct(0.6); break; case 'Bucaramanga': setIcaPct(0.5); break; default: setIcaPct(0); } }}
+                    options={[
+                      { value: 'Bogotá', label: 'Bogotá (0.414%)' },
+                      { value: 'Medellín', label: 'Medellín (0.7%)' },
+                      { value: 'Cali', label: 'Cali (0.6%)' },
+                      { value: 'Barranquilla', label: 'Barranquilla (0.6%)' },
+                      { value: 'Bucaramanga', label: 'Bucaramanga (0.5%)' },
+                      { value: 'Otra', label: 'Otra ciudad...' },
+                    ]}
+                    className="flex-1"
+                  />
                   <div className="relative w-28">
                     <input
                       type="number" step="0.001" value={icaPct}
@@ -248,13 +258,17 @@ export default function ParametrosFiscalesPage() {
             <div className="p-6 space-y-4 bg-white">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-[#6B7A8D] uppercase">Nivel de Riesgo Default para Cuadrillas</label>
-                <select value={arlDefault} onChange={e => setArlDefault(Number(e.target.value))} className={inputClass}>
-                  <option value={1}>Riesgo I (0.522%)</option>
-                  <option value={2}>Riesgo II (1.044%)</option>
-                  <option value={3}>Riesgo III (2.436%)</option>
-                  <option value={4}>Riesgo IV (4.350%) — Construcción Mampostería</option>
-                  <option value={5}>Riesgo V (6.960%) — Construcción Alturas/Excavación</option>
-                </select>
+                <SelectDropdown
+                  value={String(arlDefault)}
+                  onChange={v => setArlDefault(Number(v))}
+                  options={[
+                    { value: '1', label: 'Riesgo I (0.522%)' },
+                    { value: '2', label: 'Riesgo II (1.044%)' },
+                    { value: '3', label: 'Riesgo III (2.436%)' },
+                    { value: '4', label: 'Riesgo IV (4.350%) — Construcción Mampostería' },
+                    { value: '5', label: 'Riesgo V (6.960%) — Construcción Alturas/Excavación' },
+                  ]}
+                />
               </div>
               <div className="border border-[#E8E4DE] rounded-lg overflow-hidden">
                 <table className="w-full text-left text-xs">

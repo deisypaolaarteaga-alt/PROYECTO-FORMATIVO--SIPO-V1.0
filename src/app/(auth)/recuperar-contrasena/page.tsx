@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Mail, ArrowLeft, CheckCircle } from 'lucide-react';
 import { Card } from '@/components/shared/Card';
@@ -12,6 +12,13 @@ import { resetPassword } from '@/actions/auth';
 export default function RecuperarContrasenaPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('error') === 'link_expirado') {
+      setError('El enlace expiró o ya fue usado. Solicita un nuevo enlace a continuación.');
+    }
+  }, []);
   const [sent, setSent] = useState(false);
   const [emailEnviado, setEmailEnviado] = useState('');
 

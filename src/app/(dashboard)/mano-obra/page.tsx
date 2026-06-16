@@ -16,6 +16,7 @@ import {
   Modal, ModalContent, ModalHeader, ModalTitle, ModalFooter,
 } from '@/components/shared/Modal';
 import { ModalTrabajador } from '@/components/mano-obra/ModalTrabajador';
+import { SelectDropdown } from '@/components/shared/SelectDropdown';
 import { formatearCOP } from '@/lib/utils/formato-cop';
 import {
   getTrabajadoresReferencia,
@@ -582,24 +583,12 @@ export default function ManoObraPage() {
                     <label className="text-xs font-medium text-steel-mid uppercase tracking-wide">
                       Cuadrilla
                     </label>
-                    <select
+                    <SelectDropdown
                       value={cuadrillaId}
-                      onChange={(e) => setCuadrillaId(e.target.value)}
-                      className={cn(
-                        'w-full rounded-lg border border-concrete bg-[#F8F7F5]',
-                        'px-3 py-2 text-sm text-charcoal',
-                        'focus:outline-none focus:ring-2 focus:ring-burn-orange/40 focus:border-burn-orange',
-                        'transition-colors'
-                      )}
-                    >
-                      <option value="">Seleccionar cuadrilla…</option>
-                      {cuadrillas.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.nombre}
-                          {c.categoria_actividad ? ` · ${c.categoria_actividad}` : ''}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={setCuadrillaId}
+                      options={cuadrillas.map((c) => ({ value: c.id, label: `${c.nombre}${c.categoria_actividad ? ` · ${c.categoria_actividad}` : ''}` }))}
+                      placeholder="Seleccionar cuadrilla…"
+                    />
                   </div>
 
                   <div className="space-y-1.5">

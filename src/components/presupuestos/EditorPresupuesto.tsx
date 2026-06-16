@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/shared/Button';
+import { SelectDropdown } from '@/components/shared/SelectDropdown';
 import { InputPrecio } from '@/components/shared/InputPrecio';
 import { InputEditable } from '@/components/shared/InputEditable';
 import { InputCantidad } from '@/components/shared/InputCantidad';
@@ -1049,16 +1050,12 @@ export function EditorPresupuesto({ budget: initialBudget, profile }: EditorPres
 
                             {/* Unidad */}
                             <td className="hidden md:table-cell px-3 py-2.5">
-                              <select
+                              <SelectDropdown
                                 value={act.unidad ?? 'un'}
-                                onChange={(e) => handleUpdateAct(act.id, ch.id, { unidad: e.target.value })}
-                                className="bg-transparent border-none focus:ring-0 p-0 text-stone text-xs font-medium cursor-pointer hover:text-[#1C1814] transition-colors"
-                                suppressHydrationWarning
-                              >
-                                {['m²', 'ml', 'm³', 'kg', 'gl', 'un', 'pza', 'glb'].map(u => (
-                                  <option key={u} value={u}>{u}</option>
-                                ))}
-                              </select>
+                                onChange={(v) => handleUpdateAct(act.id, ch.id, { unidad: v })}
+                                options={['m²', 'ml', 'm³', 'kg', 'gl', 'un', 'pza', 'glb'].map(u => ({ value: u, label: u }))}
+                                size="xs"
+                              />
                             </td>
 
                             {/* Cantidad */}

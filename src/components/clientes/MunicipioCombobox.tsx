@@ -107,14 +107,19 @@ export function MunicipioCombobox({
                 className="w-full text-sm px-2 py-1.5 outline-none text-stone placeholder:text-mortar"
               />
             </div>
-            <div className="max-h-[220px] overflow-y-auto">
+            <div className="max-h-48 overflow-y-auto">
               {filtered.length > 0 ? (
                 filtered.map(m => (
                   <button
                     key={`${m.nombre}-${m.departamento}`}
                     type="button"
                     onClick={() => handleSelect(m)}
-                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-steel-fog text-left transition-colors border-b border-concrete/40 last:border-0"
+                    className={cn(
+                      'w-full flex items-center gap-2 px-3 py-2 text-left transition-colors border-b border-concrete/40 last:border-0',
+                      m.nombre === value
+                        ? 'bg-[#FFF4EF] text-[#E8571A]'
+                        : 'hover:bg-[#FFF4EF]'
+                    )}
                   >
                     <MapPin className="h-3.5 w-3.5 text-mortar shrink-0" />
                     <span className="text-sm font-medium text-stone">{m.nombre}</span>

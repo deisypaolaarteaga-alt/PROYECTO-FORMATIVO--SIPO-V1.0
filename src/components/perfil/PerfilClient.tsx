@@ -8,6 +8,7 @@ import { Button } from '@/components/shared/Button';
 import { Input } from '@/components/shared/Input';
 import { Avatar } from '@/components/shared/Avatar';
 import { CIUDADES_COLOMBIA } from '@/types';
+import { SelectDropdown } from '@/components/shared/SelectDropdown';
 import { signOut } from '@/actions/auth';
 import { toast } from 'sonner';
 
@@ -18,6 +19,7 @@ interface PerfilClientProps {
 export function PerfilClient({ profile }: PerfilClientProps) {
   const [loading, setLoading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [ciudadPerfil, setCiudadPerfil] = useState(profile.ciudad || '');
   const router = useRouter();
 
   const handleSaveProfile = async (formData: FormData) => {
@@ -88,10 +90,13 @@ export function PerfilClient({ profile }: PerfilClientProps) {
               <Input name="nit" label="NIT / Documento" defaultValue={profile.nit || ''} />
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-neutral-700">Ciudad</label>
-                <select name="ciudad" defaultValue={profile.ciudad || ''} className="w-full p-2.5 border border-neutral-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500/20 outline-none bg-white">
-                  <option value="">Selecciona</option>
-                  {CIUDADES_COLOMBIA.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
+                <SelectDropdown
+                  value={ciudadPerfil}
+                  onChange={setCiudadPerfil}
+                  options={CIUDADES_COLOMBIA.map(c => ({ value: c, label: c }))}
+                  placeholder="Selecciona"
+                  name="ciudad"
+                />
               </div>
             </div>
 

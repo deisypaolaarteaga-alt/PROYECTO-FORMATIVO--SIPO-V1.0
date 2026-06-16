@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { X, Save, Loader2, ChevronDown } from 'lucide-react';
+import { SelectDropdown } from '@/components/shared/SelectDropdown';
 import { z } from 'zod';
 import { crearTrabajador, actualizarTrabajador } from '@/actions/mano-obra';
 import type { TrabajadorReferencia } from '@/actions/mano-obra';
@@ -222,15 +223,12 @@ export function ModalTrabajador({ trabajador, onClose, onSaved }: Props) {
           <div className="grid grid-cols-2 gap-3">
             {/* Nivel ARL */}
             <Field label="Nivel ARL (1–5) *" error={errors.nivel_riesgo}>
-              <select
-                value={form.nivel_riesgo}
-                onChange={(e) => set('nivel_riesgo', Number(e.target.value))}
-                className={inputCls(!!errors.nivel_riesgo)}
-              >
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <option key={n} value={n}>Nivel {n}</option>
-                ))}
-              </select>
+              <SelectDropdown
+                value={String(form.nivel_riesgo)}
+                onChange={(v) => set('nivel_riesgo', Number(v))}
+                options={[1, 2, 3, 4, 5].map(n => ({ value: String(n), label: `Nivel ${n}` }))}
+                error={!!errors.nivel_riesgo}
+              />
             </Field>
 
             {/* Ciudad referencia */}

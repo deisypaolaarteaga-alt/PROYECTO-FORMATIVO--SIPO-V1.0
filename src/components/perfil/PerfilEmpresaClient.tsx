@@ -16,6 +16,7 @@ import {
 import { cambiarContrasena } from '@/actions/auth';
 import { useTheme } from '@/components/shared/ThemeProvider';
 import { ACCENT_THEMES } from '@/lib/design-tokens';
+import { SelectDropdown } from '@/components/shared/SelectDropdown';
 
 interface Props {
   profile: Record<string, any>;
@@ -425,14 +426,14 @@ export function PerfilEmpresaClient({ profile, email }: Props) {
 
               <div className="space-y-1.5">
                 <label className={labelCls}>Tipo de persona</label>
-                <select
+                <SelectDropdown
                   value={formData.tipo_persona}
-                  onChange={field('tipo_persona')}
-                  className={inputBase}
-                >
-                  <option value="juridica">Persona Jurídica (responsable IVA)</option>
-                  <option value="natural">Persona Natural (no responsable IVA)</option>
-                </select>
+                  onChange={(v) => setFormData(f => ({ ...f, tipo_persona: v as 'natural' | 'juridica' }))}
+                  options={[
+                    { value: 'juridica', label: 'Persona Jurídica (responsable IVA)' },
+                    { value: 'natural', label: 'Persona Natural (no responsable IVA)' },
+                  ]}
+                />
               </div>
 
               <div className="space-y-1.5">

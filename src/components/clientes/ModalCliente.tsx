@@ -164,14 +164,14 @@ export function ModalCliente({ isOpen, onClose, cliente, onSuccess }: ModalClien
         </ModalHeader>
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Tipo de Cliente Selector */}
-        <div className="flex p-1 bg-steel-fog rounded-lg w-fit">
+        <div className="flex p-1 bg-sand rounded-lg w-fit">
           <button
             type="button"
             onClick={() => setFormData({ ...formData, tipo: 'persona_natural' })}
             className={cn(
               "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all",
-              formData.tipo === 'persona_natural' 
-                ? "bg-white text-stone shadow-sm" 
+              formData.tipo === 'persona_natural'
+                ? "bg-[#E8571A] text-white shadow-sm"
                 : "text-mortar hover:text-stone"
             )}
           >
@@ -184,7 +184,7 @@ export function ModalCliente({ isOpen, onClose, cliente, onSuccess }: ModalClien
             className={cn(
               "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all",
               formData.tipo === 'empresa'
-                ? "bg-white text-stone shadow-sm"
+                ? "bg-[#E8571A] text-white shadow-sm"
                 : "text-mortar hover:text-stone"
             )}
           >

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { SelectDropdown } from '@/components/shared/SelectDropdown';
 import { Modal, ModalContent, ModalHeader, ModalTitle } from '@/components/shared/Modal';
 import { Button } from '@/components/shared/Button';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
@@ -472,14 +473,12 @@ export function ModalEditarActividad({ isOpen, onClose, actividad }: Props) {
                 <label className="block text-[12px] font-semibold text-slate-600 mb-1">
                   Unidad <span className="text-red-500">*</span>
                 </label>
-                <select
+                <SelectDropdown
                   value={UNIDADES_COMUNES.includes(unidad as typeof UNIDADES_COMUNES[number]) ? unidad : '__custom__'}
-                  onChange={e => setUnidad(e.target.value === '__custom__' ? unidad : e.target.value)}
-                  className="w-full h-9 px-3 text-[13px] border border-[#E5E1D8] rounded-lg focus:outline-none focus:border-[#D95510] bg-[#F8F7F5]"
-                >
-                  {UNIDADES_COMUNES.map(u => <option key={u} value={u}>{u}</option>)}
-                  <option value="__custom__">Otra...</option>
-                </select>
+                  onChange={v => setUnidad(v === '__custom__' ? unidad : v)}
+                  options={[...UNIDADES_COMUNES.map(u => ({ value: u, label: u })), { value: '__custom__', label: 'Otra...' }]}
+                  size="sm"
+                />
               </div>
 
               <div>
@@ -543,15 +542,13 @@ export function ModalEditarActividad({ isOpen, onClose, actividad }: Props) {
                   {/* Select de tipo */}
                   <div className="flex items-center gap-3">
                     <label className="text-[11px] font-semibold text-slate-500 shrink-0 w-8">Tipo</label>
-                    <select
+                    <SelectDropdown
                       value={tipoPanel}
-                      onChange={e => cambiarTipoPanel(e.target.value as TipoAPU)}
-                      className="flex-1 h-8 px-2 text-[12px] border border-[#E5E1D8] rounded-lg bg-white focus:outline-none focus:border-[#D95510]"
-                    >
-                      {Object.entries(TIPO_APU_LABELS_FULL).map(([k, v]) => (
-                        <option key={k} value={k}>{v}</option>
-                      ))}
-                    </select>
+                      onChange={v => cambiarTipoPanel(v as TipoAPU)}
+                      options={Object.entries(TIPO_APU_LABELS_FULL).map(([k, v]) => ({ value: k, label: v }))}
+                      className="flex-1"
+                      size="sm"
+                    />
                   </div>
 
                   {/* ── Botones de modo ────────────────────────────────── */}
@@ -879,15 +876,12 @@ export function ModalEditarActividad({ isOpen, onClose, actividad }: Props) {
                         className="grid grid-cols-[100px_1fr_60px_80px_90px_70px_36px] gap-1 items-center px-3 py-1.5 border-b border-slate-100 last:border-0 hover:bg-[#FDF9F6] transition-colors"
                       >
                         {/* Tipo */}
-                        <select
+                        <SelectDropdown
                           value={item.tipo}
-                          onChange={e => updateApuField(item.id, 'tipo', e.target.value)}
-                          className="h-7 px-1 text-[11px] border border-[#E5E1D8] rounded focus:outline-none focus:border-[#D95510] bg-white w-full"
-                        >
-                          {Object.entries(TIPO_APU_LABELS).map(([k, v]) => (
-                            <option key={k} value={k}>{v}</option>
-                          ))}
-                        </select>
+                          onChange={v => updateApuField(item.id, 'tipo', v)}
+                          options={Object.entries(TIPO_APU_LABELS).map(([k, v]) => ({ value: k, label: v }))}
+                          size="xs"
+                        />
 
                         {/* Nombre */}
                         <input

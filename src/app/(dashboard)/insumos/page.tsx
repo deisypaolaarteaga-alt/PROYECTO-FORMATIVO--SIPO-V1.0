@@ -28,6 +28,7 @@ import {
 } from '@/actions/cuadrillas';
 import { ModalTrabajador } from '@/components/mano-obra/ModalTrabajador';
 import { ModalImportarCSV } from '@/components/shared/ModalImportarCSV';
+import { SelectDropdown } from '@/components/shared/SelectDropdown';
 import { importarInsumosCSV } from '@/actions/insumos';
 import type { TrabajadorReferencia } from '@/actions/mano-obra';
 import type { MaterialConPrecio, EquipoConPrecio } from '@/types';
@@ -1111,9 +1112,11 @@ export default function InsumosPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-steel-mid uppercase tracking-wider mb-1.5">Unidad</label>
-                  <select value={createEqUnidad} onChange={(e) => setCreateEqUnidad(e.target.value)} className="w-full px-3 py-2.5 border border-concrete rounded-lg text-sm focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20 outline-none bg-white">
-                    {['día', 'hr', 'mes', 'semana', 'un'].map((u) => <option key={u} value={u}>{u}</option>)}
-                  </select>
+                  <SelectDropdown
+                    value={createEqUnidad}
+                    onChange={setCreateEqUnidad}
+                    options={['día', 'hr', 'mes', 'semana', 'un'].map(u => ({ value: u, label: u }))}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-steel-mid uppercase tracking-wider mb-1.5">Precio (COP)</label>
@@ -1151,12 +1154,12 @@ export default function InsumosPage() {
                 <>
                   <div>
                     <label className="block text-xs font-bold text-steel-mid uppercase tracking-wider mb-1.5">Trabajador</label>
-                    <select value={quickWorkerId} onChange={(e) => setQuickWorkerId(e.target.value)} className="w-full px-3 py-2.5 border border-concrete rounded-lg text-sm focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20 outline-none bg-white">
-                      <option value="">Selecciona un trabajador…</option>
-                      {trabajadoresDisponibles.filter((t) => !quickAdd.existingIds.includes(t.id)).map((t) => (
-                        <option key={t.id} value={t.id}>{t.especialidad} · {t.categoria} · {formatearCOP(t.jornal_base)}/día</option>
-                      ))}
-                    </select>
+                    <SelectDropdown
+                      value={quickWorkerId}
+                      onChange={setQuickWorkerId}
+                      options={trabajadoresDisponibles.filter((t) => !quickAdd.existingIds.includes(t.id)).map((t) => ({ value: t.id, label: `${t.especialidad} · ${t.categoria} · ${formatearCOP(t.jornal_base)}/día` }))}
+                      placeholder="Selecciona un trabajador…"
+                    />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-steel-mid uppercase tracking-wider mb-1.5">Cantidad</label>
@@ -1207,14 +1210,16 @@ export default function InsumosPage() {
                   <div className="flex items-center gap-2 text-sm text-steel-mid"><Loader2 className="h-4 w-4 animate-spin text-burn-orange" /> Cargando…</div>
                 ) : (
                   <div className="space-y-2">
-                    <select value={trabajadorElegido} onChange={(e) => setTrabajadorElegido(e.target.value)} className="w-full px-3 py-2 border border-concrete rounded-lg text-sm focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20 outline-none bg-white">
-                      <option value="">Selecciona un trabajador…</option>
-                      {trabajadoresDisponibles.map((t) => (
-                        <option key={t.id} value={t.id} disabled={trabajadoresSeleccionados.some((s) => s.id === t.id)}>
-                          {trabajadoresSeleccionados.some((s) => s.id === t.id) ? '✓ ' : ''}{t.especialidad} · {t.categoria} · {formatearCOP(t.jornal_base)}/día
-                        </option>
-                      ))}
-                    </select>
+                    <SelectDropdown
+                      value={trabajadorElegido}
+                      onChange={setTrabajadorElegido}
+                      options={trabajadoresDisponibles.map((t) => ({
+                        value: t.id,
+                        label: `${trabajadoresSeleccionados.some((s) => s.id === t.id) ? '✓ ' : ''}${t.especialidad} · ${t.categoria} · ${formatearCOP(t.jornal_base)}/día`,
+                        disabled: trabajadoresSeleccionados.some((s) => s.id === t.id),
+                      }))}
+                      placeholder="Selecciona un trabajador…"
+                    />
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-steel-mid font-semibold shrink-0">Cantidad:</span>
                       <input type="number" value={cantidadTrabajador} onChange={(e) => setCantidadTrabajador(Math.max(1, parseInt(e.target.value) || 1))} min={1} max={20} className="w-16 px-2 py-2 border border-concrete rounded-lg text-sm text-center focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20 outline-none" />
@@ -1282,9 +1287,12 @@ export default function InsumosPage() {
                 <p className="text-[10px] font-bold text-steel-mid uppercase tracking-widest">Rendimiento base <span className="font-normal normal-case">(opcional)</span></p>
                 <div className="flex gap-2">
                   <input type="number" value={rendimientoNormal} onChange={(e) => setRendimientoNormal(e.target.value)} min={0} step="0.01" placeholder="Ej: 8" className="flex-1 px-3 py-2 border border-concrete rounded-lg text-sm focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20 outline-none transition-all bg-white" />
-                  <select value={rendimientoUnidad} onChange={(e) => setRendimientoUnidad(e.target.value)} className="w-28 px-3 py-2 border border-concrete rounded-lg text-sm focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20 outline-none bg-white">
-                    {['m²','m³','ml','kg','gl','un','hr','pto','día','ton'].map((u) => <option key={u} value={u}>Unidad: {u}</option>)}
-                  </select>
+                  <SelectDropdown
+                    value={rendimientoUnidad}
+                    onChange={setRendimientoUnidad}
+                    options={['m²','m³','ml','kg','gl','un','hr','pto','día','ton'].map((u) => ({ value: u, label: `Unidad: ${u}` }))}
+                    className="w-28"
+                  />
                 </div>
                 <input type="text" value={rendimientoFuente} onChange={(e) => setRendimientoFuente(e.target.value)} maxLength={150} placeholder="Fuente: SIPO Colombia 2026" className="w-full px-3 py-2 border border-concrete rounded-lg text-sm focus:border-burn-orange focus:ring-2 focus:ring-burn-orange/20 outline-none transition-all bg-white" />
               </div>

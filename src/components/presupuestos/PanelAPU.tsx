@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { X, Plus, Trash2, Search, Users, Package, Drill, ShieldCheck, Calculator, RefreshCw, Check, Info } from 'lucide-react';
+import { SelectDropdown } from '@/components/shared/SelectDropdown';
 import { motion, AnimatePresence } from 'framer-motion';
 import Decimal from 'decimal.js';
 import { Button } from '@/components/shared/Button';
@@ -288,18 +289,13 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
 
                 {/* Selector inline de cuadrilla */}
                 <div className="space-y-2 bg-sand/30 rounded-lg p-3 border border-concrete">
-                  <select
+                  <SelectDropdown
                     value={selectedCuadrillaId || ''}
-                    onChange={e => setSelectedCuadrillaId(e.target.value || null)}
-                    className="w-full text-xs border border-concrete rounded-lg px-2 py-1.5 bg-white focus:border-[var(--accent-primary)] outline-none"
-                  >
-                    <option value="">Seleccionar cuadrilla del sistema/personalizadas…</option>
-                    {cuadrillas.map((c: any) => (
-                      <option key={c.id} value={c.id}>
-                        {c.nombre}{c.categoria_actividad ? ` — ${c.categoria_actividad}` : ''}{c.es_sistema ? ' (sistema)' : ''}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={v => setSelectedCuadrillaId(v || null)}
+                    options={cuadrillas.map((c: any) => ({ value: c.id, label: `${c.nombre}${c.categoria_actividad ? ` — ${c.categoria_actividad}` : ''}${c.es_sistema ? ' (sistema)' : ''}` }))}
+                    placeholder="Seleccionar cuadrilla del sistema/personalizadas…"
+                    size="sm"
+                  />
 
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] text-stone font-medium whitespace-nowrap">Rendimiento:</span>
@@ -312,15 +308,13 @@ export function PanelAPU({ isOpen, onClose, activity, budgetId }: PanelAPUProps)
                       className="w-20 h-7 px-2 text-xs border border-concrete rounded-lg text-right font-semibold bg-white focus:border-[var(--accent-primary)] outline-none"
                       placeholder="Ej: 8"
                     />
-                    <select
+                    <SelectDropdown
                       value={cuadrillaUnidad}
-                      onChange={e => setCuadrillaUnidad(e.target.value)}
-                      className="w-20 h-7 text-xs border border-concrete rounded-lg px-1.5 bg-white focus:border-[var(--accent-primary)] outline-none"
-                    >
-                      {UNIDADES.map(u => (
-                        <option key={u} value={u}>{u}</option>
-                      ))}
-                    </select>
+                      onChange={setCuadrillaUnidad}
+                      options={UNIDADES.map(u => ({ value: u, label: u }))}
+                      className="w-20"
+                      size="xs"
+                    />
                     <span className="text-[10px] text-stone">/ jornada</span>
                     <button
                       onClick={handleAgregarCuadrilla}

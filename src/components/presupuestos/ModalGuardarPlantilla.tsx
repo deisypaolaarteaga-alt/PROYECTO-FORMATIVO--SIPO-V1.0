@@ -103,7 +103,7 @@ export function ModalGuardarPlantilla({
                 <button
                   onClick={handleClose}
                   disabled={guardando}
-                  className="flex-1 h-10 text-[13px] font-semibold text-stone border border-concrete rounded-xl hover:bg-steel-fog/40 transition-colors disabled:opacity-40"
+                  className="flex-1 h-10 text-[13px] font-semibold text-stone border border-concrete rounded-xl hover:bg-concrete/40 transition-colors disabled:opacity-40"
                 >
                   Cancelar
                 </button>

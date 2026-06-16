@@ -6,6 +6,7 @@ import { Button } from '@/components/shared/Button';
 import { crearActividad } from '@/actions/catalogo';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import { SelectDropdown } from '@/components/shared/SelectDropdown';
 import type { CatalogoCapitulo, CatalogoActividad } from '@/types';
 
 const UNIDADES_COMUNES = ['m²', 'ml', 'm³', 'kg', 'und', 'gl', 'hr', 'jor'] as const;
@@ -101,16 +102,13 @@ export function ModalCrearActividad({ isOpen, onClose, capitulos, capituloIdInic
             <label className="block text-[12px] font-semibold text-slate-600 mb-1">
               Capítulo <span className="text-red-500">*</span>
             </label>
-            <select
+            <SelectDropdown
               value={capituloId}
-              onChange={e => setCapituloId(e.target.value)}
-              className="w-full h-9 px-3 text-[13px] border border-[#E5E1D8] rounded-lg focus:outline-none focus:border-[#D95510] bg-[#F8F7F5]"
-            >
-              <option value="">— Seleccionar capítulo —</option>
-              {capitulos.map(c => (
-                <option key={c.id} value={c.id}>{c.nombre}</option>
-              ))}
-            </select>
+              onChange={setCapituloId}
+              options={capitulos.map(c => ({ value: c.id, label: c.nombre }))}
+              placeholder="— Seleccionar capítulo —"
+              size="sm"
+            />
           </div>
 
           {/* Nombre */}
@@ -134,14 +132,13 @@ export function ModalCrearActividad({ isOpen, onClose, capitulos, capituloIdInic
               Unidad <span className="text-red-500">*</span>
             </label>
             <div className="flex gap-2">
-              <select
+              <SelectDropdown
                 value={unidad}
-                onChange={e => setUnidad(e.target.value)}
-                className="flex-1 h-9 px-3 text-[13px] border border-[#E5E1D8] rounded-lg focus:outline-none focus:border-[#D95510] bg-[#F8F7F5]"
-              >
-                {UNIDADES_COMUNES.map(u => <option key={u} value={u}>{u}</option>)}
-                <option value="__custom__">Otra...</option>
-              </select>
+                onChange={setUnidad}
+                options={[...UNIDADES_COMUNES.map(u => ({ value: u, label: u })), { value: '__custom__', label: 'Otra...' }]}
+                className="flex-1"
+                size="sm"
+              />
               {unidad === '__custom__' && (
                 <input
                   type="text"
